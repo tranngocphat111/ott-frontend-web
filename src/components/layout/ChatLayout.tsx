@@ -1,0 +1,66 @@
+import React, { useState } from 'react';
+import NavigationSidebar from '../navigation/NavigationSidebar';
+import Sidebar from '../sidebar/Sidebar';
+import ChatArea from '../chat/ChatArea';
+import type { Conversation } from '../../types';
+
+const ChatLayout: React.FC = () => {
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [activeNavItem, setActiveNavItem] = useState('chat');
+
+  const handleConversationSelect = (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+  };
+
+  const handleNavItemClick = (itemId: string) => {
+    setActiveNavItem(itemId);
+    // Handle navigation logic here
+  };
+
+  return (
+    <div className="h-screen flex bg-gray-50">
+      {/* Navigation Sidebar */}
+      <NavigationSidebar 
+        activeItem={activeNavItem}
+        onItemClick={handleNavItemClick}
+      />
+      
+      {/* Chat Sidebar */}
+      <Sidebar 
+        onConversationSelect={handleConversationSelect}
+        selectedConversationId={selectedConversation?._id}
+      />
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {selectedConversation ? (
+          <ChatArea conversation={selectedConversation} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-gradient-chat">
+            <div className="text-center max-w-md mx-auto p-8">
+              <div className="w-24 h-24 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-white/30 rounded-full"></div>
+              </div>
+              <h2 className="text-2xl font-bold text-[#AE7F53] mb-2">
+                Chào mừng đến với Chat App
+              </h2>
+              <p className="text-[#BC9166] mb-6">
+                Chọn một cuộc hội thoại để bắt đầu trò chuyện
+              </p>
+              <div className="space-y-2">
+                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-primary animate-pulse"></div>
+                </div>
+                <div className="text-sm text-[#BC9166]/70">
+                  Đang tải...
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ChatLayout;
