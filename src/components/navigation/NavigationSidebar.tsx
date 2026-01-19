@@ -1,57 +1,86 @@
-import React from 'react';
-import { MessageCircle, Users, Settings, Phone, Video, Bell, Search } from 'lucide-react';
-import Avatar from '../common/Avatar';
+
+import React from "react";
+import {
+  MessageCircle,
+  Users,
+  Settings,
+  Phone,
+  Video,
+  Bell,
+  Search,
+  Dribbble,
+} from "lucide-react";
+import Avatar from "../common/Avatar";
+
+interface NavigationItem {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  isActive?: boolean;
+}
+
+interface NavigationSidebarProps {
+  activeItem?: string;
+  onItemClick?: (itemId: string) => void;
+
 import NavigationItem from './NavigationItem';
 import type { NavigationSidebarProps, NavigationItem as NavigationItemType } from '../../interfaces';
 
+
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
-  activeItem = 'chat',
-  onItemClick
+  activeItem = "chat",
+  onItemClick,
 }) => {
   const navigationItems: NavigationItemType[] = [
     {
-      id: 'chat',
+      id: "chat",
       icon: <MessageCircle className="w-6 h-6" />,
-      label: 'Tin nhắn',
-      isActive: activeItem === 'chat'
+      label: "Tin nhắn",
+      isActive: activeItem === "chat",
     },
     {
-      id: 'contacts',
+      id: "contacts",
       icon: <Users className="w-6 h-6" />,
-      label: 'Danh bạ',
-      isActive: activeItem === 'contacts'
+      label: "Danh bạ",
+      isActive: activeItem === "contacts",
     },
     {
-      id: 'search',
+      id: "search",
       icon: <Search className="w-6 h-6" />,
-      label: 'Tìm kiếm',
-      isActive: activeItem === 'search'
+      label: "Tìm kiếm",
+      isActive: activeItem === "search",
     },
     {
-      id: 'calls',
+      id: "calls",
       icon: <Phone className="w-6 h-6" />,
-      label: 'Cuộc gọi',
-      isActive: activeItem === 'calls'
+      label: "Cuộc gọi",
+      isActive: activeItem === "calls",
     },
     {
-      id: 'video',
+      id: "video",
       icon: <Video className="w-6 h-6" />,
-      label: 'Video',
-      isActive: activeItem === 'video'
+      label: "Video",
+      isActive: activeItem === "video",
     },
     {
-      id: 'notifications',
+      id: "notifications",
       icon: <Bell className="w-6 h-6" />,
-      label: 'Thông báo',
-      isActive: activeItem === 'notifications'
-    }
+      label: "Thông báo",
+      isActive: activeItem === "notifications",
+    },
+    {
+      id: "social",
+      icon: <Dribbble className="w-6 h-6" />,
+      label: "Mạng xã hội",
+      isActive: activeItem === "social",
+    },
   ];
 
   return (
     <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4">
       {/* User Avatar */}
       <div className="mb-8">
-        <Avatar 
+        <Avatar
           name="User"
           size={40}
           className="ring-2 ring-primary-500 cursor-pointer hover:ring-4 transition-all"
