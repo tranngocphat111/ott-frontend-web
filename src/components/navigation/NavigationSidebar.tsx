@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   MessageCircle,
@@ -18,14 +17,12 @@ interface NavigationItem {
   label: string;
   isActive?: boolean;
 }
-
+import NavigationItem from "./NavigationItem";
+import type { NavigationItem as NavigationItemType } from "../../interfaces";
 interface NavigationSidebarProps {
   activeItem?: string;
   onItemClick?: (itemId: string) => void;
-
-import NavigationItem from './NavigationItem';
-import type { NavigationSidebarProps, NavigationItem as NavigationItemType } from '../../interfaces';
-
+}
 
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   activeItem = "chat",
@@ -90,20 +87,15 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       {/* Navigation Items */}
       <div className="flex-1 flex flex-col space-y-2">
         {navigationItems.map((item) => (
-          <NavigationItem
-            key={item.id}
-            item={item}
-            onItemClick={onItemClick}
-          />
+          <NavigationItem key={item.id} item={item} onItemClick={onItemClick} />
         ))}
       </div>
 
       {/* Settings */}
       <button
-        onClick={() => onItemClick?.('settings')}
+        onClick={() => onItemClick?.("settings")}
         className="p-3 text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-xl transition-all duration-200"
-        title="Cài đặt"
-      >
+        title="Cài đặt">
         <Settings className="w-6 h-6" />
       </button>
     </div>
