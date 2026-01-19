@@ -20,10 +20,10 @@ const Avatar: React.FC<AvatarProps> = ({
 
   const getGradientColor = (name: string): string => {
     const colors = [
-      'from-[#AE7F53] to-[#BC9166]',
-      'from-[#BC9166] to-[#D0A97E]',
-      'from-[#D0A97E] to-[#DFC0A4]',
-      'from-[#DFC0A4] to-[#AE7F53]',
+      'from-primary-500 to-primary-400',
+      'from-primary-400 to-primary-300',
+      'from-primary-300 to-primary-200',
+      'from-primary-200 to-primary-500',
     ];
     
     const index = name.charCodeAt(0) % colors.length;

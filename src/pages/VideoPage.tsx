@@ -15,7 +15,7 @@ const VideoPage: React.FC = () => {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Video Call</h2>
         <p className="text-gray-600 mb-6">Bắt đầu cuộc gọi video với bạn bè</p>
-        <button className="px-6 py-3 bg-[#AE7F53] text-white rounded-lg hover:bg-[#9D6E47] transition-colors">
+        <button className="px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
           Tạo cuộc họp mới
         </button>
       </div>

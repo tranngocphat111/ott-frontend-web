@@ -1,11 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-
-interface ErrorStateProps {
-  message?: string;
-  onRetry?: () => void;
-  className?: string;
-}
+import type { ErrorStateProps } from '../../interfaces';
 
 const ErrorState: React.FC<ErrorStateProps> = ({ 
   message = 'Đã xảy ra lỗi khi tải dữ liệu',
@@ -24,8 +19,8 @@ const ErrorState: React.FC<ErrorStateProps> = ({
       {onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#AE7F53] 
-                   hover:bg-[#9D6E47] rounded-lg transition-colors duration-200
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 
+                   hover:bg-primary-600 rounded-lg transition-colors duration-200
                    text-white font-medium text-sm"
         >
           <RefreshCw className="w-4 h-4" />

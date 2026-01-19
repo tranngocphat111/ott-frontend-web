@@ -9,3 +9,8 @@ export interface NavigationItem {
   label: string;
   isActive?: boolean;
 }
+
+export interface NavigationItemProps {
+  item: NavigationItem;
+  onItemClick?: (itemId: string) => void;
+}

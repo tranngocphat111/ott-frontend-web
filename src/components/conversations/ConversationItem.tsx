@@ -1,21 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, Users, Clock } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import { formatTimeAgo } from '../../utils/timeUtils';
+import ConversationContextMenu from '../modals/conversation/ConversationContextMenu';
+import CategoryManagementModal from '../modals/category/CategoryManagementModal';
 import type { ConversationItemProps } from '../../interfaces';
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   isSelected = false,
   onClick,
-  currentUserId
+  currentUserId,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadCategories();
+    }
+  }, [currentUserId]);
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/categories/${currentUserId}`);
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   const getConversationName = (): string => {
     if (conversation.name) return conversation.name;
     
-    if (conversation.type === 'private' && conversation.participants.length > 0) {
+    if (conversation.type === 'private' && conversation.participants?.length > 0) {
       return conversation.participants[0].display_name;
     }
     
@@ -23,9 +44,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const getConversationAvatar = (): string | undefined => {
+    // Ưu tiên avatar của conversation (dùng cho group)
     if (conversation.avatar_url) return conversation.avatar_url;
     
-    if (conversation.type === 'private' && conversation.participants.length > 0) {
+    // Với private chat, lấy avatar của người kia
+    if (conversation.type === 'private' && conversation.participants?.length > 0) {
       return conversation.participants[0].avatar_url;
     }
     
@@ -33,51 +56,157 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const getLatestMessagePreview = (): string => {
-    if (!conversation.latestMessage) return 'Chưa có tin nhắn';
-    
-    const { content, type, sender } = conversation.latestMessage;
-    const senderName = sender._id === currentUserId ? 'Bạn' : sender.display_name;
-    
-    switch (type) {
-      case 'text':
-        return `${senderName}: ${content}`;
-      case 'image':
-        return `${senderName} đã gửi một hình ảnh`;
-      case 'file':
-        return `${senderName} đã gửi một file`;
-      default:
-        return `${senderName}: ${content}`;
+    // Kiểm tra last_message từ backend
+    if (conversation.last_message?.content) {
+      return conversation.last_message.content;
     }
+    
+    return 'Chưa có tin nhắn';
   };
 
   const getTimeDisplay = (): string => {
-    const time = conversation.latestMessage?.created_at || conversation.created_at;
+    // Ưu tiên thời gian từ last_message
+    const time = conversation.last_message?.createdAt || 
+                 conversation.created_at;
     return formatTimeAgo(time);
   };
 
   const hasUnreadMessage = false; // TODO: Implement unread logic
 
-  return (
-    <div
-      className={`
-        relative p-3 rounded-xl cursor-pointer transition-all duration-300
-        mx-2
-        ${isSelected 
-          ? 'bg-[#AE7F53]/10 shadow-md border border-[#AE7F53]/20' 
-          : 'hover:bg-gray-50 hover:shadow-sm'
-        }
-        ${isHovered ? 'shadow-lg' : ''}
-      `}
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Selection indicator */}
-      {isSelected && (
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-[#AE7F53] rounded-r-full" />
-      )}
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
 
-      <div className="flex items-center space-x-3">
+  const handlePin = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/participants/pin', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversation._id,
+          userId: currentUserId,
+          isPinned: !conversation.is_pinned,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('Pin status updated');
+        // TODO: Refresh conversation list
+      }
+    } catch (error) {
+      console.error('Error updating pin status:', error);
+    }
+  };
+
+  const handleSelectCategory = async (categoryId: string | null) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/participants/category', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversation._id,
+          userId: currentUserId,
+          categoryId,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('Category updated');
+        // TODO: Refresh conversation list
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+    }
+  };
+
+  const handleManageCategories = () => {
+    console.log('=== handleManageCategories CALLED ===');
+    console.log('currentUserId:', currentUserId);
+    console.log('hasUserId:', !!currentUserId);
+    console.log('Current isCategoryModalOpen:', isCategoryModalOpen);
+    
+    if (!currentUserId) {
+      console.error('Cannot open CategoryManagementModal: currentUserId is missing!');
+      alert('Lỗi: Không thể mở quản lý phân loại. Vui lòng thử lại.');
+      return;
+    }
+    
+    console.log('Setting isCategoryModalOpen to TRUE');
+    setIsCategoryModalOpen(true);
+    
+    // Debug after state update
+    setTimeout(() => {
+      console.log('After setState - isCategoryModalOpen should be true now');
+    }, 100);
+  };
+
+  const handleMute = async (duration: string) => {
+    let muteUntil = null;
+    let status = 'mute';
+
+    if (duration === '1h') {
+      muteUntil = new Date(Date.now() + 60 * 60 * 1000);
+    } else if (duration === '4h') {
+      muteUntil = new Date(Date.now() + 4 * 60 * 60 * 1000);
+    } else if (duration === '8am') {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(8, 0, 0, 0);
+      muteUntil = tomorrow;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/participants/notification', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversation._id,
+          userId: currentUserId,
+          status,
+          muteUntil,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('Notification status updated');
+        // TODO: Refresh conversation list
+      }
+    } catch (error) {
+      console.error('Error updating notification:', error);
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa cuộc hội thoại này?')) {
+      console.log('Delete conversation:', conversation._id);
+      // TODO: Implement delete logic
+    }
+  };
+
+  return (
+    <>
+      <div
+        className={`
+          relative p-3 rounded-xl cursor-pointer transition-all duration-300
+          mx-2
+          ${isSelected 
+            ? 'bg-primary-500/10 shadow-md ' 
+            : 'hover:bg-gray-50 hover:shadow-sm'
+          }
+          ${isHovered ? 'shadow-lg' : ''}
+        `}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Selection indicator */}
+        {isSelected && (
+          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary-500 rounded-r-full" />
+        )}
+
+        <div className="flex items-center space-x-3">
         {/* Avatar */}
         <div className="relative">
           <Avatar 
@@ -94,9 +223,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             ring-2 ring-gray-100 shadow-sm
           `}>
             {conversation.type === 'group' ? (
-              <Users className="w-3 h-3 text-[#AE7F53]" />
+              <Users className="w-3 h-3 text-primary-500" />
             ) : (
-              <MessageCircle className="w-3 h-3 text-[#AE7F53]" />
+              <MessageCircle className="w-3 h-3 text-primary-500" />
             )}
           </div>
 
@@ -111,8 +240,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           <div className="flex items-center justify-between mb-1">
             <h3 className={`
               font-semibold truncate transition-colors duration-200
-              ${isSelected ? 'text-[#AE7F53]' : 'text-gray-900'}
-              ${isHovered ? 'text-[#AE7F53]' : ''}
+              ${isSelected ? 'text-primary-500' : 'text-gray-900'}
+              ${isHovered ? 'text-primary-500' : ''}
             `}>
               {getConversationName()}
             </h3>
@@ -136,15 +265,41 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
             {/* Unread badge */}
             {hasUnreadMessage && (
-              <div className="ml-2 w-2 h-2 bg-[#AE7F53] rounded-full animate-pulse" />
+              <div className="ml-2 w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
             )}
           </div>
         </div>
       </div>
-
-
     </div>
-  );
+
+    {/* Context Menu */}
+    <ConversationContextMenu
+      isOpen={contextMenu !== null}
+      position={contextMenu || { x: 0, y: 0 }}
+      onClose={() => setContextMenu(null)}
+      onPin={handlePin}
+      onSelectCategory={handleSelectCategory}
+      onManageCategories={handleManageCategories}
+      onMute={handleMute}
+      onDelete={handleDelete}
+      isPinned={conversation.is_pinned}
+      isMuted={conversation.is_muted}
+      categories={categories}
+      currentCategoryId={conversation.category_id}
+    />
+
+    {/* Category Management Modal */}
+    {console.log('Rendering CategoryManagementModal:', { isCategoryModalOpen, currentUserId })}
+    <CategoryManagementModal
+      isOpen={isCategoryModalOpen}
+      onClose={() => {
+        console.log('CategoryManagementModal onClose called');
+        setIsCategoryModalOpen(false);
+      }}
+      userId={currentUserId || ''}
+    />
+  </>
+);
 };
 
 export default ConversationItem;

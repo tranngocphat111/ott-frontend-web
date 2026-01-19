@@ -147,3 +147,85 @@ export const mockCurrentUser = {
   avatar_url: undefined,
   status: 'online'
 };
+
+// Mock users for creating groups
+export const mockAvailableUsers = [
+  {
+    _id: 'user2',
+    display_name: 'Sang',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user3',
+    display_name: 'Ba',
+    avatar_url: undefined,
+    status: 'offline'
+  },
+  {
+    _id: 'user4',
+    display_name: 'Me',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user5',
+    display_name: 'Bác 3',
+    avatar_url: undefined,
+    status: 'away'
+  },
+  {
+    _id: 'user6',
+    display_name: 'Hoài Nhân',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user7',
+    display_name: '6 Tuấn',
+    avatar_url: undefined,
+    status: 'offline'
+  },
+  {
+    _id: 'user8',
+    display_name: 'Thầy Nguyên',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user9',
+    display_name: 'Minh',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user10',
+    display_name: 'An Nguyễn',
+    avatar_url: undefined,
+    status: 'busy'
+  },
+  {
+    _id: 'user11',
+    display_name: 'Chúc Nguyễn',
+    avatar_url: undefined,
+    status: 'online'
+  },
+  {
+    _id: 'user12',
+    display_name: 'Trang',
+    avatar_url: undefined,
+    status: 'away'
+  },
+  {
+    _id: 'user13',
+    display_name: 'Mai Phạm',
+    avatar_url: undefined,
+    status: 'offline'
+  },
+  {
+    _id: 'user14',
+    display_name: 'Hùng Lê',
+    avatar_url: undefined,
+    status: 'online'
+  }
+];

@@ -1,8 +1,5 @@
 import React from 'react';
-
-interface LoadingSkeletonProps {
-  count?: number;
-}
+import type { LoadingSkeletonProps } from '../../interfaces';
 
 const ConversationSkeleton: React.FC = () => (
   <div className="p-3 animate-pulse">

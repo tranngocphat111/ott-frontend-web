@@ -39,7 +39,7 @@ const SettingsPage: React.FC = () => {
           {settingsSections.map((section, index) => (
             <div key={index} className="mb-6">
               <div className="flex items-center gap-2 mb-3">
-                <div className="text-[#AE7F53]">{section.icon}</div>
+                <div className="text-primary-500">{section.icon}</div>
                 <h3 className="font-semibold text-gray-900">{section.title}</h3>
               </div>
               <div className="space-y-2 ml-7">

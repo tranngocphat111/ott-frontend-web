@@ -14,7 +14,7 @@ const SearchPage: React.FC = () => {
           <input
             type="text"
             placeholder="Nhập từ khóa tìm kiếm..."
-            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AE7F53] focus:border-transparent"
+            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
       </div>

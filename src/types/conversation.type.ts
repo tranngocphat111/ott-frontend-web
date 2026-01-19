@@ -1,4 +1,3 @@
-import type { Message } from './message.type';
 import type { Participant } from './participant.type';
 
 /**
@@ -12,9 +11,17 @@ export interface Conversation {
   avatar_url?: string;
   created_at: string;
   updated_at: string;
-  latestMessage?: Message;
   participants: Participant[];
   unread_count?: number;
   is_pinned?: boolean;
   is_muted?: boolean;
+  category_id?: string;
+  // Backend field: last_message từ MongoDB
+  last_message?: {
+    msg_id: string;
+    sender_id: string;
+    content: string;
+    type: 'text' | 'image' | 'video' | 'file';
+    createdAt: string;
+  };
 }

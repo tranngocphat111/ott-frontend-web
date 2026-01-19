@@ -26,7 +26,7 @@ const ChatPage: React.FC = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center bg-white">
             <div className="text-center max-w-md mx-auto p-8">
-              <div className="w-24 h-24 mx-auto mb-6 bg-[#AE7F53] rounded-full flex items-center justify-center">
+              <div className="w-24 h-24 mx-auto mb-6 bg-primary-500 rounded-full flex items-center justify-center">
                 <MessageCircle className="w-12 h-12 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">

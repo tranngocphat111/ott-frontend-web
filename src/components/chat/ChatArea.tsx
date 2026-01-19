@@ -7,7 +7,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const getConversationName = (): string => {
     if (conversation.name) return conversation.name;
     
-    if (conversation.type === 'private' && conversation.participants.length > 0) {
+    if (conversation.type === 'private' && conversation.participants?.length > 0) {
       return conversation.participants[0].display_name;
     }
     
@@ -17,7 +17,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const getConversationAvatar = (): string | undefined => {
     if (conversation.avatar_url) return conversation.avatar_url;
     
-    if (conversation.type === 'private' && conversation.participants.length > 0) {
+    if (conversation.type === 'private' && conversation.participants?.length > 0) {
       return conversation.participants[0].avatar_url;
     }
     
@@ -40,7 +40,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
               <h2 className="font-semibold text-gray-900">{getConversationName()}</h2>
               <p className="text-sm text-gray-500">
                 {conversation.type === 'group' 
-                  ? `${conversation.participants.length + 1} thành viên`
+                  ? `${(conversation.participants?.length || 0) + 1} thành viên`
                   : 'Đang hoạt động'
                 }
               </p>
@@ -76,9 +76,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
           <input
             type="text"
             placeholder="Nhập tin nhắn..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#AE7F53] focus:border-transparent"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
-          <button className="px-6 py-2 bg-[#AE7F53] text-white rounded-lg hover:bg-[#9D6E47] transition-colors flex items-center gap-2">
+          <button className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2">
             <Send className="w-4 h-4" />
             <span>Gửi</span>
           </button>

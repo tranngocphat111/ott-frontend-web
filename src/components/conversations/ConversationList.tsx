@@ -6,7 +6,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   conversations,
   onConversationSelect,
   selectedConversationId,
-  currentUserId
+  currentUserId,
 }) => {
   if (conversations.length === 0) {
     return (

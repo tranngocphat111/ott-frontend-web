@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   MessageCircle,
@@ -21,13 +22,16 @@ interface NavigationItem {
 interface NavigationSidebarProps {
   activeItem?: string;
   onItemClick?: (itemId: string) => void;
-}
+
+import NavigationItem from './NavigationItem';
+import type { NavigationSidebarProps, NavigationItem as NavigationItemType } from '../../interfaces';
+
 
 const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   activeItem = "chat",
   onItemClick,
 }) => {
-  const navigationItems: NavigationItem[] = [
+  const navigationItems: NavigationItemType[] = [
     {
       id: "chat",
       icon: <MessageCircle className="w-6 h-6" />,
@@ -79,40 +83,27 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         <Avatar
           name="User"
           size={40}
-          className="ring-2 ring-[#AE7F53] cursor-pointer hover:ring-4 transition-all"
+          className="ring-2 ring-primary-500 cursor-pointer hover:ring-4 transition-all"
         />
       </div>
 
       {/* Navigation Items */}
       <div className="flex-1 flex flex-col space-y-2">
         {navigationItems.map((item) => (
-          <button
+          <NavigationItem
             key={item.id}
-            onClick={() => onItemClick?.(item.id)}
-            className={`
-              relative p-3 rounded-xl transition-all duration-200 group
-              ${
-                item.isActive ?
-                  "bg-[#AE7F53] text-white shadow-md"
-                : "text-gray-600 hover:bg-gray-100 hover:text-[#AE7F53]"
-              }
-            `}
-            title={item.label}>
-            {item.icon}
-
-            {/* Active indicator */}
-            {item.isActive && (
-              <div className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-[#AE7F53] rounded-l-full" />
-            )}
-          </button>
+            item={item}
+            onItemClick={onItemClick}
+          />
         ))}
       </div>
 
       {/* Settings */}
       <button
-        onClick={() => onItemClick?.("settings")}
-        className="p-3 text-gray-600 hover:bg-gray-100 hover:text-[#AE7F53] rounded-xl transition-all duration-200"
-        title="Cài đặt">
+        onClick={() => onItemClick?.('settings')}
+        className="p-3 text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-xl transition-all duration-200"
+        title="Cài đặt"
+      >
         <Settings className="w-6 h-6" />
       </button>
     </div>

@@ -1,10 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import NavigationSidebar from '../navigation/NavigationSidebar';
-
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
+import type { MainLayoutProps } from '../../interfaces';
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();

@@ -41,17 +41,17 @@ const ChatLayout: React.FC = () => {
               <div className="w-24 h-24 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center">
                 <div className="w-12 h-12 bg-white/30 rounded-full"></div>
               </div>
-              <h2 className="text-2xl font-bold text-[#AE7F53] mb-2">
+              <h2 className="text-2xl font-bold text-primary-500 mb-2">
                 Chào mừng đến với Chat App
               </h2>
-              <p className="text-[#BC9166] mb-6">
+              <p className="text-primary-400 mb-6">
                 Chọn một cuộc hội thoại để bắt đầu trò chuyện
               </p>
               <div className="space-y-2">
                 <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-primary animate-pulse"></div>
                 </div>
-                <div className="text-sm text-[#BC9166]/70">
+                <div className="text-sm text-primary-400/70">
                   Đang tải...
                 </div>
               </div>

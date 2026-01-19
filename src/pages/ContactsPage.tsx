@@ -16,7 +16,7 @@ const ContactsPage: React.FC = () => {
             <input
               type="text"
               placeholder="Tìm kiếm danh bạ..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#AE7F53] focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -40,7 +40,7 @@ const ContactsPage: React.FC = () => {
           <UserPlus className="w-20 h-20 mx-auto mb-4 text-gray-300" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Thêm bạn bè mới</h2>
           <p className="text-gray-500 mb-6">Kết nối và trò chuyện với mọi người</p>
-          <button className="px-6 py-3 bg-[#AE7F53] text-white rounded-lg hover:bg-[#9D6E47] transition-colors">
+          <button className="px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
             Thêm bạn bè
           </button>
         </div>
