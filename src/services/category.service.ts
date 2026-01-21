@@ -1,7 +1,5 @@
-import type { Category } from '../types';
-
-// const API_BASE_URL = "http://localhost:5000/api";
-const API_BASE_URL = "https://abactinal-billy-sportily.ngrok-free.dev/api";
+import type { Category } from "../types";
+import { API_CHAT_SERVER_URL } from "../config/api.config";
 
 export class CategoryService {
   /**
@@ -9,19 +7,22 @@ export class CategoryService {
    */
   static async getUserCategories(userId: string): Promise<Category[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories/${userId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true", // <--- Quan trọng: Thêm dòng này để Ngrok không chặn
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/categories/${userId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true", // <--- Quan trọng: Thêm dòng này để Ngrok không chặn
+          },
         },
-      });
+      );
       if (!response.ok) {
-        throw new Error('Failed to fetch categories');
+        throw new Error("Failed to fetch categories");
       }
       return await response.json();
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error("Error loading categories:", error);
       throw error;
     }
   }
@@ -36,7 +37,7 @@ export class CategoryService {
     order: number;
   }): Promise<Category> {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories`, {
+      const response = await fetch(`${API_CHAT_SERVER_URL}/categories`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -45,11 +46,11 @@ export class CategoryService {
         body: JSON.stringify(data),
       });
       if (!response.ok) {
-        throw new Error('Failed to create category');
+        throw new Error("Failed to create category");
       }
       return await response.json();
     } catch (error) {
-      console.error('Error creating category:', error);
+      console.error("Error creating category:", error);
       throw error;
     }
   }
@@ -63,23 +64,26 @@ export class CategoryService {
       name?: string;
       color?: string;
       order?: number;
-    }
+    },
   ): Promise<Category> {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/categories/${categoryId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data),
-      });
+      );
       if (!response.ok) {
-        throw new Error('Failed to update category');
+        throw new Error("Failed to update category");
       }
       return await response.json();
     } catch (error) {
-      console.error('Error updating category:', error);
+      console.error("Error updating category:", error);
       throw error;
     }
   }
@@ -89,18 +93,21 @@ export class CategoryService {
    */
   static async deleteCategory(categoryId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/categories/${categoryId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
         },
-      });
+      );
       if (!response.ok) {
-        throw new Error('Failed to delete category');
+        throw new Error("Failed to delete category");
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
+      console.error("Error deleting category:", error);
       throw error;
     }
   }
@@ -108,14 +115,16 @@ export class CategoryService {
   /**
    * Reorder categories
    */
-  static async reorderCategories(categories: Array<{ _id: string; order: number }>): Promise<void> {
+  static async reorderCategories(
+    categories: Array<{ _id: string; order: number }>,
+  ): Promise<void> {
     try {
       const updatePromises = categories.map((cat) =>
-        this.updateCategory(cat._id, { order: cat.order })
+        this.updateCategory(cat._id, { order: cat.order }),
       );
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error('Error reordering categories:', error);
+      console.error("Error reordering categories:", error);
       throw error;
     }
   }

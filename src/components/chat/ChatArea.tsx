@@ -64,7 +64,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     const handleNewMessage = (newMessage: any) => {
       console.log("📨 [ChatArea] Received new message:", newMessage);
       console.log("📍 Current conversation ID:", conversation?._id);
-      console.log("📍 Message conversation ID:", newMessage.conversation_id || newMessage.conversationId);
+      console.log(
+        "📍 Message conversation ID:",
+        newMessage.conversation_id || newMessage.conversationId,
+      );
 
       // Chỉ thêm tin nhắn nếu thuộc conversation hiện tại
       const msgConvId = newMessage.conversation_id || newMessage.conversationId;

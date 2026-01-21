@@ -1,5 +1,4 @@
-// const API_BASE_URL = "http://localhost:5000/api";
-const API_BASE_URL = "https://abactinal-billy-sportily.ngrok-free.dev/api";
+import { API_CHAT_SERVER_URL } from "../config/api.config";
 
 export class MessageService {
   // Send message to database
@@ -10,7 +9,7 @@ export class MessageService {
     type: string = "text",
   ) {
     try {
-      const response = await fetch(`${API_BASE_URL}/messages`, {
+      const response = await fetch(`${API_CHAT_SERVER_URL}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,7 +38,7 @@ export class MessageService {
   static async getMessages(conversationId: string) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/messages/${conversationId}`,
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}`,
         {
           method: "GET",
           headers: {

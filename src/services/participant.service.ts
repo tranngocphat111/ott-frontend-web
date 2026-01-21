@@ -1,5 +1,4 @@
-// const API_BASE_URL = "http://localhost:5000/api";
-const API_BASE_URL = "https://abactinal-billy-sportily.ngrok-free.dev/api";
+import { API_CHAT_SERVER_URL } from "../config/api.config";
 
 export class ParticipantService {
   /**
@@ -11,7 +10,7 @@ export class ParticipantService {
     isPinned: boolean,
   ): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/participants/pin`, {
+      const response = await fetch(`${API_CHAT_SERVER_URL}/participants/pin`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -42,15 +41,18 @@ export class ParticipantService {
     categoryId: string | null,
   ): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/participants/category`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId,
-          userId,
-          categoryId,
-        }),
-      });
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/participants/category`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            userId,
+            categoryId,
+          }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update category");
@@ -72,7 +74,7 @@ export class ParticipantService {
   ): Promise<void> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/participants/notification`,
+        `${API_CHAT_SERVER_URL}/participants/notification`,
         {
           method: "PUT",
           headers: {

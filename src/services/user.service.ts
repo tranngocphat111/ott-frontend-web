@@ -1,13 +1,11 @@
 import type { User } from "../types";
-
-// const API_BASE_URL = "http://localhost:5000/api";
-const API_BASE_URL = "https://abactinal-billy-sportily.ngrok-free.dev/api";
+import { API_CHAT_SERVER_URL } from "../config/api.config";
 
 export class UserService {
   // Get all users from database
   static async getAllUsers(): Promise<User[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/users`, {
+      const response = await fetch(`${API_CHAT_SERVER_URL}/users`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

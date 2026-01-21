@@ -1,9 +1,5 @@
 import { io, Socket } from "socket.io-client";
-
-// const SOCKET_URL = "http://localhost:5000";
-const SOCKET_URL = "https://abactinal-billy-sportily.ngrok-free.dev";
-
-
+import { SOCKET_CHAT_SERVER_URL } from "../config/api.config";
 
 class SocketService {
   private socket: Socket | null = null;
@@ -11,7 +7,7 @@ class SocketService {
   // Kết nối socket
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io(SOCKET_URL, {
+      this.socket = io(SOCKET_CHAT_SERVER_URL, {
         transports: ["websocket", "polling"],
         reconnection: true,
         reconnectionDelay: 1000,
@@ -48,12 +44,16 @@ class SocketService {
   joinConversation(conversationId: string) {
     if (this.socket && this.socket.connected) {
       this.socket.emit("tham_gia_nhom", conversationId);
-      console.log(`🚪 [SocketService] Joined conversation room: ${conversationId}`);
+      console.log(
+        `🚪 [SocketService] Joined conversation room: ${conversationId}`,
+      );
     } else if (this.socket && !this.socket.connected) {
       console.warn("⚠️ Socket exists but not connected yet, waiting...");
       this.socket.once("connect", () => {
         this.socket?.emit("tham_gia_nhom", conversationId);
-        console.log(`🚪 [SocketService] Joined conversation room after reconnect: ${conversationId}`);
+        console.log(
+          `🚪 [SocketService] Joined conversation room after reconnect: ${conversationId}`,
+        );
       });
     } else {
       console.error("❌ Socket not initialized, cannot join conversation");
