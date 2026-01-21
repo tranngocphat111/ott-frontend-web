@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import NavigationSidebar from '../navigation/NavigationSidebar';
 import Sidebar from '../sidebar/Sidebar';
 import ChatArea from '../chat/ChatArea';
-import type { Conversation } from '../../types';
+import type { ConversationWithParticipant } from '../../types';
 
 const ChatLayout: React.FC = () => {
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<ConversationWithParticipant | null>(null);
   const [activeNavItem, setActiveNavItem] = useState('chat');
 
-  const handleConversationSelect = (conversation: Conversation) => {
-    setSelectedConversation(conversation);
+  const handleConversationSelect = (item: ConversationWithParticipant) => {
+    setSelectedConversation(item);
   };
 
   const handleNavItemClick = (itemId: string) => {
@@ -28,13 +28,13 @@ const ChatLayout: React.FC = () => {
       {/* Chat Sidebar */}
       <Sidebar 
         onConversationSelect={handleConversationSelect}
-        selectedConversationId={selectedConversation?._id}
+        selectedConversationId={selectedConversation?.conversation._id}
       />
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedConversation ? (
-          <ChatArea conversation={selectedConversation} />
+          <ChatArea conversation={selectedConversation.conversation} />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-chat">
             <div className="text-center max-w-md mx-auto p-8">

@@ -1,4 +1,4 @@
-import type { Conversation, ConversationWithParticipant } from '../types';
+import type { ConversationWithParticipant } from '../types';
 
 export interface SidebarProps {
   onConversationSelect?: (item: ConversationWithParticipant) => void;

@@ -27,7 +27,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
       try {
         const users = await UserService.getAllUsers();
         // Giả lập lấy user đầu tiên là mình (cần logic thực tế từ auth)
-        if (users && users.length > 0) {
+        if (users && users.length > 0 && users[0]._id) {
           setCurrentUserId(users[0]._id);
         }
       } catch (error) {
@@ -92,9 +92,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   };
 
   const getConversationAvatar = (): string | undefined => {
-    if (conversation.avatar_url) return conversation.avatar_url;
+    if (conversation.avatar) return conversation.avatar;
     if (conversation.type === "private" && conversation.participants?.length) {
-      return conversation.participants[0].avatar_url;
+      return conversation.participants[0].avatar;
     }
     return undefined;
   };
@@ -163,7 +163,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
               >
                 <div
                   className={`
-                    px-5 py-3 max-w-[70%] text-[15px] leading-relaxed shadow-sm break-words
+                    px-5 py-3 max-w-[70%] text-[15px] leading-relaxed shadow-sm wrap-break-word
                     ${
                       isMe
                         ? /* Thay đổi 2: Style cho tin nhắn của mình (Màu Beige giống ảnh mẫu) */

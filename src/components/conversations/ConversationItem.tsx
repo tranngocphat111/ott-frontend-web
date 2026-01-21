@@ -255,7 +255,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 {isMuted && (
                   <FaBellSlash  className="w-4 h-4 text-gray-400" />
                 )}
-                <span className="text-xs text-gray-400 whitespace-nowrap select-none">
+                <span className="text-xs text-gray-400 whitespace-nowrap select-none max-w-15">
                   {getTimeDisplay()}
                 </span>
               </div>
