@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Users, Clock } from 'lucide-react';
+import { MessageCircle, Users, Clock, Tag } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import { formatTimeAgo } from '../../utils/timeUtils';
 import ConversationContextMenu from '../modals/conversation/ConversationContextMenu';
 import CategoryManagementModal from '../modals/category/CategoryManagementModal';
 import type { ConversationItemProps } from '../../interfaces';
+import { CategoryService, ParticipantService } from '../../services';
+import type { Category } from '../../types';
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
@@ -15,7 +17,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     if (currentUserId) {
@@ -24,10 +27,19 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   }, [currentUserId]);
 
   const loadCategories = async () => {
+    if (!currentUserId) return;
+    
     try {
-      const response = await fetch(`http://localhost:5000/api/categories/${currentUserId}`);
-      const data = await response.json();
+      const data = await CategoryService.getUserCategories(currentUserId);
       setCategories(data);
+      
+      // Find and set current category if exists
+      if (conversation.category_id) {
+        const category = data.find(cat => cat._id === conversation.category_id);
+        setCurrentCategory(category || null);
+      } else {
+        setCurrentCategory(null);
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -79,71 +91,47 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const handlePin = async () => {
+    if (!currentUserId) return;
+    
     try {
-      const response = await fetch('http://localhost:5000/api/participants/pin', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: conversation._id,
-          userId: currentUserId,
-          isPinned: !conversation.is_pinned,
-        }),
-      });
-      
-      if (response.ok) {
-        console.log('Pin status updated');
-        // TODO: Refresh conversation list
-      }
+      await ParticipantService.updatePinStatus(
+        conversation._id,
+        currentUserId,
+        !conversation.is_pinned
+      );
+      console.log('Pin status updated');
+      // TODO: Refresh conversation list
     } catch (error) {
       console.error('Error updating pin status:', error);
     }
   };
 
   const handleSelectCategory = async (categoryId: string | null) => {
+    if (!currentUserId) return;
+    
     try {
-      const response = await fetch('http://localhost:5000/api/participants/category', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: conversation._id,
-          userId: currentUserId,
-          categoryId,
-        }),
-      });
-      
-      if (response.ok) {
-        console.log('Category updated');
-        // TODO: Refresh conversation list
-      }
+      await ParticipantService.updateConversationCategory(
+        conversation._id,
+        currentUserId,
+        categoryId
+      );
+      console.log('Category updated');
+      // TODO: Refresh conversation list
     } catch (error) {
       console.error('Error updating category:', error);
     }
   };
 
   const handleManageCategories = () => {
-    console.log('=== handleManageCategories CALLED ===');
-    console.log('currentUserId:', currentUserId);
-    console.log('hasUserId:', !!currentUserId);
-    console.log('Current isCategoryModalOpen:', isCategoryModalOpen);
-    
-    if (!currentUserId) {
-      console.error('Cannot open CategoryManagementModal: currentUserId is missing!');
-      alert('Lỗi: Không thể mở quản lý phân loại. Vui lòng thử lại.');
-      return;
-    }
-    
-    console.log('Setting isCategoryModalOpen to TRUE');
     setIsCategoryModalOpen(true);
     
-    // Debug after state update
-    setTimeout(() => {
-      console.log('After setState - isCategoryModalOpen should be true now');
-    }, 100);
   };
 
   const handleMute = async (duration: string) => {
-    let muteUntil = null;
-    let status = 'mute';
+    if (!currentUserId) return;
+    
+    let muteUntil: Date | null = null;
+    const status = 'mute';
 
     if (duration === '1h') {
       muteUntil = new Date(Date.now() + 60 * 60 * 1000);
@@ -157,21 +145,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/participants/notification', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: conversation._id,
-          userId: currentUserId,
-          status,
-          muteUntil,
-        }),
-      });
-      
-      if (response.ok) {
-        console.log('Notification status updated');
-        // TODO: Refresh conversation list
-      }
+      await ParticipantService.updateNotificationSettings(
+        conversation._id,
+        currentUserId,
+        status,
+        muteUntil
+      );
+      console.log('Notification status updated');
+      // TODO: Refresh conversation list
     } catch (error) {
       console.error('Error updating notification:', error);
     }
@@ -255,13 +236,29 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <p className={`
-              text-sm truncate transition-colors duration-200
-              ${isSelected ? 'text-gray-700' : 'text-gray-600'}
-              ${isHovered ? 'text-gray-700' : ''}
-            `}>
-              {getLatestMessagePreview()}
-            </p>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <p className={`
+                text-sm truncate transition-colors duration-200
+                ${isSelected ? 'text-gray-700' : 'text-gray-600'}
+                ${isHovered ? 'text-gray-700' : ''}
+              `}>
+                {getLatestMessagePreview()}
+              </p>
+              
+              {/* Category badge */}
+              {currentCategory && (
+                <div 
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0"
+                  style={{ 
+                    backgroundColor: `${currentCategory.color}20`,
+                    color: currentCategory.color 
+                  }}
+                >
+                  <Tag className="w-3 h-3" />
+                  <span className="max-w-[60px] truncate">{currentCategory.name}</span>
+                </div>
+              )}
+            </div>
 
             {/* Unread badge */}
             {hasUnreadMessage && (
@@ -288,12 +285,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       currentCategoryId={conversation.category_id}
     />
 
-    {/* Category Management Modal */}
-    {console.log('Rendering CategoryManagementModal:', { isCategoryModalOpen, currentUserId })}
+   
     <CategoryManagementModal
       isOpen={isCategoryModalOpen}
       onClose={() => {
-        console.log('CategoryManagementModal onClose called');
         setIsCategoryModalOpen(false);
       }}
       userId={currentUserId || ''}

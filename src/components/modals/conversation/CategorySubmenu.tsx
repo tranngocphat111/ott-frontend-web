@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import type { CategorySubmenuProps } from '../../../interfaces';
+import React from "react";
+import { motion } from "framer-motion";
+import type { CategorySubmenuProps } from "../../../interfaces";
 
 const CategorySubmenu: React.FC<CategorySubmenuProps> = ({
   isVisible,
@@ -31,11 +31,14 @@ const CategorySubmenu: React.FC<CategorySubmenuProps> = ({
     >
       {categories.length === 0 ? (
         <button
-          onClick={() => {
+          onMouseDown={(e) => {
+            // Dùng onMouseDown sẽ chạy ngay khi vừa nhấn chuột
+            e.stopPropagation();
+            console.log("Mouse Down activated!");
             onManageCategories();
             onClose();
           }}
-          className="w-full px-4 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="cursor-pointer w-full px-4 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           Tạo phân loại mới
         </button>
@@ -44,24 +47,37 @@ const CategorySubmenu: React.FC<CategorySubmenuProps> = ({
           {categories.map((category) => (
             <button
               key={category._id}
-              onClick={() => {
+              onMouseDown={() => {
                 onSelectCategory(category._id);
                 onClose();
               }}
               className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-50 transition-colors"
             >
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: category.color }}
+              />
               <span className="text-sm text-gray-700">{category.name}</span>
               {currentCategoryId === category._id && (
-                <svg className="w-4 h-4 ml-auto text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 ml-auto text-primary-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               )}
             </button>
           ))}
           <div className="border-t border-gray-200 my-1" />
           <button
-            onClick={() => {
+            onMouseDown={() => {
               onManageCategories();
               onClose();
             }}

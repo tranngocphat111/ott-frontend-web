@@ -25,12 +25,6 @@ const CategoryManagementModal: React.FC<CategoryManagementModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(defaultColors[0]);
 
-  useEffect(() => {
-    console.log('CategoryManagementModal render', { isOpen, userId, hasUserId: !!userId });
-    if (isOpen && !userId) {
-      console.error('CategoryManagementModal opened without userId!');
-    }
-  }, [isOpen, userId]);
 
   useEffect(() => {
     if (isOpen && userId) {

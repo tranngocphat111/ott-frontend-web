@@ -41,11 +41,6 @@ export type {
   AddCategoryFormProps,
 } from './modal.interface';
 
-// Common component interfaces
-export type {
-  LoadingSkeletonProps,
-  ErrorStateProps,
-} from './component.interface';
 
 // Layout interfaces
 export type { MainLayoutProps } from './layout.interface';

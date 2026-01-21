@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Plus, MoreVertical } from 'lucide-react';
 import SearchBar from '../common/SearchBar';
 import ConversationList from '../conversations/ConversationList';
+import CategoryFilter from '../conversations/CategoryFilter';
 import LoadingSkeleton from '../common/LoadingSkeleton';
 import ErrorState from '../common/ErrorState';
 import CreateGroupModal from '../modals/group/CreateGroupModal';
 import { UserService } from '../../services/user.service';
 import { ConversationService } from '../../services/conversation.service';
+import { CategoryService } from '../../services';
+import { useConversations } from '../../contexts/ConversationsContext';
 import type { Conversation, User } from '../../types';
 import type { SidebarProps } from '../../interfaces';
 
@@ -14,11 +17,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   onConversationSelect, 
   selectedConversationId 
 }) => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    conversations,
+    categories,
+    loading,
+    error,
+    setConversations,
+    setCategories,
+    setLoading,
+    setError,
+    addConversation,
+  } = useConversations();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -41,9 +54,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         setAvailableUsers(otherUsers);
         
         // Load conversations for first user
-        const conversations = await ConversationService.getUserConversations(firstUser._id);
-        setConversations(conversations);
-        setFilteredConversations(conversations);
+        const loadedConversations = await ConversationService.getUserConversations(firstUser._id);
+        setConversations(loadedConversations);
+        
+        // Load categories for first user
+        const loadedCategories = await CategoryService.getUserCategories(firstUser._id);
+        setCategories(loadedCategories);
       }
     } catch (error) {
       console.error('Failed to load data from database:', error);
@@ -58,21 +74,26 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredConversations(conversations);
-      return;
+    let filtered = conversations;
+
+    // Filter by category
+    if (selectedCategoryId) {
+      filtered = filtered.filter(conv => conv.category_id === selectedCategoryId);
     }
 
-    const filtered = conversations.filter(conversation => {
-      const name = getConversationName(conversation);
-      const latestMessage = conversation.last_message?.content || '';
-      
-      return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             latestMessage.toLowerCase().includes(searchTerm.toLowerCase());
-    });
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(conversation => {
+        const name = getConversationName(conversation);
+        const latestMessage = conversation.last_message?.content || '';
+        
+        return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               latestMessage.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+    }
 
     setFilteredConversations(filtered);
-  }, [searchTerm, conversations]);
+  }, [searchTerm, conversations, selectedCategoryId]);
 
   const getConversationName = (conversation: Conversation): string => {
     if (conversation.name) return conversation.name;
@@ -97,8 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         avatar
       );
 
-      // Reload conversations from database to get updated list
-      await loadConversations();
+      // Add to conversations state without reloading
+      addConversation(newGroup);
 
       // Select the new conversation
       onConversationSelect?.(newGroup);
@@ -165,6 +186,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Tìm kiếm cuộc hội thoại..."
           />
         </div>
+
+        {/* Category Filter */}
+        {!loading && !error && categories.length > 0 && (
+          <CategoryFilter
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            onSelectCategory={setSelectedCategoryId}
+          />
+        )}
 
         {/* Conversations List */}
         <div className="flex-1 overflow-hidden">

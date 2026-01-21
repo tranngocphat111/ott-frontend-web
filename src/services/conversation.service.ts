@@ -11,7 +11,6 @@ export class ConversationService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      
       // Map backend data to frontend format
       return data.map((conv: any) => ({
         _id: conv._id,
