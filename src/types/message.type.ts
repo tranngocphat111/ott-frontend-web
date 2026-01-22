@@ -8,6 +8,8 @@ export interface Message {
   type: "text" | "image" | "file" | "video" | "audio";
   created_at: string;
   sender_id: String;
+  size?: number;
+  fileName?: string;
   attachments?: MessageAttachment[];
 }
 
@@ -25,4 +27,10 @@ export interface MessageAttachment {
 export interface ChatNotificationProps {
   type: string;
   content: string;
+}
+
+export interface ChatInputProps {
+  conversationId: string;
+  senderId: string;
+  onSendSuccess: () => void;
 }

@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { MessageService, socketService } from "../services";
 import type { Message } from "../interfaces";
 
-export const useChat = (
-  conversationId: string | undefined,
-  currentUserId: string | undefined,
-) => {
+export const useChat = (conversationId: string | undefined) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -56,15 +53,5 @@ export const useChat = (
     };
   }, [conversationId, loadMessages]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || !currentUserId || !conversationId) return;
-    try {
-      // Gửi qua API (Backend sẽ emit socket cho cả 2 bên)
-      await MessageService.sendMessage(conversationId, currentUserId, text);
-    } catch (error) {
-      console.error("❌ Send message failed:", error);
-    }
-  };
-
-  return { messages, loading, sendMessage };
+  return { messages, loading, loadMessages };
 };

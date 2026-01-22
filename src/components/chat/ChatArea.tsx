@@ -12,10 +12,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const { currentUser } = useUser();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, loading, sendMessage } = useChat(
-    conversation?._id,
-    currentUser?._id,
-  );
+  const { messages, loading, loadMessages } = useChat(conversation?._id);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,7 +54,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <ChatInput onSend={sendMessage} />
+      <ChatInput
+        conversationId={conversation?._id || ""}
+        senderId={currentUser?._id || ""}
+        onSendSuccess={loadMessages}
+      />
     </div>
   );
 };
