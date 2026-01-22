@@ -5,7 +5,7 @@
 export interface Message {
   _id: string;
   content: string;
-  type: 'text' | 'image' | 'file' | 'video' | 'audio';
+  type: "text" | "image" | "file" | "video" | "audio";
   created_at: string;
   sender_id: String;
   attachments?: MessageAttachment[];
@@ -16,8 +16,13 @@ export interface Message {
  */
 export interface MessageAttachment {
   id: string;
-  type: 'image' | 'file' | 'video' | 'audio';
+  type: "image" | "file" | "video" | "audio";
   url: string;
   name: string;
   size?: number;
+}
+
+export interface ChatNotificationProps {
+  type: string;
+  content: string;
 }

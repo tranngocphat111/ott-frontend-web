@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import NavigationSidebar from '../navigation/NavigationSidebar';
 import Sidebar from '../sidebar/Sidebar';
-import ChatArea from '../chat/ChatArea';
 import type { ConversationWithParticipant } from '../../types';
+import { ChatArea } from '..';
 
 const ChatLayout: React.FC = () => {
-  const [selectedConversation, setSelectedConversation] = useState<ConversationWithParticipant | null>(null);
+  const [selectedConversation, setSelectedConversation] =   useState<ConversationWithParticipant | null>(null);
   const [activeNavItem, setActiveNavItem] = useState('chat');
 
   const handleConversationSelect = (item: ConversationWithParticipant) => {
