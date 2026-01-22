@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
-import { MessageCircle } from 'lucide-react';
-import Sidebar from '../components/sidebar/Sidebar';
-import ChatArea from '../components/chat/ChatArea';
-import { ConversationsProvider } from '../contexts/ConversationsContext';
-import type { Conversation, ConversationWithParticipant } from '../types';
+import React, { useEffect, useState } from "react";
+import { MessageCircle } from "lucide-react";
+import Sidebar from "../components/sidebar/Sidebar";
+import { ConversationsProvider } from "../contexts/ConversationsContext";
+import type { Conversation, ConversationWithParticipant } from "../types";
+import { ChatArea } from "../components";
+import { socketService } from "../services";
 
 const ChatPage: React.FC = () => {
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  useEffect(() => {
+    socketService.connect();
+
+    return () => {
+      socketService.disconnect();
+    };
+  }, []);
+
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
 
   const handleConversationSelect = (item: ConversationWithParticipant) => {
     setSelectedConversation(item.conversation);
@@ -16,7 +26,7 @@ const ChatPage: React.FC = () => {
     <ConversationsProvider>
       <div className="flex h-full w-full">
         {/* Chat Sidebar */}
-        <Sidebar 
+        <Sidebar
           onConversationSelect={handleConversationSelect}
           selectedConversationId={selectedConversation?._id}
         />
