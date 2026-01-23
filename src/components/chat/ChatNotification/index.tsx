@@ -1,8 +1,6 @@
 import React from "react";
 import { UserPlus, Ban, LogOut, Settings } from "lucide-react";
-import type { ChatNotificationProps } from "../../types/message.type";
-
-
+import type { ChatNotificationProps } from "../../../types/message.type";
 
 export const ChatNotification: React.FC<ChatNotificationProps> = ({
   type,

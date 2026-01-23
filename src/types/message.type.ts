@@ -1,6 +1,6 @@
 export interface Message {
   _id: string;
-  content: string;
+  content: string[] | string;
   type: "text" | "image" | "file" | "video" | "audio";
   created_at: string;
   sender_id: String;
@@ -25,4 +25,10 @@ export interface ChatInputProps {
   conversationId: string;
   senderId: string;
   onSendSuccess: () => void;
+}
+
+export interface FileMessageProps {
+  url: string;
+  fileName?: string;
+  size?: number;
 }
