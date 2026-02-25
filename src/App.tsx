@@ -9,27 +9,23 @@ function AppContent() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-white">
-      {isAuthenticated ? (
-        <MainLayout>
-          <Routes>
-            <Route
-              path="/"
-              element={<Navigate to={ROUTE_PATHS.CHAT} replace />}
-            />
-            {routes.map((route) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={route.element}
-              />
-            ))}
-            <Route
-              path="*"
-              element={<Navigate to={ROUTE_PATHS.CHAT} replace />}
-            />
-          </Routes>
-        </MainLayout>
-      ) : (
+      {/* {isAuthenticated ? ( */}
+      <MainLayout>
+        <Routes>
+          <Route
+            path="/"
+            element={<Navigate to={ROUTE_PATHS.CHAT} replace />}
+          />
+          {routes.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
+          <Route
+            path="*"
+            element={<Navigate to={ROUTE_PATHS.CHAT} replace />}
+          />
+        </Routes>
+      </MainLayout>
+      {/* ) : (
         <Routes>
           <Route
             path={ROUTE_PATHS.SELECT_USER}
@@ -42,7 +38,7 @@ function AppContent() {
             element={<Navigate to={ROUTE_PATHS.SELECT_USER} replace />}
           />
         </Routes>
-      )}
+      )} */}
     </div>
   );
 }
