@@ -8,6 +8,7 @@ interface Props {
   posts: Post[];
   likedPosts: string[];
   onToggleLike: (id: string) => void;
+  onDelete: (id: string) => void;
   onOpenModal: () => void;
   currentUser: PostUser;
   stories: StoryItem[];
@@ -34,6 +35,7 @@ const PostFeed: React.FC<Props> = ({
   posts,
   likedPosts,
   onToggleLike,
+  onDelete,
   onOpenModal,
   currentUser,
   stories,
@@ -56,6 +58,8 @@ const PostFeed: React.FC<Props> = ({
           post={post}
           isLiked={likedPosts.includes(post.id)}
           onToggleLike={() => onToggleLike(post.id)}
+          onDelete={onDelete}
+          currentUser={currentUser}
         />
       ))
     }

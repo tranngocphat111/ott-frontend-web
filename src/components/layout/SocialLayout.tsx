@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import type { Post, PostUser, StoryItem } from "../social/types";
 import type { UploadedMedia } from "../social/CreatePostModal";
-import { fetchPosts, createPost } from "../../services/post.service";
+import {
+  fetchPosts,
+  createPost,
+  toggleLike,
+  deletePost,
+} from "../../services/post.service";
 import { fetchUsers } from "../../services/social.service";
 import SocialLeftSidebar from "../social/SocialLeftSidebar";
 import PostFeed from "../social/PostFeed";
@@ -74,16 +79,50 @@ const SocialLayout: React.FC = () => {
     })();
   }, []);
 
-  const toggleLike = (id: string) =>
+  const toggleLikePost = async (id: string) => {
+    if (!currentUser.id) return;
+    // Optimistic update
+    const wasLiked = likedPosts.includes(id);
     setLikedPosts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      wasLiked ? prev.filter((x) => x !== id) : [...prev, id],
     );
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id ?
+          { ...p, likes: wasLiked ? Math.max(0, p.likes - 1) : p.likes + 1 }
+        : p,
+      ),
+    );
+
+    // Call API
+    const result = await toggleLike(id, currentUser.id);
+    if (result !== null) {
+      // Sync with actual server state
+      setLikedPosts((prev) =>
+        result.liked ?
+          [...prev.filter((x) => x !== id), id]
+        : prev.filter((x) => x !== id),
+      );
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, likes: result.totalReactions } : p,
+        ),
+      );
+    }
+  };
+
+  const handleDeletePost = async (id: string) => {
+    // Optimistic update
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+    await deletePost(id);
+  };
 
   const handleNewPost = async (
     content: string,
     media: UploadedMedia[],
     visibility: string,
   ) => {
+    if (!currentUser.id) return; // guard: user not loaded yet
     // Optimistic update: hiển thị ngay lập tức
     const tempId = `temp-${Date.now()}`;
     const optimisticPost: Post = {
@@ -120,7 +159,8 @@ const SocialLayout: React.FC = () => {
             <PostFeed
               posts={posts}
               likedPosts={likedPosts}
-              onToggleLike={toggleLike}
+              onToggleLike={toggleLikePost}
+              onDelete={handleDeletePost}
               onOpenModal={() => setIsModalOpen(true)}
               currentUser={currentUser}
               stories={stories}

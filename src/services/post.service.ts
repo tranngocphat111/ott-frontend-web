@@ -224,3 +224,145 @@ export async function deletePost(postId: string): Promise<boolean> {
         return false;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+   Like / Reaction API
+═══════════════════════════════════════════════════════ */
+
+export interface ToggleLikeResult {
+    liked: boolean;
+    totalReactions: number;
+}
+
+/**
+ * Toggle like một bài post.
+ * Trả về trạng thái liked + tổng số lượt thích sau toggle.
+ */
+export async function toggleLike(
+    postId: string,
+    accountId: string,
+): Promise<ToggleLikeResult | null> {
+    try {
+        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/like`);
+        url.searchParams.set("accountId", accountId);
+        url.searchParams.set("reactionType", "LIKE");
+        const res = await fetch(url.toString(), {
+            method: "POST",
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+            liked: data.liked as boolean,
+            totalReactions: data.totalReactions as number,
+        };
+    } catch {
+        return null;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Comment API
+═══════════════════════════════════════════════════════ */
+
+export interface ApiComment {
+    id: string;
+    text: string;
+    accountId: string;
+    accountUsername: string;
+    accountDisplayName: string | null;
+    accountAvatarUrl: string | null;
+    parentCommentId: string | null;
+    isEdited: boolean;
+    isDeleted: boolean;
+    depth: number;
+    totalReplies: number;
+    totalReactions: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Comment {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorAvatar?: string;
+    text: string;
+    parentId?: string;
+    depth: number;
+    isEdited: boolean;
+    time: string;
+    totalReplies: number;
+}
+
+function mapComment(c: ApiComment): Comment {
+    return {
+        id: c.id,
+        authorId: c.accountId,
+        authorName: c.accountDisplayName ?? c.accountUsername,
+        authorAvatar: c.accountAvatarUrl ?? undefined,
+        text: c.text,
+        parentId: c.parentCommentId ?? undefined,
+        depth: c.depth,
+        isEdited: c.isEdited,
+        time: relativeTime(c.createdAt),
+        totalReplies: c.totalReplies,
+    };
+}
+
+/**
+ * Lấy danh sách comments của bài post.
+ */
+export async function fetchComments(postId: string): Promise<Comment[]> {
+    try {
+        const res = await fetch(`${API_MEDIA_SERVER_URL}/posts/${postId}/comments`, {
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return [];
+        const raw = await res.json();
+        const list: ApiComment[] = Array.isArray(raw) ? raw : (raw.value ?? []);
+        return list.filter((c) => !c.isDeleted).map(mapComment);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Thêm comment vào bài post.
+ */
+export async function addComment(
+    postId: string,
+    accountId: string,
+    text: string,
+    parentCommentId?: string,
+): Promise<Comment | null> {
+    try {
+        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/comments`);
+        url.searchParams.set("accountId", accountId);
+        url.searchParams.set("text", text);
+        if (parentCommentId) url.searchParams.set("parentCommentId", parentCommentId);
+        const res = await fetch(url.toString(), {
+            method: "POST",
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return null;
+        return mapComment(await res.json() as ApiComment);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Xoá comment.
+ */
+export async function deleteComment(postId: string, commentId: string): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/posts/${postId}/comments/${commentId}`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok || res.status === 404;
+    } catch {
+        return false;
+    }
+}

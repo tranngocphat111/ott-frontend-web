@@ -1,20 +1,131 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Camera, MapPin, Briefcase, Heart, Users, Image } from "lucide-react";
+import {
+  Camera,
+  MapPin,
+  Briefcase,
+  Heart,
+  Users,
+  Image,
+  Loader2,
+} from "lucide-react";
 import avatar from "../../assets/avatar.png";
+import {
+  fetchPostsByUser,
+  toggleLike,
+  deletePost,
+} from "../../services/post.service";
+import type { Post, PostUser } from "../../components/social/types";
+import PostCard from "../../components/social/PostCard";
+import { fetchUsers } from "../../services/social.service";
 
-/**
- * SocialProfile - Trang cá nhân người dùng
- * Hiển thị thông tin cá nhân, ảnh, bài viết
- */
+const AVATAR_COLORS = [
+  "bg-primary-500",
+  "bg-emerald-500",
+  "bg-rose-500",
+  "bg-amber-500",
+  "bg-violet-500",
+  "bg-sky-500",
+];
+
 const SocialProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
 
+  const [profileUser, setProfileUser] = useState<{
+    displayName: string;
+    username: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [currentUser, setCurrentUser] = useState<PostUser>({
+    id: "",
+    name: "Người dùng",
+    color: "bg-primary-500",
+  });
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<
+    "posts" | "about" | "friends" | "photos"
+  >("posts");
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      setLoading(true);
+      // Load current user (first user = "me") and profile user
+      const users = await fetchUsers();
+      const me = users[0];
+      if (me) {
+        setCurrentUser({
+          id: me.id,
+          name: me.displayName ?? me.username,
+          avatar: me.avatarUrl ?? undefined,
+          color: AVATAR_COLORS[0],
+        });
+      }
+      const profile = users.find((u) => u.id === userId);
+      if (profile)
+        setProfileUser({
+          displayName: profile.displayName,
+          username: profile.username,
+          avatarUrl: profile.avatarUrl ?? undefined,
+        });
+
+      // Load posts of this user
+      const userPosts = await fetchPostsByUser(userId, me?.id);
+      setPosts(userPosts);
+      setLoading(false);
+    })();
+  }, [userId]);
+
+  const handleToggleLike = async (id: string) => {
+    if (!currentUser.id) return;
+    const wasLiked = likedPosts.includes(id);
+    setLikedPosts((prev) =>
+      wasLiked ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id ?
+          { ...p, likes: wasLiked ? Math.max(0, p.likes - 1) : p.likes + 1 }
+        : p,
+      ),
+    );
+    const result = await toggleLike(id, currentUser.id);
+    if (result !== null) {
+      setLikedPosts((prev) =>
+        result.liked ?
+          [...prev.filter((x) => x !== id), id]
+        : prev.filter((x) => x !== id),
+      );
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, likes: result.totalReactions } : p,
+        ),
+      );
+    }
+  };
+
+  const handleDeletePost = async (id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+    await deletePost(id);
+  };
+
+  const tabs = [
+    { key: "posts", label: "Bài viết" },
+    { key: "about", label: "Giới thiệu" },
+    { key: "friends", label: "Bạn bè" },
+    { key: "photos", label: "Ảnh" },
+  ] as const;
+
+  const displayName =
+    profileUser?.displayName ?? profileUser?.username ?? `User ${userId ?? ""}`;
+
   return (
-    <div className="bg-[#AE7F53] w-full min-h-screen">
+    <div className="bg-primary-500 w-full min-h-screen">
       <div className="max-w-6xl mx-auto">
         {/* Cover Photo */}
-        <div className="relative bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 h-64 md:h-80 rounded-b-2xl">
+        <div className="relative bg-linear-to-r from-purple-400 via-pink-500 to-red-500 h-64 md:h-80 rounded-b-2xl">
           <button className="absolute bottom-4 right-4 bg-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-100 transition">
             <Camera className="size-5" />
             <span className="hidden md:inline">Chỉnh sửa ảnh bìa</span>
@@ -28,11 +139,18 @@ const SocialProfile: React.FC = () => {
             <div className="flex flex-col md:flex-row items-center md:items-end gap-4">
               <div className="relative -mt-20">
                 <div className="size-32 md:size-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
-                  <img
-                    src={avatar}
-                    alt="Profile"
-                    className="size-full object-cover"
-                  />
+                  {profileUser?.avatarUrl ?
+                    <img
+                      src={profileUser.avatarUrl}
+                      alt={displayName}
+                      className="size-full object-cover"
+                    />
+                  : <img
+                      src={avatar}
+                      alt="Profile"
+                      className="size-full object-cover"
+                    />
+                  }
                 </div>
                 <button className="absolute bottom-2 right-2 bg-gray-200 p-2 rounded-full hover:bg-gray-300 transition">
                   <Camera className="size-4" />
@@ -41,21 +159,34 @@ const SocialProfile: React.FC = () => {
 
               <div className="flex-1 text-center md:text-left mb-4">
                 <h1 className="text-3xl font-bold text-gray-800">
-                  {userId ? `User ${userId}` : "Tên người dùng"}
+                  {displayName}
                 </h1>
+                {profileUser?.username &&
+                  profileUser.username !== profileUser.displayName && (
+                    <p className="text-gray-400 text-sm mt-0.5">
+                      @{profileUser.username}
+                    </p>
+                  )}
                 <p className="text-gray-600 mt-1">
                   <Users className="inline size-4 mr-1" />
-                  1,234 bạn bè
+                  {posts.length} bài viết
                 </p>
               </div>
 
               <div className="flex gap-2 mb-4">
-                <button className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition font-medium">
-                  Thêm vào tin
-                </button>
-                <button className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium">
-                  Chỉnh sửa trang cá nhân
-                </button>
+                {currentUser.id === userId ?
+                  <button className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium">
+                    Chỉnh sửa trang cá nhân
+                  </button>
+                : <>
+                    <button className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition font-medium">
+                      Kết bạn
+                    </button>
+                    <button className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium">
+                      Nhắn tin
+                    </button>
+                  </>
+                }
               </div>
             </div>
 
@@ -81,21 +212,18 @@ const SocialProfile: React.FC = () => {
           {/* Navigation Tabs */}
           <div className="border-t border-gray-200">
             <div className="flex gap-2 px-6 overflow-x-auto">
-              <button className="px-6 py-4 text-blue-500 border-b-2 border-blue-500 font-medium whitespace-nowrap">
-                Bài viết
-              </button>
-              <button className="px-6 py-4 text-gray-600 hover:bg-gray-100 rounded-t-lg font-medium whitespace-nowrap">
-                Giới thiệu
-              </button>
-              <button className="px-6 py-4 text-gray-600 hover:bg-gray-100 rounded-t-lg font-medium whitespace-nowrap">
-                Bạn bè
-              </button>
-              <button className="px-6 py-4 text-gray-600 hover:bg-gray-100 rounded-t-lg font-medium whitespace-nowrap">
-                Ảnh
-              </button>
-              <button className="px-6 py-4 text-gray-600 hover:bg-gray-100 rounded-t-lg font-medium whitespace-nowrap">
-                Video
-              </button>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-6 py-4 font-medium whitespace-nowrap transition ${
+                    activeTab === tab.key ?
+                      "text-blue-500 border-b-2 border-blue-500"
+                    : "text-gray-600 hover:bg-gray-100 rounded-t-lg"
+                  }`}>
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -125,13 +253,37 @@ const SocialProfile: React.FC = () => {
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
-                  <div
-                    key={i}
-                    className="aspect-square bg-gray-200 rounded-lg overflow-hidden hover:opacity-80 cursor-pointer">
-                    <div className="size-full flex items-center justify-center">
-                      <Image className="size-8 text-gray-400" />
+                {posts
+                  .flatMap((p) =>
+                    p.media.filter((m) => m.type === "image").slice(0, 1),
+                  )
+                  .slice(0, 9)
+                  .map((m, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-lg overflow-hidden hover:opacity-80 cursor-pointer bg-gray-100">
+                      <img
+                        src={m.url}
+                        alt=""
+                        className="size-full object-cover"
+                      />
                     </div>
+                  ))}
+                {Array.from({
+                  length: Math.max(
+                    0,
+                    9 -
+                      posts
+                        .flatMap((p) =>
+                          p.media.filter((m) => m.type === "image").slice(0, 1),
+                        )
+                        .slice(0, 9).length,
+                  ),
+                }).map((_, i) => (
+                  <div
+                    key={`placeholder-${i}`}
+                    className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Image className="size-8 text-gray-400" />
                   </div>
                 ))}
               </div>
@@ -145,11 +297,10 @@ const SocialProfile: React.FC = () => {
                   Xem tất cả
                 </button>
               </div>
-              <p className="text-gray-600 mb-4">1,234 người bạn</p>
               <div className="grid grid-cols-3 gap-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="text-center">
-                    <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2 hover:opacity-80 cursor-pointer">
+                    <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
                       <img
                         src={avatar}
                         alt={`Friend ${i}`}
@@ -165,39 +316,27 @@ const SocialProfile: React.FC = () => {
 
           {/* Right Column - Posts */}
           <div className="md:col-span-2 space-y-4">
-            {/* Create Post */}
-            <div className="bg-white rounded-2xl p-6 shadow">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="size-10 rounded-full overflow-hidden">
-                  <img
-                    src={avatar}
-                    alt="Avatar"
-                    className="size-full object-cover"
-                  />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Bạn đang nghĩ gì?"
-                  className="flex-1 bg-gray-100 rounded-full px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                  readOnly
-                />
-              </div>
-              <div className="flex gap-2 pt-3 border-t border-gray-200">
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 hover:bg-gray-100 rounded-lg transition">
-                  <Image className="size-5 text-green-500" />
-                  <span className="font-medium text-gray-700">Ảnh/Video</span>
-                </button>
-              </div>
-            </div>
-
             {/* Posts List */}
-            <div className="bg-white rounded-2xl p-6 shadow">
-              <h3 className="text-xl font-bold mb-4">Bài viết</h3>
-              <div className="text-center py-12 text-gray-500">
+            {loading ?
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="size-8 animate-spin text-primary-400" />
+              </div>
+            : posts.length === 0 ?
+              <div className="bg-white rounded-2xl p-6 shadow text-center py-12 text-gray-500">
                 <p>Chưa có bài viết nào</p>
                 <p className="text-sm mt-2">Hãy chia sẻ khoảnh khắc của bạn!</p>
               </div>
-            </div>
+            : posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  isLiked={likedPosts.includes(post.id)}
+                  onToggleLike={() => handleToggleLike(post.id)}
+                  onDelete={handleDeletePost}
+                  currentUser={currentUser}
+                />
+              ))
+            }
           </div>
         </div>
       </div>
