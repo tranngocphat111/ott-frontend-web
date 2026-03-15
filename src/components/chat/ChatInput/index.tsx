@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, type ClipboardEvent, type ChangeEvent } from "react";
 import { Smile, SendHorizonal } from "lucide-react";
 import { MessageService } from "../../../services";
 import type { ChatInputProps } from "../../../types/message.type";
@@ -6,6 +6,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { UploadProgress } from "./UploadProgress";
 import { ImageInput } from "./ImageInput";
 import { FileInput } from "./FileInput";
+import { StagingArea } from "./StagingArea";
 
 export const ChatInput = ({
   conversationId,
@@ -16,26 +17,31 @@ export const ChatInput = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
-  // --- Gửi text ---
-  const handleSendText = async () => {
-    if (!text.trim()) return;
-    try {
-      await MessageService.sendMessage(
-        conversationId,
-        senderId,
-        text,
-        "text",
-        0,
-      );
-      setText("");
-      onSendSuccess();
-    } catch {
-      alert("Gửi tin nhắn thất bại");
-    }
+  // Input ẩn dành riêng cho nút "+" trong StagingArea
+  const addMoreInputRef = useRef<HTMLInputElement>(null);
+
+  // Thêm file vào staging (chưa upload)
+  const addToPending = (files: File[]) => {
+    setPendingFiles((prev) => [...prev, ...files]);
   };
 
-  // --- Upload nhiều ảnh → 1 message với mảng keys ---
+  const handleRemoveFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAll = () => setPendingFiles([]);
+
+  const handleAddMore = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length > 0) addToPending(files);
+  };
+
+  // --- Upload helpers (được gọi khi Send) ---
+
+  // Nhiều ảnh → 1 message
   const uploadImages = async (files: File[]) => {
     const MAX = 50 * 1024 * 1024;
     const valid = files.filter((f) => {
@@ -79,7 +85,7 @@ export const ChatInput = ({
     }
   };
 
-  // --- Upload 1 file (video / tệp) → 1 message riêng ---
+  // 1 file (video / tệp) → 1 message
   const uploadSingleFile = async (file: File) => {
     const MAX = 50 * 1024 * 1024;
     if (file.size > MAX) {
@@ -114,27 +120,76 @@ export const ChatInput = ({
     }
   };
 
-  // --- Handlers nhận File[] từ sub-components ---
+  // --- Gửi tất cả (file staged + text) ---
+  const handleSend = async () => {
+    if (isUploading) return;
+    if (!text.trim() && pendingFiles.length === 0) return;
 
-  // Icon ảnh: tất cả đều là ảnh → 1 message
-  const handleImageFiles = (files: File[]) => {
-    uploadImages(files);
-  };
+    // Upload file staged trước
+    if (pendingFiles.length > 0) {
+      const files = [...pendingFiles];
+      setPendingFiles([]); // xoá staging ngay khi bắt đầu gửi
 
-  // Icon tệp: phân loại ảnh vs video/file
-  // ảnh → gom 1 message, video/file → mỗi cái 1 message (tuần tự)
-  const handleAttachFiles = (files: File[]) => {
-    const images = files.filter((f) => f.type.startsWith("image/"));
-    const others = files.filter((f) => !f.type.startsWith("image/"));
-    const run = async () => {
+      const images = files.filter((f) => f.type.startsWith("image/"));
+      const others = files.filter((f) => !f.type.startsWith("image/"));
+
       if (images.length > 0) await uploadImages(images);
       for (const file of others) await uploadSingleFile(file);
-    };
-    run();
+    }
+
+    // Sau đó gửi text nếu có
+    if (text.trim()) {
+      try {
+        await MessageService.sendMessage(
+          conversationId,
+          senderId,
+          text,
+          "text",
+          0,
+        );
+        setText("");
+        onSendSuccess();
+      } catch {
+        alert("Gửi tin nhắn thất bại");
+      }
+    }
   };
 
+  // --- Handlers từ sub-components → staging ---
+
+  // Icon ảnh: thêm vào staging
+  const handleImageFiles = (files: File[]) => addToPending(files);
+
+  // Icon tệp: thêm vào staging
+  const handleAttachFiles = (files: File[]) => addToPending(files);
+
+  // Paste (Ctrl+V): nếu có file → staging, text → paste bình thường
+  const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+
+    if (files.length > 0) {
+      e.preventDefault();
+      addToPending(files);
+    }
+  };
+
+  const canSend = (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
+
   return (
-    <div className="p-4 bg-white border-t border-gray-100 relative">
+    <div
+      className="p-4 bg-white border-t border-gray-100 relative"
+      onPaste={handlePaste}
+    >
       {showEmojiPicker && (
         <EmojiPicker
           onSelect={(emoji) => {
@@ -146,6 +201,27 @@ export const ChatInput = ({
       )}
 
       {isUploading && <UploadProgress progress={uploadProgress} />}
+
+      {/* Staging area — hiện khi có file chờ gửi */}
+      {pendingFiles.length > 0 && (
+        <>
+          {/* Input ẩn cho nút "+" trong StagingArea */}
+          <input
+            type="file"
+            ref={addMoreInputRef}
+            className="hidden"
+            accept="*/*"
+            multiple
+            onChange={handleAddMore}
+          />
+          <StagingArea
+            files={pendingFiles}
+            onRemove={handleRemoveFile}
+            onClearAll={handleClearAll}
+            onAddMore={() => addMoreInputRef.current?.click()}
+          />
+        </>
+      )}
 
       <div className="flex items-center gap-2 bg-gray-50 px-2 py-1.5 rounded-full border border-gray-200">
         <ImageInput
@@ -168,19 +244,17 @@ export const ChatInput = ({
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) =>
-            e.key === "Enter" && !isUploading && handleSendText()
-          }
+          onKeyDown={(e) => e.key === "Enter" && canSend && handleSend()}
           placeholder={isUploading ? "Đang tải lên..." : "Nhập tin nhắn..."}
           disabled={isUploading}
           className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm"
         />
 
-        {text.trim() && !isUploading && (
+        {canSend && (
           <button
-            onClick={handleSendText}
+            onClick={handleSend}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-[#EFDCCB] rounded-full transition-colors"
-            title="Gửi tin nhắn"
+            title="Gửi"
           >
             <SendHorizonal size={20} />
           </button>
