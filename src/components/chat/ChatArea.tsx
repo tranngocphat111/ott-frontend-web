@@ -1,9 +1,9 @@
 // src/components/Chat/ChatArea.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { useUser } from "../../contexts/UserContext";
-import { useConversations } from "../../contexts/ConversationsContext";
+import { useConversations } from "../../contexts/ConversationsContext"; // Giữ từ bản 2
 import { useChat } from "../../hooks/useChat";
-import { ParticipantService } from "../../services";
+import { ParticipantService } from "../../services"; // Giữ từ bản 2
 import type { ChatAreaProps } from "../../interfaces";
 
 // Components
@@ -20,48 +20,50 @@ import { MediaViewer } from "./ChatMessage/MediaViewer";
 
 const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const { currentUser } = useUser();
-  const { updateParticipant } = useConversations();
-  const { messages, loadMessages } = useChat(conversation?._id, currentUser?._id);
+  const { updateParticipant } = useConversations(); // Logic "Đã xem"
+  const { messages, loadMessages } = useChat(
+    conversation?._id,
+    currentUser?._id
+  );
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMarkedRef = useRef<string>("0");
+  const lastMarkedRef = useRef<string>("0"); // Logic "Đã xem"
 
-  // Reset khi chuyển conversation
+  // --- STATE QUẢN LÝ MEDIA VIEWER (Merge cả 2 bản) ---
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0); // Giữ từ bản 1
+
+  // --- LOGIC ĐÁNH DẤU ĐÃ ĐỌC (Bản 2) ---
   useEffect(() => {
     lastMarkedRef.current = "0";
   }, [conversation?._id]);
 
-  // Đánh dấu đã đọc khi có tin nhắn mới hoặc khi messages được load xong
-  // KHÔNG dùng conversation?._id làm dep để tránh chạy với messages cũ của conversation trước
-  // (React effects chạy theo thứ tự đăng ký: useChat's setMessages([]) schedule re-render nhưng
-  //  chưa apply ngay, nên nếu dep có conversation._id thì effect này chạy với messages stale)
   useEffect(() => {
     if (!messages.length || !currentUser?._id || !conversation?._id) return;
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg.msg_id) return;
     if (lastMsg.msg_id === lastMarkedRef.current) return;
 
-    // Optimistic update: cập nhật UI ngay lập tức, không chờ API
+    // Optimistic update
     lastMarkedRef.current = lastMsg.msg_id;
     updateParticipant(conversation._id, {
       last_read_message_id: lastMsg.msg_id,
     });
 
-    // Lưu vào localStorage làm fallback (hoạt động ngay cả khi API lỗi)
+    // Fallback localStorage
     localStorage.setItem(`read_${conversation._id}_${currentUser._id}`, lastMsg.msg_id);
 
-    // Gọi API để lưu xuống DB (fire-and-forget)
+    // Gọi API
     ParticipantService.markAsRead(conversation._id, currentUser._id, lastMsg.msg_id)
       .catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
-  // --- 🔥 3. THÊM STATE QUẢN LÝ MEDIA VIEWER ---
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
-
-  // --- 🔥 4. THÊM HÀM MỞ VIEWER ---
-  const handleOpenMedia = (msgId: string) => {
+  // --- HÀM MỞ VIEWER (Merge: nhận msgId và index) ---
+  const handleOpenMedia = (msgId: string, imageIndex: number = 0) => {
     setSelectedMediaId(msgId);
+    setSelectedImageIndex(imageIndex);
     setViewerOpen(true);
   };
 
@@ -113,18 +115,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
 
                 {/* B. Nội dung tin nhắn */}
                 {isSystemMsg ? (
-                  <ChatNotification
-                    type={msg.type}
-                    content={msg.content[0]}
-                  />
+                  <ChatNotification type={msg.type} content={msg.content[0]} />
                 ) : (
                   <ChatMessage
                     msg={msg}
                     isMe={isMe}
                     isFirstInSequence={isFirstInSequence}
                     isLastInSequence={isLastInSequence}
-                    // 🔥 5. TRUYỀN HÀM MỞ MODAL XUỐNG DƯỚI
-                    onMediaClick={() => handleOpenMedia(msg._id)}
+                    onMediaClick={(imageIndex) =>
+                      handleOpenMedia(msg._id, imageIndex)
+                    }
                   />
                 )}
               </React.Fragment>
@@ -142,12 +142,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
         onSendSuccess={loadMessages}
       />
 
-      {/* 🔥 6. RENDER MEDIA VIEWER Ở CUỐI CÙNG */}
+      {/* Media Viewer - Giữ đầy đủ props từ cả 2 bản */}
       {viewerOpen && (
         <MediaViewer
           isOpen={viewerOpen}
           onClose={() => setViewerOpen(false)}
           initialMessageId={selectedMediaId}
+          initialImageIndex={selectedImageIndex}
           messages={messages}
         />
       )}

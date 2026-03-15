@@ -11,22 +11,28 @@ export const ChatMessage = memo(
     isMe,
     isFirstInSequence,
     isLastInSequence,
-    onMediaClick, // 1. Nhận prop từ ChatArea
+    onMediaClick,
   }: {
     msg: any;
     isMe: boolean;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
-    onMediaClick?: () => void;
+    onMediaClick?: (imageIndex: number) => void;
   }) => {
-    // 2. 🔥 FIX QUAN TRỌNG: Chuẩn hóa type về chữ thường
     const msgType = msg.type?.toLowerCase();
 
-    // Logic lấy URL an toàn
+    // Cho video/file: chỉ lấy phần tử đầu tiên
     const fullUrl = useMemo(() => {
-      if (msgType === "text") return "";
+      if (msgType === "text" || msgType === "image") return "";
       const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
       return getFullUrl(content);
+    }, [msg.content, msgType]);
+
+    // Cho ảnh: lấy toàn bộ mảng URL
+    const imageUrls = useMemo(() => {
+      if (msgType !== "image") return [];
+      const content = Array.isArray(msg.content) ? msg.content : [msg.content];
+      return content.map((c: string) => getFullUrl(c));
     }, [msg.content, msgType]);
 
     switch (msgType) {
@@ -34,11 +40,11 @@ export const ChatMessage = memo(
         return (
           <ImageMessage
             msg={msg}
-            url={fullUrl}
+            urls={imageUrls}
             isMe={isMe}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
-            onClick={onMediaClick} // 3. Truyền xuống ImageMessage
+            onClick={onMediaClick}
           />
         );
 
@@ -50,7 +56,7 @@ export const ChatMessage = memo(
             isMe={isMe}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
-            onClick={onMediaClick} // 4. Truyền xuống VideoMessage
+            onClick={() => onMediaClick?.(0)}
           />
         );
 
@@ -79,10 +85,7 @@ export const ChatMessage = memo(
         );
     }
   },
-  // 5. 🔥 TỐI ƯU MEMO
   (prev, next) => {
-    // Chỉ render lại nếu nội dung tin nhắn thay đổi hoặc vị trí (đầu/cuối) thay đổi.
-    // KHÔNG so sánh onMediaClick vì nó luôn thay đổi mỗi lần cha render.
     return (
       prev.msg._id === next.msg._id &&
       prev.msg.content === next.msg.content &&

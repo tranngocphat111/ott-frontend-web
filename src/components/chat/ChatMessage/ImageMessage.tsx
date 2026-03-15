@@ -3,19 +3,182 @@ import { MessageLayout } from "./MessageLayout";
 
 export const ImageMessage = ({
   msg,
-  url,
+  urls,
   isMe,
   isFirstInSequence,
   isLastInSequence,
-  onClick, // 1. Nhận prop onClick từ ChatMessage
+  onClick,
 }: {
   msg: Message;
-  url: string;
+  urls: string[];
   isMe: boolean;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
-  onClick?: () => void; // 2. Định nghĩa kiểu dữ liệu cho onClick
+  onClick?: (imageIndex: number) => void;
 }) => {
+  const count = urls.length;
+
+  const imgCell = (url: string, index: number, className = "") => (
+    <div
+      key={index}
+      className={`overflow-hidden cursor-pointer hover:brightness-90 transition-all ${className}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(index);
+      }}
+    >
+      <img
+        src={url}
+        alt="Attachment"
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
+    </div>
+  );
+
+  const renderGrid = (borderRadius: string) => {
+    // 1 ảnh
+    if (count === 1) {
+      return (
+        <div
+          className={`overflow-hidden cursor-pointer border border-gray-200 shadow-sm hover:brightness-90 transition-all ${borderRadius}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.(0);
+          }}
+        >
+          <img
+            src={urls[0]}
+            alt="Attachment"
+            className="block max-w-full h-auto object-cover max-h-[400px] min-w-[100px]"
+            loading="lazy"
+          />
+        </div>
+      );
+    }
+
+    // 2 ảnh
+    if (count === 2) {
+      return (
+        <div
+          className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
+          style={{ width: "300px" }}
+        >
+          {urls.map((url, i) => (
+            <div
+              key={i}
+              className="overflow-hidden cursor-pointer hover:brightness-90 transition-all"
+              style={{ height: "150px" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.(i);
+              }}
+            >
+              <img
+                src={url}
+                alt="Attachment"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 3 ảnh: 1 lớn bên trái + 2 nhỏ bên phải
+    if (count === 3) {
+      return (
+        <div
+          className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
+          style={{ width: "300px", gridTemplateRows: "repeat(2, 150px)" }}
+        >
+          {/* ảnh đầu chiếm cả cột trái */}
+          <div
+            className="row-span-2 overflow-hidden cursor-pointer hover:brightness-90 transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.(0);
+            }}
+          >
+            <img
+              src={urls[0]}
+              alt="Attachment"
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+          {/* 2 ảnh còn lại xếp dọc bên phải */}
+          {urls.slice(1, 3).map((url, i) => imgCell(url, i + 1, ""))}
+        </div>
+      );
+    }
+
+    // 4 ảnh: 2x2 grid
+    if (count === 4) {
+      return (
+        <div
+          className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
+          style={{ width: "300px" }}
+        >
+          {urls.map((url, i) => (
+            <div
+              key={i}
+              className="overflow-hidden cursor-pointer hover:brightness-90 transition-all"
+              style={{ height: "150px" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.(i);
+              }}
+            >
+              <img
+                src={url}
+                alt="Attachment"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 5+ ảnh: grid 3 cột, hiển thị tối đa 6 ô, ô cuối overlay "+N"
+    const visibleUrls = urls.slice(0, 6);
+    const remaining = count - 6;
+
+    return (
+      <div
+        className={`grid grid-cols-3 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
+        style={{ width: "300px" }}
+      >
+        {visibleUrls.map((url, i) => (
+          <div
+            key={i}
+            className="relative overflow-hidden cursor-pointer hover:brightness-90 transition-all"
+            style={{ height: "100px" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.(i);
+            }}
+          >
+            <img
+              src={url}
+              alt="Attachment"
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+            {i === 5 && remaining > 0 && (
+              <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-xl font-bold pointer-events-none">
+                +{remaining}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <MessageLayout
       msg={msg}
@@ -23,31 +186,7 @@ export const ImageMessage = ({
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
     >
-      {(borderRadius) => (
-        <div
-          className={`
-            relative overflow-hidden group cursor-pointer border border-gray-200 shadow-sm transition-all hover:brightness-90
-            ${borderRadius} 
-          `}
-          // 3. Xử lý sự kiện click
-          onClick={(e) => {
-            e.stopPropagation(); // Ngăn sự kiện lan truyền lên trên
-            if (onClick) {
-              onClick(); // Mở MediaViewer
-            } else {
-              // Fallback: Nếu không có handler thì mở tab mới như cũ
-              window.open(url, "_blank");
-            }
-          }}
-        >
-          <img
-            src={url}
-            alt="Attachment"
-            className="block max-w-full h-auto object-cover max-h-[400px] min-w-[100px]"
-            loading="lazy"
-          />
-        </div>
-      )}
+      {(borderRadius) => renderGrid(borderRadius)}
     </MessageLayout>
   );
 };
