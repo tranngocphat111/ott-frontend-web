@@ -18,7 +18,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations, updateParticipant, removeConversation } = useConversations();
+  const { categories, refreshConversations, updateParticipant } = useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -78,6 +78,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     const lastMsg = conversation.last_message;
     if (!lastMsg?.content) return "Chưa có tin nhắn";
 
+    // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
+    if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
+
     const prefix = lastMsg.sender_id === currentUserId
       ? "Bạn"
       : (lastMsg.sender_name || "");
@@ -92,7 +95,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     return formatTimeAgo(time);
   };
 
-  const hasUnreadMessage = false; // TODO: Implement unread logic
+  const lastMsgId = conversation.last_message?.msg_id || "0";
+  const lastReadMsgId = participant.last_read_message_id || "0";
+  const hasUnreadMessage =
+    lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadMsgId);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -178,8 +184,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử hội thoại này?")) return;
 
     try {
-      await ParticipantService.deleteConversation(conversation._id, currentUserId);
-      removeConversation(conversation._id);
+      const updatedParticipant = await ParticipantService.deleteConversation(
+        conversation._id,
+        currentUserId,
+      );
+      // Cập nhật deleted_msg_id trong state — Sidebar filter sẽ tự động ẩn conversation
+      updateParticipant(conversation._id, { deleted_msg_id: updatedParticipant.deleted_msg_id });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
       alert(message);
@@ -260,11 +270,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center space-x-1 ml-2">
+              <div className="flex items-center space-x-1 ml-2 ">
                 {isMuted && (
                   <FaBellSlash  className="w-4 h-4 text-gray-400" />
                 )}
-                <span className="text-xs text-gray-400 whitespace-nowrap select-none max-w-15">
+                <span className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}>
                   {getTimeDisplay()}
                 </span>
               </div>
@@ -279,7 +289,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 />
               )}
 
-              <p className="text-sm text-gray-600 truncate flex-1 select-none">
+              <p className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}>
                 {getLatestMessagePreview()}
               </p>
 

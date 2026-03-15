@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Conversation, ConversationWithParticipant, Category } from '../types';
-import { ConversationService } from '../services';
+import { ConversationService, socketService } from '../services';
 import type { Participant } from '../types';
 
 interface ConversationsContextType {
@@ -94,6 +94,64 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({ ch
     setConversations(prev => prev.filter(item => item.conversation._id !== conversationId));
   }, []);
 
+  // Cập nhật conversation list khi có tin nhắn mới từ socket (real-time)
+  const handleIncomingMessage = useCallback((message: any) => {
+    const convId = message.conversation_id?.toString();
+    if (!convId) return;
+
+    setConversations(prev => {
+      const targetIndex = prev.findIndex(item => item.conversation._id === convId);
+      if (targetIndex === -1) return prev;
+
+      const rawContent: string = Array.isArray(message.content)
+        ? message.content[0] || ""
+        : message.content || "";
+
+      let displayContent = "";
+      switch (message.type) {
+        case "image": displayContent = "[Hình ảnh]"; break;
+        case "video": displayContent = "[Video]"; break;
+        case "file":  displayContent = "[Tệp tin]"; break;
+        default:
+          displayContent = rawContent.length > 50
+            ? rawContent.substring(0, 50) + "..."
+            : rawContent;
+      }
+
+      const existing = prev[targetIndex];
+      const updated: ConversationWithParticipant = {
+        ...existing,
+        conversation: {
+          ...existing.conversation,
+          last_message: {
+            msg_id:      message.msg_id,
+            sender_id:   message.sender_id,
+            sender_name: message.sender_name || "",
+            content:     displayContent,
+            type:        message.type,
+            createdAt:   message.createdAt || new Date().toISOString(),
+          },
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+      // Lấy conversation ra đặt lên đầu, sort tiếp theo sẽ giữ đúng thứ tự pinned/unpinned
+      const newList = [...prev];
+      newList.splice(targetIndex, 1);
+      newList.unshift(updated);
+      return newList;
+    });
+  }, []);
+
+  // Kết nối socket và đăng ký lắng nghe tin nhắn mới để cập nhật conversation list
+  useEffect(() => {
+    socketService.connect();
+    socketService.onNewMessage(handleIncomingMessage);
+    return () => {
+      socketService.offNewMessage(handleIncomingMessage);
+    };
+  }, [handleIncomingMessage]);
+
   // Add new category
   const addCategory = useCallback((category: Category) => {
     setCategories(prev => [...prev, category]);
@@ -133,7 +191,31 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({ ch
   const refreshConversations = useCallback(async (userId: string) => {
     try {
       const loadedConversations = await ConversationService.getUserConversations(userId);
-      setConversations(loadedConversations);
+      setConversations(prev => {
+        return loadedConversations.map(newItem => {
+          const convId = newItem.conversation._id;
+          const dbId = newItem.participant.last_read_message_id || "0";
+
+          // Lấy giá trị in-memory (optimistic update trong session hiện tại)
+          const existing = prev.find(p => p.conversation._id === convId);
+          const inMemId = existing?.participant.last_read_message_id || "0";
+
+          // Lấy giá trị từ localStorage (fallback khi API lỗi hoặc sau F5)
+          const lsId = localStorage.getItem(`read_${convId}_${userId}`) || "0";
+
+          // Dùng giá trị lớn nhất trong 3 nguồn
+          const candidates = [dbId, inMemId, lsId].filter(id => id !== "0");
+          if (candidates.length === 0) return newItem;
+
+          const bestId = candidates.reduce((max, id) =>
+            BigInt(id) > BigInt(max) ? id : max
+          );
+
+          return BigInt(bestId) > BigInt(dbId)
+            ? { ...newItem, participant: { ...newItem.participant, last_read_message_id: bestId } }
+            : newItem;
+        });
+      });
     } catch (error) {
       console.error('Failed to refresh conversations:', error);
     }

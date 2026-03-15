@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SearchBar from "../common/SearchBar";
 import ConversationList from "../conversations/ConversationList";
 import CategoryFilter from "../conversations/CategoryFilter";
@@ -8,7 +8,7 @@ import ErrorState from "../common/ErrorState";
 import CreateGroupModal from "../modal/group/CreateGroupModal";
 import { UserService } from "../../services/user.service";
 import { ConversationService } from "../../services/conversation.service";
-import { CategoryService } from "../../services";
+import { CategoryService, socketService } from "../../services";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { useUser } from "../../contexts/UserContext";
 import type {
@@ -46,6 +46,27 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
 
+  // Join user room để nhận tin nhắn real-time từ tất cả cuộc hội thoại
+  useEffect(() => {
+    if (!currentUser?._id) return;
+    socketService.joinUserRoom(currentUser._id);
+  }, [currentUser]);
+
+  // Lắng nghe cuộc hội thoại mới được người khác thêm mình vào
+  const handleNewConversation = useCallback((newConv: any) => {
+    const convId = newConv._id?.toString();
+    if (!convId || !currentUser?._id) return;
+    const exists = conversations.some(item => item.conversation._id === convId);
+    if (!exists) {
+      refreshConversations(currentUser._id);
+    }
+  }, [conversations, currentUser, refreshConversations]);
+
+  useEffect(() => {
+    socketService.onNewConversation(handleNewConversation);
+    return () => socketService.offNewConversation(handleNewConversation);
+  }, [handleNewConversation]);
+
   const loadConversations = async () => {
     if (!currentUser?._id) return;
 
@@ -65,7 +86,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Load conversations for current user
       const loadedConversations =
         await ConversationService.getUserConversations(currentUser._id);
-      setConversations(loadedConversations);
+
+      // Reconcile last_read_message_id với localStorage để tránh bôi đen sau F5
+      const userId = currentUser._id;
+      const reconciledConversations = loadedConversations.map(newItem => {
+        const convId = newItem.conversation._id;
+        const dbId = newItem.participant.last_read_message_id || "0";
+        const lsId = localStorage.getItem(`read_${convId}_${userId}`) || "0";
+        if (lsId !== "0" && BigInt(lsId) > BigInt(dbId)) {
+          return { ...newItem, participant: { ...newItem.participant, last_read_message_id: lsId } };
+        }
+        return newItem;
+      });
+      setConversations(reconciledConversations);
 
       // Load categories for current user
       const loadedCategories = await CategoryService.getUserCategories(
@@ -86,6 +119,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     let filtered = conversations;
+
+    // Ẩn conversations đã xóa (deleted_msg_id >= last_message.msg_id)
+    filtered = filtered.filter(item => {
+      const lastMsgId = item.conversation.last_message?.msg_id;
+      const deletedMsgId = item.participant.deleted_msg_id || "0";
+      if (deletedMsgId === "0") return true;
+      if (lastMsgId) return BigInt(lastMsgId) > BigInt(deletedMsgId);
+      return false;
+    });
 
     // Filter by categories (multiple selection)
     if (selectedCategoryIds.length > 0) {

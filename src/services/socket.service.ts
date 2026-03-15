@@ -28,6 +28,22 @@ class SocketService {
     console.log("Socket disconnected manually");
   }
 
+  joinUserRoom(userId: string) {
+    const socket = this.socket;
+    if (!socket) return console.error("Socket chưa được khởi tạo");
+
+    const join = () => {
+      socket.emit("tham_gia_user_room", userId);
+      console.log(`Đã vào user room: user:${userId}`);
+    };
+
+    if (socket.connected) {
+      join();
+    } else {
+      socket.once("connect", join);
+    }
+  }
+
   joinConversation(conversationId: string) {
     const socket = this.socket;
 
@@ -49,15 +65,27 @@ class SocketService {
   }
 
   onNewMessage(callback: (message: any) => void) {
-    this.socket?.on("tin_nhan", (msg) => {
-      console.log("Tin nhắn mới:", msg._id);
-      callback(msg);
-    });
+    this.socket?.on("tin_nhan", callback);
   }
 
   offNewMessage(callback?: (message: any) => void) {
-    this.socket?.off("tin_nhan", callback);
-    console.log("Dọn dẹp socket 'tin_nhan'");
+    if (callback) {
+      this.socket?.off("tin_nhan", callback);
+    } else {
+      this.socket?.removeAllListeners("tin_nhan");
+    }
+  }
+
+  onNewConversation(callback: (conversation: any) => void) {
+    this.socket?.on("tao_phong_moi", callback);
+  }
+
+  offNewConversation(callback?: (conversation: any) => void) {
+    if (callback) {
+      this.socket?.off("tao_phong_moi", callback);
+    } else {
+      this.socket?.removeAllListeners("tao_phong_moi");
+    }
   }
 
   getSocket(): Socket | null {
