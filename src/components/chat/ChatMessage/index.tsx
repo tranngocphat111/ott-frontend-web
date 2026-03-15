@@ -11,17 +11,25 @@ export const ChatMessage = memo(
     isMe,
     isFirstInSequence,
     isLastInSequence,
+    onMediaClick, // 1. Nhận prop từ ChatArea
   }: {
     msg: any;
     isMe: boolean;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
+    onMediaClick?: () => void;
   }) => {
-    const fullUrl = useMemo(() => {
-      return msg.type !== "text" ? getFullUrl(msg.content) : "";
-    }, [msg.content, msg.type]);
+    // 2. 🔥 FIX QUAN TRỌNG: Chuẩn hóa type về chữ thường
+    const msgType = msg.type?.toLowerCase();
 
-    switch (msg.type) {
+    // Logic lấy URL an toàn
+    const fullUrl = useMemo(() => {
+      if (msgType === "text") return "";
+      const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
+      return getFullUrl(content);
+    }, [msg.content, msgType]);
+
+    switch (msgType) {
       case "image":
         return (
           <ImageMessage
@@ -30,6 +38,7 @@ export const ChatMessage = memo(
             isMe={isMe}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onClick={onMediaClick} // 3. Truyền xuống ImageMessage
           />
         );
 
@@ -41,6 +50,7 @@ export const ChatMessage = memo(
             isMe={isMe}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onClick={onMediaClick} // 4. Truyền xuống VideoMessage
           />
         );
 
@@ -69,7 +79,10 @@ export const ChatMessage = memo(
         );
     }
   },
+  // 5. 🔥 TỐI ƯU MEMO
   (prev, next) => {
+    // Chỉ render lại nếu nội dung tin nhắn thay đổi hoặc vị trí (đầu/cuối) thay đổi.
+    // KHÔNG so sánh onMediaClick vì nó luôn thay đổi mỗi lần cha render.
     return (
       prev.msg._id === next.msg._id &&
       prev.msg.content === next.msg.content &&

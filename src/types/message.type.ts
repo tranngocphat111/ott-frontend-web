@@ -1,8 +1,10 @@
+import type { LucideIcon } from "lucide-react";
+
 export interface Message {
   _id: string;
   content: string[] | string;
   type: "text" | "image" | "file" | "video" | "audio";
-  created_at: string;
+  createdAt: string;
   sender_id: String;
   size?: number;
   attachments?: MessageAttachment[];
@@ -31,4 +33,10 @@ export interface FileMessageProps {
   url: string;
   fileName?: string;
   size?: number;
+}
+
+export interface FileTypeData {
+  Icon: LucideIcon;
+  color: string;
+  bg: string;
 }

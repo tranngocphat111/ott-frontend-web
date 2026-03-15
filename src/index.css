@@ -2,16 +2,25 @@
 
 @theme {
   /* Định nghĩa bảng màu Primary */
-  --color-primary-50: #F7F3F0;
-  --color-primary-100: #EFE7E0;
-  --color-primary-200: #DFC0A4;
-  --color-primary-300: #D0A97E;
-  --color-primary-400: #BC9166;
-  --color-primary-500: #AE7F53; /* Primary 500 mặc định */
-  --color-primary-600: #8B6642;
-  --color-primary-700: #694D31;
+  --color-primary-50: #f7f3f0;
+  --color-primary-100: #efe7e0;
+  --color-primary-200: #dfc0a4;
+  --color-primary-300: #d0a97e;
+  --color-primary-400: #bc9166;
+  --color-primary-500: #ae7f53; /* Primary 500 mặc định */
+  --color-primary-600: #8b6642;
+  --color-primary-700: #694d31;
   --color-primary-800: #463421;
-  --color-primary-900: #231A10;
+  --color-primary-900: #231a10;
+
+  /* Định nghĩa màu riêng cho tin nhắn của bản thân*/
+  --color-chat-me: #efdccb;
+  --color-chat-me-text: #101828;
+
+  /* Định nghĩa màu riêng cho tin nhắn của người khác */
+  --color-chat-other: #ffffff;
+  --color-chat-other-border: #e5e7eb;
+  --color-chat-other-text: #111827;
 
   /* Định nghĩa Animations */
   --animate-slide-in-left: slideInLeft 0.3s ease-out forwards;
@@ -20,14 +29,30 @@
   --animate-shimmer: shimmer 2s infinite linear;
 
   /* Định nghĩa Background Images */
-  --background-image-gradient-primary: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-200));
-  --background-image-gradient-sidebar: linear-gradient(180deg, var(--color-primary-500), var(--color-primary-400));
-  --background-image-gradient-chat: linear-gradient(135deg, var(--color-primary-200), var(--color-primary-300));
+  --background-image-gradient-primary: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-primary-200)
+  );
+  --background-image-gradient-sidebar: linear-gradient(
+    180deg,
+    var(--color-primary-500),
+    var(--color-primary-400)
+  );
+  --background-image-gradient-chat: linear-gradient(
+    135deg,
+    var(--color-primary-200),
+    var(--color-primary-300)
+  );
 }
 
 /* Khai báo Keyframes nếu cần */
 @keyframes slideInLeft {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 /* ... các keyframes khác */
