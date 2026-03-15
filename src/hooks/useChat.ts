@@ -2,18 +2,18 @@ import { useState, useEffect, useCallback } from "react";
 import { MessageService, socketService } from "../services";
 import type { Message } from "../interfaces";
 
-export const useChat = (conversationId: string) => {
+export const useChat = (conversationId: string, userId?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
   const loadMessages = useCallback(async () => {
     if (!conversationId) return;
     try {
-      const data = await MessageService.getMessages(conversationId);
+      const data = await MessageService.getMessages(conversationId, userId);
       setMessages(data);
     } catch (error) {
       console.error("Load tin nhắn thất bại:", error);
-    } 
-  }, [conversationId]);
+    }
+  }, [conversationId, userId]);
 
   const handleNewMessage = (msg: any) => {
     const msgConvId = msg.conversation_id || msg.conversationId;

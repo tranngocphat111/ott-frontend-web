@@ -18,7 +18,7 @@ import { MediaViewer } from "./ChatMessage/MediaViewer";
 
 const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const { currentUser } = useUser();
-  const { messages, loadMessages } = useChat(conversation?._id);
+  const { messages, loadMessages } = useChat(conversation?._id, currentUser?._id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // --- 🔥 3. THÊM STATE QUẢN LÝ MEDIA VIEWER ---

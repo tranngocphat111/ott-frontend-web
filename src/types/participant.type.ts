@@ -15,7 +15,7 @@ export interface Participant {
   };
   last_read_message_id: string;
   last_read_at: string;
-  deleted_msg_id: number;
+  deleted_msg_id: string;
   nickname?: string;
   joined_at: string;
   roles: 'admin' | 'user';

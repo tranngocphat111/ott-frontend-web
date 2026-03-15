@@ -20,9 +20,14 @@ export class UserService {
       // Mapping dữ liệu từ Backend về Frontend
       return data.map((user: any) => ({
         _id: user.user_id || user._id,
-        display_name: user.name,
-        avatar_url: user.avatar || undefined,
+        user_id: user.user_id || '',
+        name: user.name || '',
+        display_name: user.name || '',
+        avatar: user.avatar || '',
+        is_online: user.is_online || false,
+        last_active_at: user.last_active_at || '',
         status: user.is_online ? "online" : "offline",
+        avatar_url: user.avatar || undefined,
       }));
     } catch (error) {
       console.error("Error fetching users:", error);

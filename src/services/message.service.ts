@@ -83,18 +83,18 @@ export class MessageService {
   }
 
   // Get messages from database
-  static async getMessages(conversationId: string) {
+  static async getMessages(conversationId: string, userId?: string) {
     try {
-      const response = await fetch(
-        `${API_CHAT_SERVER_URL}/messages/${conversationId}`,
-        {
+      const url = userId
+        ? `${API_CHAT_SERVER_URL}/messages/${conversationId}?userId=${encodeURIComponent(userId)}`
+        : `${API_CHAT_SERVER_URL}/messages/${conversationId}`;
+      const response = await fetch(url, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true", // <--- Thêm dòng này
+            "ngrok-skip-browser-warning": "true",
           },
-        },
-      );
+        });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

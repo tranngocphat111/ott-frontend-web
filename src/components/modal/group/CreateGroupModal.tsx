@@ -44,14 +44,15 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   };
 
   const filteredUsers = availableUsers.filter(user => {
-    const matchesSearch = user.display_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const name = user.display_name || user.name || '';
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
   // Group users by first letter
   const groupedUsers = filteredUsers.reduce((acc, user) => {
-    const firstLetter = user.display_name.charAt(0).toUpperCase();
-    const key = /[0-9]/.test(firstLetter) ? '0-9' : firstLetter;
+    const firstLetter = (user.display_name || user.name || '').charAt(0).toUpperCase();
+    const key = /[0-9]/.test(firstLetter) ? '0-9' : firstLetter || '#';
     if (!acc[key]) acc[key] = [];
     acc[key].push(user);
     return acc;
