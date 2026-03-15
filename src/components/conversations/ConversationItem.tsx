@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { MessageCircle, Users, Pin } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
-import ConversationContextMenu from "../modals/conversation/ConversationContextMenu";
-import CategoryManagementModal from "../modals/category/CategoryManagementModal";
+import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
+import CategoryManagementModal from "../modal/category/CategoryManagementModal";
 import type { ConversationItemProps } from "../../interfaces";
 import { ParticipantService } from "../../services";
 import type { Category } from "../../types";
@@ -18,7 +18,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations } = useConversations();
+  const { categories, refreshConversations, updateParticipant, removeConversation } = useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -75,12 +75,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const getLatestMessagePreview = (): string => {
-    // Kiểm tra last_message từ backend
-    if (conversation.last_message?.content) {
-      return conversation.last_message.content;
-    }
+    const lastMsg = conversation.last_message;
+    if (!lastMsg?.content) return "Chưa có tin nhắn";
 
-    return "Chưa có tin nhắn";
+    const prefix = lastMsg.sender_id === currentUserId
+      ? "Bạn"
+      : (lastMsg.sender_name || "");
+
+    return prefix ? `${prefix}: ${lastMsg.content}` : lastMsg.content;
   };
 
   const getTimeDisplay = (): string => {
@@ -171,10 +173,17 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const handleDelete = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa cuộc hội thoại này?")) {
-      console.log("Delete conversation:", conversation._id);
-      // TODO: Implement delete logic
+  const handleDelete = async () => {
+    if (!currentUserId) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử hội thoại này?")) return;
+
+    try {
+      await ParticipantService.deleteConversation(conversation._id, currentUserId);
+      removeConversation(conversation._id);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
+      alert(message);
+      console.error("Error deleting conversation:", error);
     }
   };
 

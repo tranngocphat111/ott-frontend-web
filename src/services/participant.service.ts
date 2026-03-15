@@ -98,4 +98,30 @@ export class ParticipantService {
       throw error;
     }
   }
+
+  /**
+   * Xóa cuộc hội thoại theo cơ chế soft-delete kiểu Zalo.
+   * Backend tự động lấy last_message.msg_id và lưu vào deleted_msg_id.
+   */
+  static async deleteConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/delete-conversation`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({ conversationId, userId }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to delete conversation");
+    }
+  }
 }

@@ -81,7 +81,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({ ch
         },
         last_read_message_id: '0',
         last_read_at: new Date().toISOString(),
-        deleted_msg_id: 0,
+        deleted_msg_id: "0",
         joined_at: new Date().toISOString(),
         roles: 'user',
       },

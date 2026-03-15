@@ -14,6 +14,7 @@ export interface Conversation {
   last_message?: {
     msg_id: string;
     sender_id: string;
+    sender_name: string;
     content: string;
     type: 'text' | 'image' | 'video' | 'file';
     createdAt: string;
