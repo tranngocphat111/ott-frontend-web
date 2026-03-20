@@ -157,11 +157,22 @@ export const ChatInput = ({
 
   // --- Handlers từ sub-components → staging ---
 
-  // Icon ảnh: thêm vào staging
-  const handleImageFiles = (files: File[]) => addToPending(files);
+  // Icon ảnh: upload và gửi ngay (không qua staging)
+  const handleImageFiles = async (files: File[]) => {
+    if (isUploading || files.length === 0) return;
+    await uploadImages(files);
+  };
 
-  // Icon tệp: thêm vào staging
-  const handleAttachFiles = (files: File[]) => addToPending(files);
+  // Icon tệp: upload và gửi ngay (ảnh gộp 1 tin; file/video gửi từng tin)
+  const handleAttachFiles = async (files: File[]) => {
+    if (isUploading || files.length === 0) return;
+
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    const others = files.filter((f) => !f.type.startsWith("image/"));
+
+    if (images.length > 0) await uploadImages(images);
+    for (const file of others) await uploadSingleFile(file);
+  };
 
   // Paste (Ctrl+V): nếu có file → staging, text → paste bình thường
   const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
@@ -183,7 +194,8 @@ export const ChatInput = ({
     }
   };
 
-  const canSend = (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
+  const canSend =
+    (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
 
   return (
     <div
