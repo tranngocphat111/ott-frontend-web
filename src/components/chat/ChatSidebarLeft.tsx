@@ -26,6 +26,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
   selectedConversationId,
 }) => {
   const { currentUser } = useUser();
+  const normalizedUserId = currentUser?.user_id || currentUser?._id;
   const {
     conversations,
     categories,
@@ -51,19 +52,24 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
 
   // Join user room để nhận tin nhắn real-time từ tất cả cuộc hội thoại
   useEffect(() => {
-    if (!currentUser?._id) return;
-    socketService.joinUserRoom(currentUser._id);
-  }, [currentUser]);
+    if (!normalizedUserId) return;
+    socketService.joinUserRoom(normalizedUserId);
+  }, [normalizedUserId]);
 
   // Lắng nghe cuộc hội thoại mới được người khác thêm mình vào
-  const handleNewConversation = useCallback((newConv: any) => {
-    const convId = newConv._id?.toString();
-    if (!convId || !currentUser?._id) return;
-    const exists = conversations.some(item => item.conversation._id === convId);
-    if (!exists) {
-      refreshConversations(currentUser._id);
-    }
-  }, [conversations, currentUser, refreshConversations]);
+  const handleNewConversation = useCallback(
+    (newConv: any) => {
+      const convId = newConv._id?.toString();
+      if (!convId || !normalizedUserId) return;
+      const exists = conversations.some(
+        (item) => item.conversation._id === convId,
+      );
+      if (!exists) {
+        refreshConversations(normalizedUserId);
+      }
+    },
+    [conversations, normalizedUserId, refreshConversations],
+  );
 
   useEffect(() => {
     socketService.onNewConversation(handleNewConversation);
@@ -71,7 +77,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
   }, [handleNewConversation]);
 
   const loadConversations = async () => {
-    if (!currentUser?._id) return;
+    if (!normalizedUserId) return;
 
     try {
       setLoading(true);
@@ -88,25 +94,27 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
 
       // Load conversations for current user
       const loadedConversations =
-        await ConversationService.getUserConversations(currentUser._id);
+        await ConversationService.getUserConversations(normalizedUserId);
 
       // Reconcile last_read_message_id với localStorage để tránh bôi đen sau F5
-      const userId = currentUser._id;
-      const reconciledConversations = loadedConversations.map(newItem => {
+      const userId = normalizedUserId;
+      const reconciledConversations = loadedConversations.map((newItem) => {
         const convId = newItem.conversation._id;
         const dbId = newItem.participant.last_read_message_id || "0";
         const lsId = localStorage.getItem(`read_${convId}_${userId}`) || "0";
         if (lsId !== "0" && BigInt(lsId) > BigInt(dbId)) {
-          return { ...newItem, participant: { ...newItem.participant, last_read_message_id: lsId } };
+          return {
+            ...newItem,
+            participant: { ...newItem.participant, last_read_message_id: lsId },
+          };
         }
         return newItem;
       });
       setConversations(reconciledConversations);
 
       // Load categories for current user
-      const loadedCategories = await CategoryService.getUserCategories(
-        currentUser._id,
-      );
+      const loadedCategories =
+        await CategoryService.getUserCategories(normalizedUserId);
       setCategories(loadedCategories);
     } catch (error) {
       console.error("Failed to load data from database:", error);
@@ -118,7 +126,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     loadConversations();
-  }, [currentUser]);
+  }, [normalizedUserId]);
 
   useEffect(() => {
     let filtered = conversations;
@@ -128,7 +136,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     };
 
     // Ẩn conversations đã xóa (deleted_msg_id >= last_message.msg_id)
-    filtered = filtered.filter(item => {
+    filtered = filtered.filter((item) => {
       const lastMsgId = item.conversation.last_message?.msg_id;
       const deletedMsgId = item.participant.deleted_msg_id || "0";
       if (deletedMsgId === "0") return true;
@@ -205,7 +213,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     selectedUsers: User[],
     avatar?: string,
   ) => {
-    if (!currentUser?._id) {
+    if (!normalizedUserId) {
       console.error("Current user not found");
       alert("Vui lòng đăng nhập lại!");
       return;
@@ -219,7 +227,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
 
       // Call API to create group in database with full data
       const newGroup = await ConversationService.createGroup(
-        currentUser._id,
+        normalizedUserId,
         groupName,
         memberIds,
         avatar,
@@ -229,8 +237,8 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       addConversation(newGroup);
 
       // Refresh to get full participant data
-      if (currentUser._id) {
-        await refreshConversations(currentUser._id);
+      if (normalizedUserId) {
+        await refreshConversations(normalizedUserId);
       }
 
       console.log("Group created successfully in database:", newGroup);

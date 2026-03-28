@@ -28,13 +28,18 @@ export class MessageService {
   /**
    * 2. Upload trực tiếp file lên S3
    */
-  static async uploadFileToS3(uploadUrl: string, file: File) {
+  static async uploadFileToS3(
+    uploadUrl: string,
+    file: File,
+    contentType?: string,
+  ) {
     try {
       const response = await fetch(uploadUrl, {
         method: "PUT", // Bắt buộc là PUT cho S3 Presigned URL
         body: file,
         headers: {
-          "Content-Type": file.type, // Đảm bảo khớp với fileType lúc xin URL
+          "Content-Type":
+            contentType || file.type || "application/octet-stream", // Đảm bảo khớp với fileType lúc xin URL
         },
       });
 

@@ -4,6 +4,7 @@ import { TextMessage } from "./TextMessage";
 import { ImageMessage } from "./ImageMessage";
 import { VideoMessage } from "./VideoMessage";
 import { FileMessage } from "./FileMessage";
+import { AudioMessage } from "./AudioMessage";
 
 export const ChatMessage = memo(
   ({
@@ -27,7 +28,7 @@ export const ChatMessage = memo(
   }) => {
     const msgType = msg.type?.toLowerCase();
 
-    // Cho video/file: chỉ lấy phần tử đầu tiên
+    // Cho video/file/audio: chỉ lấy phần tử đầu tiên
     const fullUrl = useMemo(() => {
       if (msgType === "text" || msgType === "image") return "";
       const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
@@ -75,6 +76,22 @@ export const ChatMessage = memo(
       case "file":
         return (
           <FileMessage
+            msg={msg}
+            url={fullUrl}
+            fileName={msg.fileName}
+            size={msg.size}
+            isMe={isMe}
+            currentUserId={currentUserId}
+            isFirstInSequence={isFirstInSequence}
+            isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
+          />
+        );
+
+      case "audio":
+        return (
+          <AudioMessage
             msg={msg}
             url={fullUrl}
             fileName={msg.fileName}

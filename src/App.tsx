@@ -1,11 +1,31 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
 import { routes, ROUTE_PATHS } from "./routers";
-import { useUser } from "./contexts/UserContext";
+import CallPage from "./pages/CallPage";
 import "./App.css";
 
 function AppContent() {
-  const { isAuthenticated } = useUser();
+  const location = useLocation();
+
+  if (location.pathname === ROUTE_PATHS.CALL) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-slate-950">
+        <Routes>
+          <Route path={ROUTE_PATHS.CALL} element={<CallPage />} />
+          <Route
+            path="*"
+            element={<Navigate to={ROUTE_PATHS.CALL} replace />}
+          />
+        </Routes>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-white">
