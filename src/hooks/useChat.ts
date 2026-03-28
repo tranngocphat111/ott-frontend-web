@@ -20,22 +20,56 @@ export const useChat = (conversationId: string, userId?: string) => {
     }
   }, [conversationId, userId]);
 
-  const handleNewMessage = useCallback((msg: any) => {
-    const msgConvId = msg.conversation_id?.toString() || msg.conversationId;
-    if (msgConvId !== conversationId) return;
+  const handleNewMessage = useCallback(
+    (msg: any) => {
+      const msgConvId = msg.conversation_id?.toString() || msg.conversationId;
+      if (msgConvId !== conversationId) return;
 
-    setMessages(prev => {
-      if (prev.some((m: any) => m._id === msg._id || m.msg_id === msg.msg_id)) return prev;
-      return [...prev, msg];
-    });
-  }, [conversationId]);
+      setMessages((prev) => {
+        if (prev.some((m: any) => m._id === msg._id || m.msg_id === msg.msg_id))
+          return prev;
+        return [...prev, msg];
+      });
+    },
+    [conversationId],
+  );
+
+  const handleReactionUpdate = useCallback(
+    (payload: any) => {
+      const payloadConvId =
+        payload.conversation_id?.toString() || payload.conversationId;
+
+      if (payloadConvId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((message: any) => {
+          if (
+            message.msg_id !== payload.msg_id &&
+            message._id !== payload._id
+          ) {
+            return message;
+          }
+
+          return {
+            ...message,
+            reactions: payload.reactions || [],
+          };
+        }),
+      );
+    },
+    [conversationId],
+  );
 
   useEffect(() => {
     loadMessages();
     socketService.joinConversation(conversationId);
     socketService.onNewMessage(handleNewMessage);
-    return () => socketService.offNewMessage(handleNewMessage);
-  }, [conversationId, loadMessages, handleNewMessage]);
+    socketService.onMessageReaction(handleReactionUpdate);
+    return () => {
+      socketService.offNewMessage(handleNewMessage);
+      socketService.offMessageReaction(handleReactionUpdate);
+    };
+  }, [conversationId, loadMessages, handleNewMessage, handleReactionUpdate]);
 
   return { messages, loadMessages };
 };

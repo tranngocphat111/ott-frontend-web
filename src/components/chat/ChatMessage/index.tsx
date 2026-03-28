@@ -9,15 +9,21 @@ export const ChatMessage = memo(
   ({
     msg,
     isMe,
+    currentUserId,
     isFirstInSequence,
     isLastInSequence,
     onMediaClick,
+    onReply,
+    onReact,
   }: {
     msg: any;
     isMe: boolean;
+    currentUserId?: string;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
     onMediaClick?: (imageIndex: number) => void;
+    onReply?: (msg: any) => void;
+    onReact?: (msg: any, reactionType: string) => void;
   }) => {
     const msgType = msg.type?.toLowerCase();
 
@@ -42,9 +48,12 @@ export const ChatMessage = memo(
             msg={msg}
             urls={imageUrls}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
             onClick={onMediaClick}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -54,9 +63,12 @@ export const ChatMessage = memo(
             msg={msg}
             url={fullUrl}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
             onClick={() => onMediaClick?.(0)}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -68,8 +80,11 @@ export const ChatMessage = memo(
             fileName={msg.fileName}
             size={msg.size}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -79,16 +94,25 @@ export const ChatMessage = memo(
           <TextMessage
             msg={msg}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
     }
   },
   (prev, next) => {
+    const prevReactions = JSON.stringify(prev.msg.reactions || []);
+    const nextReactions = JSON.stringify(next.msg.reactions || []);
+
     return (
       prev.msg._id === next.msg._id &&
       prev.msg.content === next.msg.content &&
+      prevReactions === nextReactions &&
+      prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
+      prev.msg.reply_to?.content === next.msg.reply_to?.content &&
       prev.isFirstInSequence === next.isFirstInSequence &&
       prev.isLastInSequence === next.isLastInSequence
     );

@@ -5,16 +5,22 @@ export const ImageMessage = ({
   msg,
   urls,
   isMe,
+  currentUserId,
   isFirstInSequence,
   isLastInSequence,
   onClick,
+  onReply,
+  onReact,
 }: {
   msg: Message;
   urls: string[];
   isMe: boolean;
+  currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
   onClick?: (imageIndex: number) => void;
+  onReply?: (msg: Message) => void;
+  onReact?: (msg: Message, reactionType: string) => void;
 }) => {
   const count = urls.length;
 
@@ -50,7 +56,7 @@ export const ImageMessage = ({
           <img
             src={urls[0]}
             alt="Attachment"
-            className="block max-w-full h-auto object-cover max-h-[400px] min-w-[100px]"
+            className="block max-w-full h-auto object-cover max-h-100 min-w-25"
             loading="lazy"
           />
         </div>
@@ -183,8 +189,11 @@ export const ImageMessage = ({
     <MessageLayout
       msg={msg}
       isMe={isMe}
+      currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      onReply={onReply}
+      onReact={onReact}
     >
       {(borderRadius) => renderGrid(borderRadius)}
     </MessageLayout>

@@ -7,16 +7,22 @@ export const VideoMessage = ({
   msg,
   url,
   isMe,
+  currentUserId,
   isFirstInSequence,
   isLastInSequence,
   onClick, // 1. Nhận prop onClick
+  onReply,
+  onReact,
 }: {
   msg: Message;
   url: string;
   isMe: boolean;
+  currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
   onClick?: () => void; // 2. Định nghĩa type
+  onReply?: (msg: Message) => void;
+  onReact?: (msg: Message, reactionType: string) => void;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -39,12 +45,15 @@ export const VideoMessage = ({
     <MessageLayout
       msg={msg}
       isMe={isMe}
+      currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      onReply={onReply}
+      onReact={onReact}
     >
       {(borderRadius) => (
         <div
-          className={`relative max-w-[300px] overflow-hidden bg-black shadow-sm group cursor-pointer border border-gray-100 transition-all
+          className={`relative max-w-75 overflow-hidden bg-black shadow-sm group cursor-pointer border border-gray-100 transition-all
           ${borderRadius} 
           `}
           // Click vào vùng bao quanh vẫn toggle Play/Pause (trải nghiệm tự nhiên)
@@ -53,7 +62,7 @@ export const VideoMessage = ({
           <video
             ref={videoRef}
             src={url}
-            className="w-full h-full object-cover max-h-[400px]"
+            className="w-full h-full object-cover max-h-100"
             controls={isPlaying} // Chỉ hiện controls native khi đang play
             preload="metadata"
             onPlay={onPlay}

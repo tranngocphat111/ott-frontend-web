@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useUser } from "../../contexts/UserContext";
 import { useConversations } from "../../contexts/ConversationsContext"; // Giữ từ bản 2
 import { useChat } from "../../hooks/useChat";
-import { ParticipantService } from "../../services"; // Giữ từ bản 2
+import { MessageService, ParticipantService } from "../../services"; // Giữ từ bản 2
 import type { ChatAreaProps } from "../../interfaces";
 
 // Components
@@ -17,15 +17,16 @@ import { ChatTimeSeparator } from "./ChatTimeSeparator";
 // Utils
 import { shouldShowTimestamp, formatChatTimestamp } from "../../utils";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
+import type { Message } from "../../types";
 
 const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const { currentUser } = useUser();
   const { updateParticipant } = useConversations(); // Logic "Đã xem"
   const { messages, loadMessages } = useChat(
     conversation?._id,
-    currentUser?._id
+    currentUser?._id,
   );
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMarkedRef = useRef<string>("0"); // Logic "Đã xem"
 
@@ -33,10 +34,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0); // Giữ từ bản 1
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
 
   // --- LOGIC ĐÁNH DẤU ĐÃ ĐỌC (Bản 2) ---
   useEffect(() => {
     lastMarkedRef.current = "0";
+    setReplyToMessage(null);
   }, [conversation?._id]);
 
   useEffect(() => {
@@ -52,12 +55,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     });
 
     // Fallback localStorage
-    localStorage.setItem(`read_${conversation._id}_${currentUser._id}`, lastMsg.msg_id);
+    localStorage.setItem(
+      `read_${conversation._id}_${currentUser._id}`,
+      lastMsg.msg_id,
+    );
 
     // Gọi API
-    ParticipantService.markAsRead(conversation._id, currentUser._id, lastMsg.msg_id)
-      .catch(console.error);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    ParticipantService.markAsRead(
+      conversation._id,
+      currentUser._id,
+      lastMsg.msg_id,
+    ).catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   // --- HÀM MỞ VIEWER (Merge: nhận msgId và index) ---
@@ -65,6 +74,25 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     setSelectedMediaId(msgId);
     setSelectedImageIndex(imageIndex);
     setViewerOpen(true);
+  };
+
+  const handleReplyMessage = (msg: Message) => {
+    setReplyToMessage(msg);
+  };
+
+  const handleReactMessage = async (msg: Message, reactionType: string) => {
+    if (!conversation?._id || !currentUser?._id || !msg.msg_id) return;
+
+    try {
+      await MessageService.reactToMessage(
+        conversation._id,
+        msg.msg_id,
+        currentUser._id,
+        reactionType,
+      );
+    } catch (error) {
+      console.error("Thả reaction thất bại:", error);
+    }
   };
 
   useEffect(() => {
@@ -120,11 +148,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
                   <ChatMessage
                     msg={msg}
                     isMe={isMe}
+                    currentUserId={currentUser?._id}
                     isFirstInSequence={isFirstInSequence}
                     isLastInSequence={isLastInSequence}
                     onMediaClick={(imageIndex) =>
                       handleOpenMedia(msg._id, imageIndex)
                     }
+                    onReply={handleReplyMessage}
+                    onReact={handleReactMessage}
                   />
                 )}
               </React.Fragment>
@@ -140,6 +171,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
         conversationId={conversation._id}
         senderId={currentUser?._id || ""}
         onSendSuccess={loadMessages}
+        replyToMessage={replyToMessage}
+        onCancelReply={() => setReplyToMessage(null)}
       />
 
       {/* Media Viewer - Giữ đầy đủ props từ cả 2 bản */}

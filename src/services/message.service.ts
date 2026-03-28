@@ -53,6 +53,7 @@ export class MessageService {
     type: string = "text",
     size: number = 0,
     fileName?: string,
+    replyToMsgId?: string,
   ) {
     try {
       const response = await fetch(`${API_CHAT_SERVER_URL}/messages`, {
@@ -68,6 +69,7 @@ export class MessageService {
           type,
           size,
           fileName,
+          replyToMsgId,
         }),
       });
 
@@ -101,6 +103,36 @@ export class MessageService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching messages:", error);
+      throw error;
+    }
+  }
+
+  static async reactToMessage(
+    conversationId: string,
+    msgId: string,
+    userId: string,
+    reactionType: string,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/reaction`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId, reactionType }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error reacting to message:", error);
       throw error;
     }
   }

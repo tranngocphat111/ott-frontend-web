@@ -76,6 +76,18 @@ class SocketService {
     }
   }
 
+  onMessageReaction(callback: (payload: any) => void) {
+    this.socket?.on("tin_nhan_reaction", callback);
+  }
+
+  offMessageReaction(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("tin_nhan_reaction", callback);
+    } else {
+      this.socket?.removeAllListeners("tin_nhan_reaction");
+    }
+  }
+
   onNewConversation(callback: (conversation: any) => void) {
     this.socket?.on("tao_phong_moi", callback);
   }
