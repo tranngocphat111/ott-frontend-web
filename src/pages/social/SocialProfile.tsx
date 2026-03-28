@@ -11,6 +11,7 @@ import PhotosTab from "../../components/social/PhotosTab";
 import AvatarEditModal from "../../components/social/AvatarEditModal";
 import CoverEditModal from "../../components/social/CoverEditModal";
 import { useProfileData } from "../../hooks/social/useProfileData";
+import { useSocialFeed } from "../../hooks/useSocialFeed";
 import { useAvatarUpload } from "../../hooks/social/useAvatarUpload";
 import { useCoverUpload } from "../../hooks/social/useCoverUpload";
 import { useAboutEdit } from "../../hooks/social/useAboutEdit";
@@ -23,6 +24,8 @@ const SocialProfile: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("posts");
 
   /* ── Custom Hooks ─────────────────────────────────── */
+  const { currentUser: feedCurrentUser } = useSocialFeed();
+
   const {
     profileUser,
     currentUser,
@@ -34,7 +37,7 @@ const SocialProfile: React.FC = () => {
     setUserReactionMap,
     postReactionCountsMap,
     loading,
-  } = useProfileData(userId);
+  } = useProfileData(userId, feedCurrentUser);
 
   const {
     localAvatar,
@@ -73,7 +76,7 @@ const SocialProfile: React.FC = () => {
 
   const { handleToggleLike: togglePostLike, handleDeletePost } = usePostActions(
     setPosts,
-    setUserReactionMap
+    setUserReactionMap,
   );
 
   /* ── Computed values ──────────────────────────────── */

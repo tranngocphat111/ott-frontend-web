@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import type { Post, PostUser } from "../../components/social/types";
 import type { UserProfile } from "../../services/social.service";
 import {
-  fetchUsers,
   fetchUserById,
 } from "../../services/social.service";
 import {
@@ -11,15 +10,6 @@ import {
   fetchPostReactions,
 } from "../../services/post.service";
 
-const AVATAR_COLORS = [
-  "bg-primary-500",
-  "bg-emerald-500",
-  "bg-rose-500",
-  "bg-amber-500",
-  "bg-violet-500",
-  "bg-sky-500",
-];
-
 interface ProfileUser {
   displayName: string;
   username: string;
@@ -27,14 +17,17 @@ interface ProfileUser {
   coverUrl?: string;
 }
 
-export const useProfileData = (userId: string | undefined) => {
+export const useProfileData = (
+  userId: string | undefined,
+  initialCurrentUser?: PostUser
+) => {
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
-  const [currentUser, setCurrentUser] = useState<PostUser>({
+  const currentUser = initialCurrentUser ?? {
     id: "",
     name: "Người dùng",
     displayName: "Người dùng",
     color: "bg-primary-500",
-  });
+  };
   const [profile, setProfile] = useState<UserProfile>({
     bio: "",
     work: "",
@@ -54,32 +47,9 @@ export const useProfileData = (userId: string | undefined) => {
     (async () => {
       setLoading(true);
 
-      // Fetch users
-      const users = await fetchUsers();
-      const me = users[0];
+      const currentUserId: string | undefined = initialCurrentUser?.id;
 
-      if (me) {
-        setCurrentUser({
-          id: me.id,
-          name: me.displayName ?? me.username,
-          displayName: me.displayName,
-          avatar: me.avatarUrl ?? undefined,
-          color: AVATAR_COLORS[0],
-        });
-      }
-
-      // Fetch profile user
-      const prof = users.find((u) => u.id === userId);
-      if (prof) {
-        setProfileUser({
-          displayName: prof.displayName,
-          username: prof.username,
-          avatarUrl: prof.avatarUrl ?? undefined,
-          coverUrl: prof.coverUrl ?? undefined,
-        });
-      }
-
-      // Load full profile fields
+      // Load full profile fields and set profile user
       const full = await fetchUserById(userId);
       if (full) {
         setProfile({
@@ -88,10 +58,16 @@ export const useProfileData = (userId: string | undefined) => {
           location: full.location ?? "",
           relationship: full.relationshipStatus ?? "",
         });
+        setProfileUser({
+          displayName: full.displayName ?? full.username ?? "",
+          username: full.username ?? "",
+          avatarUrl: full.avatarUrl ?? undefined,
+          coverUrl: full.coverUrl ?? undefined,
+        });
       }
 
       // Load posts
-      const userPosts = await fetchPostsByUser(userId, me?.id);
+      const userPosts = await fetchPostsByUser(userId, currentUserId);
       setPosts(userPosts);
 
       // Load post reactions
@@ -107,8 +83,8 @@ export const useProfileData = (userId: string | undefined) => {
       }
 
       // Load user reactions
-      if (me?.id) {
-        const reactions = await fetchUserReactions(me.id);
+      if (currentUserId) {
+        const reactions = await fetchUserReactions(currentUserId);
         const map: Record<string, string> = {};
         for (const r of reactions) {
           if (r.targetType === "POST") {
@@ -120,7 +96,7 @@ export const useProfileData = (userId: string | undefined) => {
 
       setLoading(false);
     })();
-  }, [userId]);
+  }, [userId, initialCurrentUser]);
 
   return {
     profileUser,

@@ -46,7 +46,11 @@ const SocialFeed: React.FC = () => {
               onOpenModal={() => openModal(false)}
               onOpenWithFeeling={() => openModal(true)}
             />
-            <StoryFeed currentUserAvatar={currentUser.avatar ?? ""} />
+            <StoryFeed
+              currentUserAvatar={currentUser.avatar ?? ""}
+              currentUserId={currentUser.id}
+              currentUserName={currentUser.displayName ?? currentUser.name}
+            />
             <PostFeed
               posts={posts}
               userReactionMap={userReactionMap}

@@ -58,7 +58,7 @@ export const useSocialFeedBootstrap = ({
                 const result = await findPostsWithAuthorized(
                     0,
                     5,
-                    dbCurrentUser?.id ?? "",
+                    dbCurrentUser?.id,
                 );
                 if (result && result.posts.length > 0) {
                     setPosts(result.posts);

@@ -22,7 +22,7 @@ const CreatePostCard: React.FC<Props> = ({
       <button
         onClick={onOpenModal}
         className="flex-1 bg-primary-50 hover:bg-primary-100 rounded-full px-4 py-2 cursor-pointer text-primary-400 transition select-none text-left text-sm">
-        {currentUser.displayName?.split(" ").pop() } ơi, bạn đang nghĩ gì vậy?
+        {currentUser.displayName?.split(" ").pop()} ơi, bạn đang nghĩ gì vậy?
       </button>
     </div>
     <div className="border-t border-primary-100 pt-2 flex">

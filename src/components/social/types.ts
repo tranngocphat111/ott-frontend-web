@@ -31,6 +31,30 @@ export interface StoryItem {
     id: string;
     name: string;
     isBirthday: boolean;
+    userId?: string;
+    avatarUrl?: string;
+    contentType?: "TEXT" | "IMAGE" | "UNKNOWN";
+    textContent?: string;
+    textBackgroundColor?: string;
+    imageUrl?: string;
+}
+
+export interface StoryUserGroup {
+    userId: string;
+    name: string;
+    avatarUrl?: string;
+    stories: StoryItem[];
+}
+
+export interface StorySuggestedUser {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+}
+
+export interface StoryReelData {
+    storyGroups: StoryUserGroup[];
+    suggestedUsers: StorySuggestedUser[];
 }
 
 export interface FriendRequest {
