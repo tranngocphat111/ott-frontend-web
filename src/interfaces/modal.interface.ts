@@ -6,6 +6,8 @@ export interface CreateGroupModalProps {
   onClose: () => void;
   onCreateGroup: (name: string, selectedUsers: User[], avatar?: string) => void;
   availableUsers: User[];
+  preSelectedUserIds?: string[];
+  categories?: Category[];
 }
 
 export interface CategoryManagementModalProps {
@@ -38,7 +40,7 @@ export interface ConversationContextMenuProps {
 }
 
 // Modal specific types
-export type FilterType = 'all' | 'customer' | 'family' | 'work' | 'friends' | 'later';
+export type FilterType = string;
 
 // Group Modal Component Props
 export interface GroupInfoSectionProps {

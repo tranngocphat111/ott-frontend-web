@@ -3,12 +3,14 @@ import React from "react";
 import { Phone, Video, PanelRightOpen, PanelRightClose } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
+import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils";
 
 interface ChatHeaderProps extends ChatAreaProps {
   // Props từ bản HEAD (Call logic)
   onStartVoiceCall?: () => void;
   onStartVideoCall?: () => void;
   disableCallActions?: boolean;
+  currentUserId?: string;
   // Props từ bản develop (Sidebar logic)
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
@@ -19,24 +21,16 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onStartVoiceCall,
   onStartVideoCall,
   disableCallActions = false,
+  currentUserId,
   isSidebarOpen = false,
   onToggleSidebar,
 }) => {
   const getConversationName = (): string => {
-    if (conversation.name) return conversation.name;
-    if (conversation.type === "private" && conversation.participants?.length) {
-      // Ưu tiên lấy display_name của đối phương
-      return conversation.participants[0].display_name || "Hội thoại";
-    }
-    return "Hội thoại";
+    return getConversationDisplayName(conversation, currentUserId);
   };
 
   const getConversationAvatar = (): string | undefined => {
-    if (conversation.avatar) return conversation.avatar;
-    if (conversation.type === "private" && conversation.participants?.length) {
-      return conversation.participants[0].avatar;
-    }
-    return undefined;
+    return getConversationDisplayAvatar(conversation, currentUserId);
   };
 
   return (
@@ -86,13 +80,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </button>
 
           {/* Vertical Divider (Optional) */}
-          <div className="w-[1px] h-6 bg-gray-200 mx-1" />
+          <div className="w-px h-6 bg-gray-200 mx-1" />
 
           {/* Sidebar Toggle Button */}
           <button
             onClick={onToggleSidebar}
-            className={`p-2 hover:bg-gray-50 rounded-full transition-colors ${
-              isSidebarOpen ? "bg-blue-50 text-blue-600" : ""
+            className={`p-2 hover:bg-gray-50 rounded-full transition-colors cursor-pointer ${
+              isSidebarOpen ? "bg-primary-50 text-primary-600" : ""
             }`}
             title={isSidebarOpen ? "Đóng thông tin" : "Mở thông tin"}
           >

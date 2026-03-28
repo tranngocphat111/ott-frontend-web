@@ -3,23 +3,30 @@ import { Pencil } from "lucide-react";
 import { ConversationService } from "../../../../services";
 import Avatar from "../../../common/Avatar";
 import type { GroupInfoHeaderProps } from "../../../../interfaces";
+import { getConversationDisplayAvatar, getConversationDisplayName } from "../../../../utils";
 
 const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
   conversation,
   memberCount,
   onUpdate,
   isAdmin,
+  currentUserId,
 }) => {
   const [showRenameModal, setShowRenameModal] = useState(false);
-  const [displayName, setDisplayName] = useState(conversation.name || "");
-  const [newName, setNewName] = useState(conversation.name || "");
+  const [displayName, setDisplayName] = useState(
+    getConversationDisplayName(conversation, currentUserId),
+  );
+  const [newName, setNewName] = useState(
+    getConversationDisplayName(conversation, currentUserId),
+  );
 
   useEffect(() => {
-    setDisplayName(conversation.name || "");
+    const resolvedName = getConversationDisplayName(conversation, currentUserId);
+    setDisplayName(resolvedName);
     if (!showRenameModal) {
-      setNewName(conversation.name || "");
+      setNewName(resolvedName);
     }
-  }, [conversation.name, showRenameModal]);
+  }, [conversation, currentUserId, showRenameModal]);
 
   const handleSave = async () => {
     const nextName = newName.trim();
@@ -48,8 +55,8 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
   return (
     <div className="px-4 py-6 text-center border-b border-gray-100">
       <Avatar
-        src={conversation.avatar}
-        name={conversation.name}
+        src={getConversationDisplayAvatar(conversation, currentUserId)}
+        name={displayName}
         size={80}
         className="mx-auto mb-3"
       />
@@ -84,13 +91,11 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
 
             <div className="px-6 py-5">
               <div className="mb-4 flex items-center justify-center">
-                <div className="relative h-24 w-24">
-                  <div className="absolute left-1 top-1">
-                    <Avatar src={conversation.avatar} name={displayName} size={56} />
+                <div className="relative h-28 w-28">
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-amber-100">
+                    <Avatar src={conversation.avatar} name={displayName} size={72} />
                   </div>
-                  <div className="absolute right-1 top-0 h-10 w-10 rounded-full border-2 border-white bg-gray-100" />
-                  <div className="absolute bottom-0 left-0 h-10 w-10 rounded-full border-2 border-white bg-gray-100" />
-                  <div className="absolute bottom-1 right-0 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-gray-200 text-[18px] font-semibold text-gray-600">
+                  <div className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-amber-200 text-[16px] font-semibold text-amber-800">
                     {memberCount}
                   </div>
                 </div>
@@ -104,7 +109,7 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                className="h-12 w-full rounded-md border border-blue-300 px-3 text-center text-[15px] text-gray-900 outline-none focus:border-blue-500"
+                className="h-12 w-full rounded-md border border-primary-300 px-3 text-center text-[15px] text-gray-900 outline-none focus:border-primary-600"
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && handleSave()}
               />
@@ -121,7 +126,7 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
                 </button>
                 <button
                   onClick={handleSave}
-                  className="rounded-md bg-blue-600 px-5 py-2 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  className="rounded-md bg-primary-700 px-5 py-2 text-[16px] font-semibold text-white hover:bg-primary-800"
                 >
                   Xác nhận
                 </button>

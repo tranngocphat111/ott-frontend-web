@@ -83,7 +83,7 @@ const ChatPage: React.FC = () => {
 
   return (
     <ConversationsProvider>
-      <div className="flex h-full w-full">
+      <div className="flex h-full w-full" style={{ zoom: 0.9}}>
         {incomingCall && (
           <div className="absolute top-4 right-6 z-30 w-90 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-lg">
             <p className="font-semibold text-blue-900">Cuoc goi den</p>

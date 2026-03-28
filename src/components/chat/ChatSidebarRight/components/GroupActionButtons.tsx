@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BellOff, Pin, UserPlus, X } from "lucide-react";
+import { BellOff, Pin, UserPlus, X, Users } from "lucide-react";
 import { ParticipantService } from "../../../../services";
 import type { GroupActionButtonsProps } from "../../../../interfaces";
 
@@ -8,6 +8,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
   participant,
   currentUserId,
   onAddMember,
+  onCreateGroup,
   onParticipantUpdated,
 }) => {
   const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
@@ -140,31 +141,32 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
   };
 
   const isGroupChat = conversation.type === "group";
+  const isPrivateChat = conversation.type === "private";
 
   return (
     <>
       <div className="px-4 py-2.5 border-b border-gray-100">
-      <div className={`grid ${isGroupChat ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+      <div className={`grid ${isGroupChat ? "grid-cols-3" : isPrivateChat ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
         <button
           onClick={handleToggleMute}
           disabled={loading.mute}
-          className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl transition-colors"
+          className="cursor-pointer group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <div className={`w-6.5 h-6.5 rounded-full flex items-center justify-center ${
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
             participant?.settings?.notification_status === "mute" 
               ? "bg-primary-200/80" 
-              : "bg-gray-100"
+              : "bg-gray-100 group-hover:bg-primary-100"
           }`}>
-            <BellOff size={14} className={
+            <BellOff size={15} className={
               participant?.settings?.notification_status === "mute" 
                 ? "text-primary-700" 
-                : "text-gray-600"
+                : "text-gray-600 group-hover:text-primary-700"
             } />
           </div>
-          <span className={`text-[12px] leading-4 text-center ${
+          <span className={`text-[13px] leading-4 text-center transition-colors  ${
             participant?.settings?.notification_status === "mute" 
               ? "text-primary-800" 
-              : "text-gray-700"
+              : "text-gray-700 group-hover:text-primary-800"
           }`}>
             {participant?.settings?.notification_status === "mute" ? "Bật thông báo" : "Tắt thông báo"}
           </span>
@@ -173,23 +175,23 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
         <button
           onClick={handleTogglePin}
           disabled={loading.pin}
-          className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl transition-colors"
+          className="cursor-pointer group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <div className={`w-6.5 h-6.5 rounded-full flex items-center justify-center ${
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
             participant?.settings?.is_pinned 
               ? "bg-primary-200/80" 
-              : "bg-gray-100"
+              : "bg-gray-100 group-hover:bg-primary-100"
           }`}>
-            <Pin size={14} className={
+            <Pin size={15} className={
               participant?.settings?.is_pinned 
                 ? "text-primary-600" 
-                : "text-gray-600"
+                : "text-gray-600 group-hover:text-primary-700"
             } />
           </div>
-          <span className={`text-[12px] leading-4 text-center ${
+          <span className={`text-[13px] leading-4 text-center transition-colors ${
             participant?.settings?.is_pinned 
               ? "text-primary-600" 
-              : "text-gray-700"
+              : "text-gray-700 group-hover:text-primary-800"
           }`}>
             {participant?.settings?.is_pinned ? "Bỏ ghim" : "Ghim hội thoại"}
           </span>
@@ -200,12 +202,26 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
             onClick={() => {
               onAddMember();
             }}
-            className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl transition-colors bg-gray-50/70 hover:bg-gray-100/80 cursor-pointer"
+            className="group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 cursor-pointer"
           >
-            <div className="w-6.5 h-6.5 bg-gray-100 rounded-full flex items-center justify-center">
-              <UserPlus size={14} className="text-gray-600" />
+            <div className="w-8 h-8 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center transition-colors">
+              <UserPlus size={15} className="text-gray-600 group-hover:text-primary-700" />
             </div>
-            <span className="text-[12px] leading-4 text-gray-600 text-center">Thêm thành viên</span>
+            <span className="text-[13px] leading-4 text-gray-700 group-hover:text-primary-800 text-center transition-colors">Thêm thành viên</span>
+          </button>
+        )}
+
+        {isPrivateChat && (
+          <button
+            onClick={() => {
+              onCreateGroup?.();
+            }}
+            className="group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 cursor-pointer"
+          >
+            <div className="w-8 h-8 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center transition-colors">
+              <Users size={15} className="text-gray-600 group-hover:text-primary-700" />
+            </div>
+            <span className="text-[13px] leading-4 text-gray-700 group-hover:text-primary-800 text-center transition-colors">Tạo nhóm <br /> trò chuyện</span>
           </button>
         )}
       </div>
@@ -245,7 +261,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
                       name="mute-duration"
                       checked={selectedMuteOption === option.id}
                       onChange={() => setSelectedMuteOption(option.id)}
-                      className="h-3.5 w-3.5"
+                      className="h-3.5 w-3.5 "
                     />
                     <span>{option.label}</span>
                   </label>
@@ -256,14 +272,14 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
             <div className="flex justify-end gap-2 px-4 pb-4">
               <button
                 onClick={() => setShowMuteModal(false)}
-                className="rounded-md bg-gray-100 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-200"
+                className=" cursor-pointer rounded-md bg-gray-100 px-3 py-1.5 text-[12px] font-medium text-gray-700 hover:bg-gray-200"
               >
                 Hủy
               </button>
               <button
                 onClick={handleConfirmMute}
                 disabled={loading.mute}
-                className="rounded-md bg-amber-700 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+                className="rounded-md bg-primary-500 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-primary-600 disabled:opacity-60 cursor-pointer"
               >
                 Đồng ý
               </button>

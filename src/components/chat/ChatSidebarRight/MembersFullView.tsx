@@ -16,6 +16,10 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   const validMembers = (members || []).filter(member => member && member.user_id);
   const [menuOpenForUserId, setMenuOpenForUserId] = useState<string | null>(null);
 
+  const getDisplayName = (member: (typeof validMembers)[number]) => {
+    return (member.nickname || "").trim() || member.name || `User ${member.user_id.slice(-4)}`;
+  };
+
   const getRoleLabel = (member: (typeof validMembers)[number]) => {
     if (member.user_id === ownerId) {
       return "Trưởng nhóm";
@@ -78,20 +82,25 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
             >
               <Avatar 
                 src={member.avatar || ""} 
-                name={member.name || `User ${member.user_id.slice(-4)}`} 
+                name={getDisplayName(member)} 
                 size={48} 
               />
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {member.name || `User ${member.user_id.slice(-4)}`}
+                    {getDisplayName(member)}
                     {member.user_id === currentUserId && " (Bạn)"}
                   </p>
                   {(member.role === "admin" || member.user_id === ownerId) && (
                     <Crown size={14} className="text-amber-500" />
                   )}
                 </div>
+                {!!(member.nickname || "").trim() && (
+                  <p className="text-[11px] text-amber-700">
+                    Tên gốc: {member.name || member.user_id}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500">
                   {getRoleLabel(member)}
                 </p>

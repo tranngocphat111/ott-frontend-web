@@ -7,10 +7,12 @@ import { UserProvider } from "./contexts/UserContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <UserProvider>
-      <ConversationsProvider>
-        <App />
-      </ConversationsProvider>
-    </UserProvider>
+    <div className="app-zoom-shell">
+      <UserProvider>
+        <ConversationsProvider>
+          <App />
+        </ConversationsProvider>
+      </UserProvider>
+    </div>
   </StrictMode>,
 );

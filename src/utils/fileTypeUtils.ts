@@ -102,3 +102,16 @@ export const getFileTypeData = (ext: string): FileTypeData => {
     bg: "bg-zinc-100",
   };
 };
+
+export const getFileTypeLabel = (ext: string): string => {
+  const extension = ext.toLowerCase().replace(".", "");
+
+  if (extension === "pdf") return "PDF";
+  if (["doc", "docx", "rtf", "odt"].includes(extension)) return "Word";
+  if (["xls", "xlsx", "csv"].includes(extension)) return "Excel";
+  if (["ppt", "pptx", "key", "odp"].includes(extension)) return "PowerPoint";
+  if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) return "Nén";
+  if (["txt"].includes(extension)) return "TXT";
+
+  return "Khác";
+};

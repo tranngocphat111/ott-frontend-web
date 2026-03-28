@@ -41,6 +41,7 @@ export interface GroupInfoHeaderProps {
   memberCount: number;
   onUpdate: (updates: Partial<Conversation>) => void;
   isAdmin: boolean;
+  currentUserId?: string;
 }
 
 export interface GroupActionButtonsProps {
@@ -48,6 +49,7 @@ export interface GroupActionButtonsProps {
   participant?: Participant;
   currentUserId: string;
   onAddMember: () => void;
+  onCreateGroup?: () => void;
   onParticipantUpdated?: (updates: Partial<Participant>) => void;
 }
 

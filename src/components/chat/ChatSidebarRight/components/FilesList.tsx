@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Clock3, Download, Ellipsis, FileText, Reply } from "lucide-react";
+import { Clock3, Download, Ellipsis, Reply } from "lucide-react";
 import { URL_S3 } from "../../../../config/api.config";
 import type { Message } from "../../../../types";
+import { getFileTypeData, getFileTypeLabel } from "../../../../utils/fileTypeUtils";
 
 interface FilesListProps {
   messages: Message[];
@@ -58,24 +59,11 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
   if (allFiles.length === 0) {
     return (
       <div className="text-center py-12">
-        <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+        <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-gray-100" />
         <p className="text-gray-500">Chưa có file nào</p>
       </div>
     );
   }
-
-  const getFileIcon = (filename: string) => {
-    const ext = filename?.split('.').pop()?.toLowerCase();
-    if (['pdf'].includes(ext || '')) 
-      return <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center text-xs font-bold text-red-600">PDF</div>;
-    if (['doc', 'docx'].includes(ext || '')) 
-      return <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-xs font-bold text-blue-600">W</div>;
-    if (['ppt', 'pptx'].includes(ext || '')) 
-      return <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center text-xs font-bold text-orange-600">P</div>;
-    if (['xls', 'xlsx'].includes(ext || '')) 
-      return <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center text-xs font-bold text-green-600">X</div>;
-    return <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center"><FileText size={14} className="text-gray-600" /></div>;
-  };
 
   const getFileName = (key: string) => {
     const rawName = key.split("/").pop() || "File";
@@ -99,6 +87,9 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
       <div className="space-y-2 mb-3">
         {allFiles.slice(0, 3).map(({ id, message, key, size }) => {
           const fileName = getFileName(key);
+          const ext = fileName.split(".").pop() || "";
+          const { Icon, bg, color } = getFileTypeData(ext);
+          const typeLabel = getFileTypeLabel(ext);
           const fileUrl = `${URL_S3}${key}`;
           const fileDate = message.created_at || message.createdAt
             ? new Date(message.created_at || message.createdAt || "").toLocaleDateString("vi-VN")
@@ -118,12 +109,14 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                   window.open(fileUrl, "_blank", "noopener,noreferrer");
                 }}
               >
-                {getFileIcon(fileName)}
+                <div className={`flex h-8 w-8 items-center justify-center rounded ${bg}`}>
+                  <Icon size={14} className={color} />
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-gray-900">
                     {fileName}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">{formatFileSize(size)}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{typeLabel} • {formatFileSize(size)}</p>
                 </div>
               </button>
 
