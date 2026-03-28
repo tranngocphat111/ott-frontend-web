@@ -87,4 +87,95 @@ export class ConversationService {
       throw error;
     }
   }
+
+  // Update conversation (name, avatar)
+  static async updateConversation(
+    conversationId: string,
+    updateData: { name?: string; avatar?: string; background?: string },
+  ): Promise<Conversation> {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/${conversationId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify(updateData),
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update conversation");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error updating conversation:", error);
+      throw error;
+    }
+  }
+
+  // Add member to conversation
+  static async addMember(
+    conversationId: string,
+    userId: string,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/add-member`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to add member");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error adding member:", error);
+      throw error;
+    }
+  }
+
+  // Add multiple members to conversation
+  static async addMembers(
+    conversationId: string,
+    userIds: string[],
+    addedBy: string,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/add-member`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userIds, addedBy }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to add members");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error adding members:", error);
+      throw error;
+    }
+  }
 }

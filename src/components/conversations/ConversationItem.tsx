@@ -97,8 +97,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const lastMsgId = conversation.last_message?.msg_id || "0";
   const lastReadMsgId = participant.last_read_message_id || "0";
-  const hasUnreadMessage =
-    lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadMsgId);
+  const fallbackUnread =
+    lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadMsgId) ? 1 : 0;
+  const unreadCount = Math.max(Number(participant.unread_count || 0), fallbackUnread);
+  const hasUnreadMessage = unreadCount > 0;
+  const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -295,7 +298,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
               {/* Unread badge */}
               {hasUnreadMessage && (
-                <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse shrink-0" />
+                <div className="min-w-5 h-5 px-1 rounded-full bg-primary-500 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
+                  {unreadLabel}
+                </div>
               )}
             </div>
           </div>

@@ -1,11 +1,20 @@
 import type { LucideIcon } from "lucide-react";
 
+export interface MessageContent {
+  type: "text" | "image" | "file" | "video" | "audio";
+  text?: string;
+  url?: string;
+  name?: string;
+  size?: number;
+}
+
 export interface Message {
   _id: string;
   msg_id?: string;
-  content: string[] | string;
+  content: MessageContent[];
   type: "text" | "image" | "file" | "video" | "audio" | "system_add";
-  createdAt: string;
+  created_at: string;
+  createdAt?: string; // For backwards compatibility
   sender_id: String;
   conversation_id?: string;
   size?: number;
@@ -14,6 +23,10 @@ export interface Message {
   reply_to?: MessageReplyPreview | null;
   reactions?: MessageReaction[];
   attachments?: MessageAttachment[];
+  // Pinned message fields
+  is_pinned?: boolean;
+  pinned_at?: string | null;
+  pinned_by?: string | null;
 }
 
 export interface MessageReaction {

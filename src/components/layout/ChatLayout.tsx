@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import NavigationSidebar from '../navigation/NavigationSidebar';
-import Sidebar from '../sidebar/Sidebar';
+import ChatSidebarLeft from '../chat/ChatSidebarLeft';
 import type { ConversationWithParticipant } from '../../types';
 import { ChatArea } from '..';
 
@@ -26,7 +26,7 @@ const ChatLayout: React.FC = () => {
       />
       
       {/* Chat Sidebar */}
-      <Sidebar 
+      <ChatSidebarLeft 
         onConversationSelect={handleConversationSelect}
         selectedConversationId={selectedConversation?.conversation._id}
       />

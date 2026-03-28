@@ -2,7 +2,7 @@
 export type { User } from './user.type';
 
 // Message types
-export type { Message, MessageAttachment } from './message.type';
+export type { Message, MessageContent, MessageAttachment } from './message.type';
 
 // Participant types
 export type { Participant, ConversationParticipant } from './participant.type';

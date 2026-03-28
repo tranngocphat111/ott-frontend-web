@@ -141,4 +141,160 @@ export class MessageService {
       throw error;
     }
   }
+
+  // Pin/Unpin message
+  static async pinMessage(
+    conversationId: string,
+    msgId: string,
+    userId: string,
+    isPinned: boolean,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/pin`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId, isPinned }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error pinning message:", error);
+      throw error;
+    }
+  }
+
+  // Toggle pin message (unpin if already pinned)
+  static async togglePinMessage(msgId: string) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/toggle-pin`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error toggling pin message:", error);
+      throw error;
+    }
+  }
+
+  // Get pinned messages
+  static async getPinnedMessages(conversationId: string) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/pinned`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching pinned messages:", error);
+      throw error;
+    }
+  }
+
+  // Get media messages (images/videos)
+  static async getMediaMessages(conversationId: string, limit = 20, skip = 0) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/media?limit=${limit}&skip=${skip}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching media messages:", error);
+      throw error;
+    }
+  }
+
+  // Get file messages
+  static async getFileMessages(conversationId: string, limit = 20, skip = 0) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/files?limit=${limit}&skip=${skip}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching file messages:", error);
+      throw error;
+    }
+  }
+
+  // Get link messages
+  static async getLinkMessages(conversationId: string, limit = 20, skip = 0) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/links?limit=${limit}&skip=${skip}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching link messages:", error);
+      throw error;
+    }
+  }
 }

@@ -19,7 +19,9 @@ import type {
 import type { SidebarProps } from "../../interfaces";
 import { MdOutlineGroupAdd, MdPersonAddAlt } from "react-icons/md";
 
-const Sidebar: React.FC<SidebarProps> = ({
+type FilterMode = "all" | "unread" | "category";
+
+const ChatSidebarLeft: React.FC<SidebarProps> = ({
   onConversationSelect,
   selectedConversationId,
 }) => {
@@ -42,6 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [filteredConversations, setFilteredConversations] = useState<
     ConversationWithParticipant[]
   >([]);
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -128,6 +131,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     let filtered = conversations;
 
+    const hasUnreadConversation = (item: ConversationWithParticipant) => {
+      return Number(item.participant.unread_count || 0) > 0;
+    };
+
     // Ẩn conversations đã xóa (deleted_msg_id >= last_message.msg_id)
     filtered = filtered.filter((item) => {
       const lastMsgId = item.conversation.last_message?.msg_id;
@@ -137,8 +144,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       return false;
     });
 
+    // Filter by status mode
+    if (filterMode === "unread") {
+      filtered = filtered.filter(hasUnreadConversation);
+    }
+
     // Filter by categories (multiple selection)
-    if (selectedCategoryIds.length > 0) {
+    if (filterMode === "category" && selectedCategoryIds.length > 0) {
       filtered = filtered.filter(
         (item) =>
           item.participant.settings.category_id &&
@@ -180,7 +192,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
 
     setFilteredConversations(filtered);
-  }, [searchTerm, conversations, selectedCategoryIds]);
+  }, [searchTerm, conversations, selectedCategoryIds, filterMode]);
 
   const getConversationName = (conversation: Conversation): string => {
     if (conversation.name) return conversation.name;
@@ -294,6 +306,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 categories={categories}
                 selectedCategoryIds={selectedCategoryIds}
                 onSelectCategories={setSelectedCategoryIds}
+                filterMode={filterMode}
+                onFilterModeChange={setFilterMode}
                 onManageCategories={() => setIsCategoryModalOpen(true)}
               />
             </div>
@@ -322,4 +336,4 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 };
 
-export default Sidebar;
+export default ChatSidebarLeft;

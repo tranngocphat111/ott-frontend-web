@@ -1,12 +1,17 @@
+// src/components/Chat/ChatHeader.tsx
 import React from "react";
-import { Phone, Video, MoreVertical } from "lucide-react";
+import { Phone, Video, PanelRightOpen, PanelRightClose } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
 
 interface ChatHeaderProps extends ChatAreaProps {
+  // Props từ bản HEAD (Call logic)
   onStartVoiceCall?: () => void;
   onStartVideoCall?: () => void;
   disableCallActions?: boolean;
+  // Props từ bản develop (Sidebar logic)
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -14,11 +19,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onStartVoiceCall,
   onStartVideoCall,
   disableCallActions = false,
+  isSidebarOpen = false,
+  onToggleSidebar,
 }) => {
   const getConversationName = (): string => {
     if (conversation.name) return conversation.name;
     if (conversation.type === "private" && conversation.participants?.length) {
-      return conversation.participants[0].display_name;
+      // Ưu tiên lấy display_name của đối phương
+      return conversation.participants[0].display_name || "Hội thoại";
     }
     return "Hội thoại";
   };
@@ -34,6 +42,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   return (
     <div className="px-6 py-3 bg-white border-b border-gray-100 shadow-sm flex-none z-10">
       <div className="flex items-center justify-between">
+        {/* Left Section: Avatar & Info */}
         <div className="flex items-center gap-4">
           <Avatar
             src={getConversationAvatar()}
@@ -42,7 +51,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             className="ring-2 ring-white shadow-sm"
           />
           <div>
-            <h2 className="font-bold text-gray-800 text-lg">
+            <h2 className="font-bold text-gray-800 text-lg line-clamp-1">
               {getConversationName()}
             </h2>
             <div className="flex items-center gap-2">
@@ -54,7 +63,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-1 text-gray-600">
+        {/* Right Section: Actions */}
+        <div className="flex items-center gap-1 text-gray-600">
+          {/* Voice Call Button */}
           <button
             className="p-2 hover:bg-gray-50 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onStartVoiceCall}
@@ -63,6 +74,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           >
             <Phone size={20} />
           </button>
+
+          {/* Video Call Button */}
           <button
             className="p-2 hover:bg-gray-50 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onStartVideoCall}
@@ -71,8 +84,23 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           >
             <Video size={20} />
           </button>
-          <button className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-            <MoreVertical size={20} />
+
+          {/* Vertical Divider (Optional) */}
+          <div className="w-[1px] h-6 bg-gray-200 mx-1" />
+
+          {/* Sidebar Toggle Button */}
+          <button
+            onClick={onToggleSidebar}
+            className={`p-2 hover:bg-gray-50 rounded-full transition-colors ${
+              isSidebarOpen ? "bg-blue-50 text-blue-600" : ""
+            }`}
+            title={isSidebarOpen ? "Đóng thông tin" : "Mở thông tin"}
+          >
+            {isSidebarOpen ? (
+              <PanelRightClose size={20} />
+            ) : (
+              <PanelRightOpen size={20} />
+            )}
           </button>
         </div>
       </div>

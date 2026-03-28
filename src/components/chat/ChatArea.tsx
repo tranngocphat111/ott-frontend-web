@@ -1,9 +1,9 @@
 // src/components/Chat/ChatArea.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../../contexts/UserContext";
-import { useConversations } from "../../contexts/ConversationsContext"; // Giữ từ bản 2
+import { useConversations } from "../../contexts/ConversationsContext";
 import { useChat } from "../../hooks/useChat";
-import { MessageService, ParticipantService } from "../../services"; // Giữ từ bản 2
+import { MessageService, ParticipantService } from "../../services";
 import type { ChatAreaProps } from "../../interfaces";
 
 // Components
@@ -13,37 +13,83 @@ import { ChatEmpty } from "./ChatEmpty";
 import { ChatMessage } from "./ChatMessage";
 import { ChatNotification } from "./ChatNotification";
 import { ChatTimeSeparator } from "./ChatTimeSeparator";
+import ChatSidebarRight from "./ChatSidebarRight";
 
 // Utils
 import { shouldShowTimestamp, formatChatTimestamp } from "../../utils";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
 import type { Message } from "../../types";
 
-const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
+interface ExtendedChatAreaProps extends ChatAreaProps {
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+}
+
+const ChatArea: React.FC<ExtendedChatAreaProps> = ({
+  conversation,
+  isSidebarOpen = false,
+  onToggleSidebar,
+}) => {
   const { currentUser } = useUser();
+  const { conversations, updateParticipant } = useConversations();
+
+  // Ưu tiên lấy ID đồng nhất
   const normalizedUserId = currentUser?.user_id || currentUser?._id;
-  const { updateParticipant } = useConversations(); // Logic "Đã xem"
+
+  // Logic từ bản develop: Luôn đồng bộ dữ liệu hội thoại mới nhất từ context
+  const activeConversation = useMemo(() => {
+    const matched = conversations.find(
+      (item) => item.conversation._id === conversation?._id,
+    )?.conversation;
+    return matched || conversation;
+  }, [conversations, conversation]);
+
   const { messages, loadMessages } = useChat(
-    conversation?._id,
+    activeConversation?._id,
     normalizedUserId,
   );
+
   const [isOpeningCall, setIsOpeningCall] = useState(false);
-  const getConversationName = () => {
-    if (conversation.name) return conversation.name;
-    if (conversation.type === "private" && conversation.participants?.length) {
-      return conversation.participants[0].display_name || "Hoi thoai";
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMarkedRef = useRef<string>("0");
+
+  // State quản lý Media Viewer & Tin nhắn
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+
+  // Sidebar state (Internal fallback nếu không truyền từ props)
+  const [internalSidebarOpen, setInternalSidebarOpen] = useState(false);
+  const sidebarOpen = onToggleSidebar ? isSidebarOpen : internalSidebarOpen;
+
+  const toggleSidebar = () => {
+    if (onToggleSidebar) {
+      onToggleSidebar();
+    } else {
+      setInternalSidebarOpen(!internalSidebarOpen);
     }
-    return "Hoi thoai";
+  };
+
+  const getConversationName = () => {
+    if (activeConversation.name) return activeConversation.name;
+    if (
+      activeConversation.type === "private" &&
+      activeConversation.participants?.length
+    ) {
+      return activeConversation.participants[0].display_name || "Hội thoại";
+    }
+    return "Hội thoại";
   };
 
   const openCallWindow = (
     type: "voice" | "video",
     action: "start" | "join" = "start",
   ) => {
-    if (!conversation?._id) return;
+    if (!activeConversation?._id) return;
 
     const params = new URLSearchParams({
-      conversationId: conversation._id,
+      conversationId: activeConversation._id,
       type,
       action,
       name: getConversationName(),
@@ -59,69 +105,54 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
     if (!callWindow) {
       window.location.href = `/call?${params.toString()}`;
     }
-
     setTimeout(() => setIsOpeningCall(false), 500);
   };
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMarkedRef = useRef<string>("0"); // Logic "Đã xem"
-
-  // --- STATE QUẢN LÝ MEDIA VIEWER (Merge cả 2 bản) ---
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0); // Giữ từ bản 1
-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
-
-  // --- LOGIC ĐÁNH DẤU ĐÃ ĐỌC (Bản 2) ---
+  // Logic đánh dấu đã đọc
   useEffect(() => {
     lastMarkedRef.current = "0";
     setReplyToMessage(null);
-  }, [conversation?._id]);
+  }, [activeConversation?._id]);
 
   useEffect(() => {
-    if (!messages.length || !normalizedUserId || !conversation?._id) return;
-    const lastMsg = messages[messages.length - 1];
-    if (!lastMsg.msg_id) return;
-    if (lastMsg.msg_id === lastMarkedRef.current) return;
+    if (!messages.length || !normalizedUserId || !activeConversation?._id)
+      return;
 
-    // Optimistic update
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg.msg_id || lastMsg.msg_id === lastMarkedRef.current) return;
+
     lastMarkedRef.current = lastMsg.msg_id;
-    updateParticipant(conversation._id, {
+
+    // Cập nhật UI ngay lập tức thông qua context
+    updateParticipant(activeConversation._id, {
       last_read_message_id: lastMsg.msg_id,
     });
 
-    // Fallback localStorage
+    // Lưu dự phòng và gọi API
     localStorage.setItem(
-      `read_${conversation._id}_${normalizedUserId}`,
+      `read_${activeConversation._id}_${normalizedUserId}`,
       lastMsg.msg_id,
     );
-
-    // Gọi API
     ParticipantService.markAsRead(
-      conversation._id,
+      activeConversation._id,
       normalizedUserId,
       lastMsg.msg_id,
     ).catch(console.error);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, normalizedUserId, conversation?._id, updateParticipant]);
+  }, [messages, normalizedUserId, activeConversation?._id, updateParticipant]);
 
-  // --- HÀM MỞ VIEWER (Merge: nhận msgId và index) ---
   const handleOpenMedia = (msgId: string, imageIndex: number = 0) => {
     setSelectedMediaId(msgId);
     setSelectedImageIndex(imageIndex);
     setViewerOpen(true);
   };
 
-  const handleReplyMessage = (msg: Message) => {
-    setReplyToMessage(msg);
-  };
+  const handleReplyMessage = (msg: Message) => setReplyToMessage(msg);
 
   const handleReactMessage = async (msg: Message, reactionType: string) => {
-    if (!conversation?._id || !normalizedUserId || !msg.msg_id) return;
-
+    if (!activeConversation?._id || !normalizedUserId || !msg.msg_id) return;
     try {
       await MessageService.reactToMessage(
-        conversation._id,
+        activeConversation._id,
         msg.msg_id,
         normalizedUserId,
         reactionType,
@@ -136,87 +167,100 @@ const ChatArea: React.FC<ChatAreaProps> = ({ conversation }) => {
   }, [messages]);
 
   return (
-    <div className="relative flex-1 flex flex-col bg-[#F2F4F7] h-full overflow-hidden">
-      {/* Header */}
-      <ChatHeader
-        conversation={conversation}
-        onStartVoiceCall={() => openCallWindow("voice")}
-        onStartVideoCall={() => openCallWindow("video")}
-        disableCallActions={isOpeningCall}
-      />
+    <div className="flex-1 flex h-full overflow-hidden relative">
+      {/* Main Chat Area */}
+      <div
+        className={`flex-1 flex flex-col bg-[#F2F4F7] h-full overflow-hidden transition-all duration-300 ${sidebarOpen ? "mr-80" : ""}`}
+      >
+        <ChatHeader
+          conversation={activeConversation}
+          onStartVoiceCall={() => openCallWindow("voice")}
+          onStartVideoCall={() => openCallWindow("video")}
+          disableCallActions={isOpeningCall}
+          isSidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
+        />
 
-      {/* Danh sách tin nhắn */}
-      <div className="flex-1 p-4 gap-2 overflow-y-auto custom-scrollbar flex flex-col">
-        <div className="flex-1 min-h-0" />
+        <div className="flex-1 p-4 gap-2 overflow-y-auto custom-scrollbar flex flex-col">
+          <div className="flex-1 min-h-0" />
 
-        {messages.length === 0 ? (
-          <ChatEmpty />
-        ) : (
-          messages.map((msg, index) => {
-            const isSystemMsg = msg.type?.startsWith("system_");
-            const isMe = msg.sender_id === currentUser?._id;
+          {messages.length === 0 ? (
+            <ChatEmpty />
+          ) : (
+            messages.map((msg, index) => {
+              const isSystemMsg = msg.type?.startsWith("system_");
+              const isMe = msg.sender_id === normalizedUserId;
+              const prevMsg = messages[index - 1];
+              const nextMsg = messages[index + 1];
 
-            const prevMsg = messages[index - 1];
-            const nextMsg = messages[index + 1];
+              const showTime = shouldShowTimestamp(
+                msg.createdAt || "",
+                prevMsg?.createdAt,
+              );
+              const nextShowTime = nextMsg
+                ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
+                : false;
 
-            const showTime = shouldShowTimestamp(
-              msg.createdAt || "",
-              prevMsg?.createdAt,
-            );
+              const isFirstInSequence =
+                !prevMsg || prevMsg.sender_id !== msg.sender_id || showTime;
+              const isLastInSequence =
+                !nextMsg || nextMsg.sender_id !== msg.sender_id || nextShowTime;
 
-            const nextShowTime = nextMsg
-              ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
-              : false;
+              // Nội dung hiển thị cho thông báo hệ thống
+              const notificationContent =
+                msg.content?.[0]?.text || msg.content?.[0]?.name || "";
 
-            const isFirstInSequence =
-              !prevMsg || prevMsg.sender_id !== msg.sender_id || showTime;
-            const isLastInSequence =
-              !nextMsg || nextMsg.sender_id !== msg.sender_id || nextShowTime;
+              return (
+                <React.Fragment key={msg._id || index}>
+                  {showTime && (
+                    <ChatTimeSeparator
+                      time={formatChatTimestamp(msg.createdAt || "")}
+                    />
+                  )}
 
-            return (
-              <React.Fragment key={msg._id}>
-                {/* A. Dòng thời gian */}
-                {showTime && (
-                  <ChatTimeSeparator
-                    time={formatChatTimestamp(msg.createdAt || "")}
-                  />
-                )}
+                  {isSystemMsg ? (
+                    <ChatNotification
+                      type={msg.type}
+                      content={notificationContent}
+                    />
+                  ) : (
+                    <ChatMessage
+                      msg={msg}
+                      isMe={isMe}
+                      currentUserId={normalizedUserId}
+                      isFirstInSequence={isFirstInSequence}
+                      isLastInSequence={isLastInSequence}
+                      onMediaClick={(imageIndex) =>
+                        handleOpenMedia(msg._id, imageIndex)
+                      }
+                      onReply={handleReplyMessage}
+                      onReact={handleReactMessage}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-                {/* B. Nội dung tin nhắn */}
-                {isSystemMsg ? (
-                  <ChatNotification type={msg.type} content={msg.content[0]} />
-                ) : (
-                  <ChatMessage
-                    msg={msg}
-                    isMe={isMe}
-                    currentUserId={normalizedUserId}
-                    isFirstInSequence={isFirstInSequence}
-                    isLastInSequence={isLastInSequence}
-                    onMediaClick={(imageIndex) =>
-                      handleOpenMedia(msg._id, imageIndex)
-                    }
-                    onReply={handleReplyMessage}
-                    onReact={handleReactMessage}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })
-        )}
-
-        <div ref={messagesEndRef} />
+        <ChatInput
+          conversationId={activeConversation._id}
+          senderId={normalizedUserId || ""}
+          onSendSuccess={loadMessages}
+          replyToMessage={replyToMessage}
+          onCancelReply={() => setReplyToMessage(null)}
+        />
       </div>
 
-      {/* Ô nhập liệu */}
-      <ChatInput
-        conversationId={conversation._id}
-        senderId={normalizedUserId || ""}
-        onSendSuccess={loadMessages}
-        replyToMessage={replyToMessage}
-        onCancelReply={() => setReplyToMessage(null)}
+      {/* Right Sidebar */}
+      <ChatSidebarRight
+        conversation={activeConversation}
+        isOpen={sidebarOpen}
+        onClose={toggleSidebar}
       />
 
-      {/* Media Viewer - Giữ đầy đủ props từ cả 2 bản */}
+      {/* Media Viewer Overlay */}
       {viewerOpen && (
         <MediaViewer
           isOpen={viewerOpen}

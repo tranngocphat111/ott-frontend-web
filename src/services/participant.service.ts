@@ -157,4 +157,115 @@ export class ParticipantService {
 
     return await response.json();
   }
+
+  /**
+   * Get conversation members with user details
+   */
+  static async getConversationMembers(conversationId: string) {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/members/${conversationId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to get members");
+    }
+
+    return await response.json();
+  }
+
+  // Alias for getConversationMembers
+  static async getMembers(conversationId: string) {
+    return this.getConversationMembers(conversationId);
+  }
+
+  /**
+   * Leave a group conversation
+   */
+  static async leaveGroup(
+    conversationId: string,
+    userId: string,
+  ): Promise<{ success: boolean; conversationId: string; userId: string }> {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/leave/${conversationId}/${userId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to leave group");
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Remove a member from group (admin only)
+   */
+  static async removeMember(
+    conversationId: string,
+    userId: string,
+    adminId: string,
+  ): Promise<{ success: boolean; conversationId: string; userId: string }> {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/remove/${conversationId}/${userId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({ adminId }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to remove member");
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Update member role (admin only)
+   */
+  static async updateMemberRole(
+    conversationId: string,
+    userId: string,
+    newRole: "admin" | "user",
+    adminId: string,
+  ): Promise<{ success: boolean; conversationId: string; userId: string; newRole: string }> {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/role/${conversationId}/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({ adminId, newRole }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to update member role");
+    }
+
+    return await response.json();
+  }
 }

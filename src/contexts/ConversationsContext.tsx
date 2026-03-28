@@ -1,3 +1,4 @@
+// src/contexts/ConversationsContext.tsx
 import React, {
   createContext,
   useContext,
@@ -10,9 +11,9 @@ import type {
   Conversation,
   ConversationWithParticipant,
   Category,
+  Participant,
 } from "../types";
 import { ConversationService, socketService } from "../services";
-import type { Participant } from "../types";
 
 interface ConversationsContextType {
   // State
@@ -27,7 +28,7 @@ interface ConversationsContextType {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 
-  // Update methods (no reload needed)
+  // Update methods
   updateConversation: (
     conversationId: string,
     updates: Partial<Conversation>,
@@ -65,7 +66,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Update specific conversation without reloading
+  // Update specific conversation
   const updateConversation = useCallback(
     (conversationId: string, updates: Partial<Conversation>) => {
       setConversations((prev) =>
@@ -79,15 +80,32 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     [],
   );
 
-  // Update participant settings
+  // --- LOGIC UPDATE PARTICIPANT (Merged từ develop) ---
   const updateParticipant = useCallback(
     (conversationId: string, updates: Partial<Participant>) => {
       setConversations((prev) =>
-        prev.map((item) =>
-          item.conversation._id === conversationId
-            ? { ...item, participant: { ...item.participant, ...updates } }
-            : item,
-        ),
+        prev.map((item) => {
+          if (item.conversation._id !== conversationId) return item;
+
+          const mergedParticipant = { ...item.participant, ...updates };
+
+          // Logic đồng bộ Unread Count dựa trên last_read_message_id
+          if (
+            updates.last_read_message_id !== undefined &&
+            updates.unread_count === undefined
+          ) {
+            const lastMsgId = item.conversation.last_message?.msg_id || "0";
+            const lastReadId = updates.last_read_message_id || "0";
+
+            // Nếu tin nhắn cuối cùng mới hơn tin nhắn vừa đọc -> giữ badge hoặc set về 1, ngược lại về 0
+            mergedParticipant.unread_count =
+              lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadId)
+                ? mergedParticipant.unread_count || 1
+                : 0;
+          }
+
+          return { ...item, participant: mergedParticipant };
+        }),
       );
     },
     [],
@@ -95,21 +113,17 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
   // Add new conversation
   const addConversation = useCallback((conversation: Conversation) => {
-    // When adding new conversation, we don't have participant data yet
-    // Will be loaded on refresh
     const newItem: ConversationWithParticipant = {
       conversation,
       participant: {
         _id: "",
         user_id: "",
         conversation_id: conversation._id,
-        settings: {
-          is_pinned: false,
-          notification_status: "on",
-        },
+        settings: { is_pinned: false, notification_status: "on" },
         last_read_message_id: "0",
         last_read_at: new Date().toISOString(),
         deleted_msg_id: "0",
+        unread_count: 0,
         joined_at: new Date().toISOString(),
         roles: "user",
       },
@@ -117,14 +131,13 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     setConversations((prev) => [newItem, ...prev]);
   }, []);
 
-  // Remove conversation
   const removeConversation = useCallback((conversationId: string) => {
     setConversations((prev) =>
       prev.filter((item) => item.conversation._id !== conversationId),
     );
   }, []);
 
-  // Cập nhật conversation list khi có tin nhắn mới từ socket (real-time)
+  // Socket: Xử lý tin nhắn mới real-time
   const handleIncomingMessage = useCallback((message: any) => {
     const convId = message.conversation_id?.toString();
     if (!convId) return;
@@ -161,6 +174,13 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       }
 
       const existing = prev[targetIndex];
+      const isIncomingFromOther =
+        String(message.sender_id || "") !==
+        String(existing.participant.user_id || "");
+      const nextUnread = isIncomingFromOther
+        ? (Number(existing.participant.unread_count) || 0) + 1
+        : Number(existing.participant.unread_count) || 0;
+
       const updated: ConversationWithParticipant = {
         ...existing,
         conversation: {
@@ -175,9 +195,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
           },
           updatedAt: new Date().toISOString(),
         },
+        participant: { ...existing.participant, unread_count: nextUnread },
       };
 
-      // Lấy conversation ra đặt lên đầu, sort tiếp theo sẽ giữ đúng thứ tự pinned/unpinned
       const newList = [...prev];
       newList.splice(targetIndex, 1);
       newList.unshift(updated);
@@ -185,7 +205,6 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     });
   }, []);
 
-  // Kết nối socket và đăng ký lắng nghe tin nhắn mới để cập nhật conversation list
   useEffect(() => {
     socketService.connect();
     socketService.onNewMessage(handleIncomingMessage);
@@ -194,12 +213,11 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     };
   }, [handleIncomingMessage]);
 
-  // Add new category
+  // Category Actions
   const addCategory = useCallback((category: Category) => {
     setCategories((prev) => [...prev, category]);
   }, []);
 
-  // Update category
   const updateCategory = useCallback(
     (categoryId: string, updates: Partial<Category>) => {
       setCategories((prev) =>
@@ -211,10 +229,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     [],
   );
 
-  // Remove category
   const removeCategory = useCallback((categoryId: string) => {
     setCategories((prev) => prev.filter((cat) => cat._id !== categoryId));
-    // Also remove category_id from participant settings
     setConversations((prev) =>
       prev.map((item) =>
         item.participant.settings.category_id === categoryId
@@ -230,7 +246,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
-  // Refresh conversations from API
+  // Refresh Conversations with Optimistic Consistency
   const refreshConversations = useCallback(async (userId: string) => {
     try {
       const loadedConversations =
@@ -239,20 +255,16 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
         return loadedConversations.map((newItem) => {
           const convId = newItem.conversation._id;
           const dbId = newItem.participant.last_read_message_id || "0";
-
-          // Lấy giá trị in-memory (optimistic update trong session hiện tại)
           const existing = prev.find((p) => p.conversation._id === convId);
           const inMemId = existing?.participant.last_read_message_id || "0";
-
-          // Lấy giá trị từ localStorage (fallback khi API lỗi hoặc sau F5)
           const lsId = localStorage.getItem(`read_${convId}_${userId}`) || "0";
 
-          // Dùng giá trị lớn nhất trong 3 nguồn
           const candidates = [dbId, inMemId, lsId].filter((id) => id !== "0");
           if (candidates.length === 0) return newItem;
 
-          const bestId = candidates.reduce((max, id) =>
-            BigInt(id) > BigInt(max) ? id : max,
+          const bestId = candidates.reduce(
+            (max, id) => (BigInt(id) > BigInt(max) ? id : max),
+            "0",
           );
 
           return BigInt(bestId) > BigInt(dbId)
@@ -271,7 +283,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     }
   }, []);
 
-  const value: ConversationsContextType = {
+  const value = {
     conversations,
     categories,
     loading,
@@ -297,12 +309,11 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   );
 };
 
-export const useConversations = (): ConversationsContextType => {
+export const useConversations = () => {
   const context = useContext(ConversationsContext);
-  if (!context) {
+  if (!context)
     throw new Error(
       "useConversations must be used within ConversationsProvider",
     );
-  }
   return context;
 };
