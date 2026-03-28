@@ -268,4 +268,30 @@ export class ParticipantService {
 
     return await response.json();
   }
+
+  static async updateMemberNickname(
+    conversationId: string,
+    userId: string,
+    requesterId: string,
+    nickname: string,
+  ): Promise<{ success: boolean; conversationId: string; userId: string; nickname: string }> {
+    const response = await fetch(
+      `${API_CHAT_SERVER_URL}/participants/nickname/${conversationId}/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({ requesterId, nickname }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to update nickname");
+    }
+
+    return await response.json();
+  }
 }

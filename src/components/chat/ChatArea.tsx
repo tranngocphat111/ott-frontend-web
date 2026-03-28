@@ -17,6 +17,7 @@ import ChatSidebarRight from "./ChatSidebarRight";
 
 // Utils
 import { shouldShowTimestamp, formatChatTimestamp } from "../../utils";
+import { getConversationDisplayName } from "../../utils";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
 import type { Message } from "../../types";
 
@@ -72,14 +73,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   };
 
   const getConversationName = () => {
-    if (activeConversation.name) return activeConversation.name;
-    if (
-      activeConversation.type === "private" &&
-      activeConversation.participants?.length
-    ) {
-      return activeConversation.participants[0].display_name || "Hội thoại";
-    }
-    return "Hội thoại";
+    return getConversationDisplayName(activeConversation, normalizedUserId);
   };
 
   const openCallWindow = (
@@ -174,6 +168,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       >
         <ChatHeader
           conversation={activeConversation}
+          currentUserId={normalizedUserId}
           onStartVoiceCall={() => openCallWindow("voice")}
           onStartVideoCall={() => openCallWindow("video")}
           disableCallActions={isOpeningCall}

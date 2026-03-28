@@ -28,7 +28,10 @@ export interface Participant {
  */
 export interface ConversationParticipant {
   _id: string;
+  user_id?: string;
   display_name: string;
+  name?: string;
+  nickname?: string;
   avatar?: string;
   status?: 'online' | 'offline' | 'away' | 'busy';
   role?: 'admin' | 'member' | 'owner';

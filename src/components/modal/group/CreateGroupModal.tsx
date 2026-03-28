@@ -11,7 +11,9 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   isOpen,
   onClose,
   onCreateGroup,
-  availableUsers
+  availableUsers,
+  preSelectedUserIds,
+  categories = []
 }) => {
   const [groupName, setGroupName] = useState('');
   const [groupAvatar, setGroupAvatar] = useState('');
@@ -19,14 +21,27 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
-  const filters = [
-    { id: 'all' as FilterType, label: 'Tất cả' },
-    { id: 'customer' as FilterType, label: 'Khách hàng' },
-    { id: 'family' as FilterType, label: 'Gia đình' },
-    { id: 'work' as FilterType, label: 'Công việc' },
-    { id: 'friends' as FilterType, label: 'Bạn bè' },
-    { id: 'later' as FilterType, label: 'Trả lời sau' }
-  ];
+  // Initialize selectedUsers with preSelectedUserIds when modal opens
+  React.useEffect(() => {
+    if (isOpen && preSelectedUserIds && preSelectedUserIds.length > 0) {
+      setSelectedUsers(new Set(preSelectedUserIds));
+    }
+  }, [isOpen, preSelectedUserIds]);
+
+  // Build filters from user categories
+  const filters = React.useMemo(() => {
+    const baseFilters: Array<{ id: FilterType; label: string }> = [
+      { id: 'all' as FilterType, label: 'Tất cả' },
+    ];
+
+    // Add categories loaded from the same source as conversation category menu
+    categories.forEach((cat) => {
+      if (!cat?._id || !cat?.name) return;
+      baseFilters.push({ id: cat._id as FilterType, label: cat.name });
+    });
+
+    return baseFilters;
+  }, [categories]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

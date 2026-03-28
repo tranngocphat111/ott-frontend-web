@@ -15,6 +15,7 @@ import {
 import { URL_S3 } from "../../../config/api.config";
 import type { StorageViewProps, StorageTab } from "../../../interfaces";
 import Avatar from "../../common/Avatar";
+import { getFileTypeData, getFileTypeLabel } from "../../../utils/fileTypeUtils";
 
 type DatePreset = "all" | "7d" | "30d" | "90d" | "custom";
 
@@ -56,14 +57,8 @@ const dateLabel = (dateInput: string) => {
   return `Ngày ${parsed.getDate()} Tháng ${parsed.getMonth() + 1}`;
 };
 
-const fileTypeFromName = (name: string) => {
-  const ext = (name.split(".").pop() || "").toLowerCase();
-  if (ext === "pdf") return "PDF";
-  if (["doc", "docx"].includes(ext)) return "Word";
-  if (["ppt", "pptx"].includes(ext)) return "PowerPoint";
-  if (["xls", "xlsx"].includes(ext)) return "Excel";
-  return "Khác";
-};
+const fileTypeFromName = (name: string) =>
+  getFileTypeLabel((name.split(".").pop() || "").toLowerCase());
 
 const fileNameFromKey = (key: string) => {
   const rawName = key.split("/").pop() || "File";
@@ -707,46 +702,52 @@ const StorageView: React.FC<StorageViewProps> = ({
                 <div key={group} className="border-t border-gray-100 px-4 py-4 first:border-t-0">
                   <h4 className="mb-2.5 text-[15px] font-semibold text-gray-800">{group}</h4>
                   <div className="space-y-2">
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          if (isSelectMode) {
-                            toggleItemSelection(item.id);
-                            return;
-                          }
-                          window.open(`${URL_S3}${item.key}`, "_blank", "noopener,noreferrer");
-                        }}
-                        className={`flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
-                          isSelectMode && selectedItemIds.has(item.id)
-                            ? "bg-amber-50 ring-1 ring-amber-200"
-                            : ""
-                        }`}
-                      >
-                        {isSelectMode && (
-                          <span
-                            className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border ${
-                              selectedItemIds.has(item.id)
-                                ? "border-amber-700 bg-amber-700 text-white"
-                                : "border-gray-300 bg-white text-transparent"
-                            }`}
-                          >
-                            <Check size={10} />
-                          </span>
-                        )}
+                    {items.map((item) => {
+                      const ext = item.fileName.split(".").pop() || "";
+                      const { Icon, bg, color } = getFileTypeData(ext);
+                      const typeLabel = getFileTypeLabel(ext);
 
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-xs font-bold text-sky-700">
-                          {fileTypeFromName(item.fileName).slice(0, 3).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-medium text-gray-900">{item.fileName}</p>
-                          <div className="mt-0.5 flex items-center gap-1 text-[12px] text-amber-700">
-                            <Clock3 size={12} />
-                            <span>Tải về để xem lâu dài</span>
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            if (isSelectMode) {
+                              toggleItemSelection(item.id);
+                              return;
+                            }
+                            window.open(`${URL_S3}${item.key}`, "_blank", "noopener,noreferrer");
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
+                            isSelectMode && selectedItemIds.has(item.id)
+                              ? "bg-amber-50 ring-1 ring-amber-200"
+                              : ""
+                          }`}
+                        >
+                          {isSelectMode && (
+                            <span
+                              className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border ${
+                                selectedItemIds.has(item.id)
+                                  ? "border-amber-700 bg-amber-700 text-white"
+                                  : "border-gray-300 bg-white text-transparent"
+                              }`}
+                            >
+                              <Check size={10} />
+                            </span>
+                          )}
+
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${bg}`}>
+                            <Icon size={18} className={color} />
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-medium text-gray-900">{item.fileName}</p>
+                            <div className="mt-0.5 flex items-center gap-1 text-[12px] text-amber-700">
+                              <Clock3 size={12} />
+                              <span>{typeLabel} • Tải về để xem lâu dài</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))

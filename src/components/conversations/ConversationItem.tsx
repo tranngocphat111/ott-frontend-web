@@ -10,6 +10,7 @@ import type { Category } from "../../types";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { PiTagSimpleFill } from "react-icons/pi";
 import { FaBellSlash } from "react-icons/fa6";
+import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils";
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   item,
@@ -45,33 +46,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                     new Date(participant.settings.mute_until) > new Date());
 
   const getConversationName = (): string => {
-    if (conversation.name) return conversation.name;
-
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].display_name;
-    }
-
-    return "Conversation";
+    return getConversationDisplayName(conversation, currentUserId) || "Conversation";
   };
 
   const getConversationAvatar = (): string | undefined => {
-    // Ưu tiên avatar của conversation (dùng cho group)
-    if (conversation.avatar) return conversation.avatar;
-    
-    // Với private chat, lấy avatar của người kia
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].avatar;
-    }
-    
-    return undefined;
+    return getConversationDisplayAvatar(conversation, currentUserId);
   };
 
   const getLatestMessagePreview = (): string => {
@@ -95,12 +74,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     return formatTimeAgo(time);
   };
 
-  const lastMsgId = conversation.last_message?.msg_id || "0";
-  const lastReadMsgId = participant.last_read_message_id || "0";
-  const fallbackUnread =
-    lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadMsgId) ? 1 : 0;
-  const unreadCount = Math.max(Number(participant.unread_count || 0), fallbackUnread);
-  const hasUnreadMessage = unreadCount > 0;
+  const unreadCount = Number(participant.unread_count || 0);
+  const hasUnreadMessage = !isSelected && unreadCount > 0;
   const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -248,11 +223,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               )}
             </div>
 
-            {/* Online status indicator for private chats */}
-            {conversation.type === "private" &&
-              conversation.participants?.[0]?.status === "online" && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full ring-2 ring-white shadow-sm" />
-              )}
           </div>
 
           {/* Content */}

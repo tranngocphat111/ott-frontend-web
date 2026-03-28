@@ -11,6 +11,7 @@ import { ConversationService } from "../../services/conversation.service";
 import { CategoryService, socketService } from "../../services";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { useUser } from "../../contexts/UserContext";
+import { getConversationDisplayName } from "../../utils";
 import type {
   Conversation,
   ConversationWithParticipant,
@@ -195,17 +196,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
   }, [searchTerm, conversations, selectedCategoryIds, filterMode]);
 
   const getConversationName = (conversation: Conversation): string => {
-    if (conversation.name) return conversation.name;
-
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].display_name;
-    }
-
-    return "Conversation";
+    return getConversationDisplayName(conversation, normalizedUserId) || "Conversation";
   };
 
   const handleCreateGroup = async (
@@ -262,7 +253,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
         conversations={filteredConversations}
         onConversationSelect={onConversationSelect}
         selectedConversationId={selectedConversationId}
-        currentUserId={currentUser?._id || ""}
+        currentUserId={normalizedUserId || ""}
       />
     );
   };
@@ -324,6 +315,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
         onClose={() => setIsCreateGroupModalOpen(false)}
         onCreateGroup={handleCreateGroup}
         availableUsers={availableUsers}
+        categories={categories}
       />
 
       {/* Category Management Modal */}
