@@ -26,7 +26,7 @@ interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPost: (content: string, media: UploadedMedia[], visibility: string) => void;
-  currentUser: { name: string; color: string; avatar?: string };
+  currentUser: { displayName: string; color: string; avatar?: string };
   openWithFeeling?: boolean;
 }
 
@@ -71,7 +71,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
 }) => {
   const [content, setContent] = useState("");
   const [mediaFiles, setMediaFiles] = useState<UploadedMedia[]>([]);
-  const [visibility, setVisibility] = useState("friends");
+  const [visibility, setVisibility] = useState("public");
   const [showVisibility, setShowVisibility] = useState(false);
   const [showDropZone, setShowDropZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -319,14 +319,14 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   className="size-full object-cover"
                 />
               : <span className="text-white font-bold text-sm">
-                  {currentUser.name.split(" ").pop()?.charAt(0)}
+                  {currentUser.displayName.split(" ").pop()?.charAt(0)}
                 </span>
               }
             </div>
             <div>
               <div className="flex items-center gap-1 flex-wrap">
                 <p className="font-semibold text-gray-900 text-sm">
-                  {currentUser.name}
+                  {currentUser.displayName}
                 </p>
                 {feeling && (
                   <span className=" text-center text-sm text-gray-600">
@@ -380,7 +380,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder={`${currentUser.name.split(" ").pop()} ơi, bạn đang nghĩ gì vậy?`}
+              placeholder={`${currentUser.displayName.split(" ").pop()} ơi, bạn đang nghĩ gì vậy?`}
               className="w-full resize-none outline-none text-gray-800 placeholder-gray-400 text-lg leading-relaxed min-h-25"
               rows={4}
               autoFocus
