@@ -5,6 +5,7 @@ import { ImageMessage } from "./ImageMessage";
 import { VideoMessage } from "./VideoMessage";
 import { FileMessage } from "./FileMessage";
 import { AudioMessage } from "./AudioMessage";
+import { LinkMessage } from "./LinkMessage";
 
 export const ChatMessage = memo(
   ({
@@ -30,7 +31,9 @@ export const ChatMessage = memo(
 
     // Cho video/file/audio: chỉ lấy phần tử đầu tiên
     const fullUrl = useMemo(() => {
-      if (msgType === "text" || msgType === "image") return "";
+      if (msgType === "text" || msgType === "link" || msgType === "image") {
+        return "";
+      }
       const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
       return getFullUrl(content);
     }, [msg.content, msgType]);
@@ -96,6 +99,19 @@ export const ChatMessage = memo(
             url={fullUrl}
             fileName={msg.fileName}
             size={msg.size}
+            isMe={isMe}
+            currentUserId={currentUserId}
+            isFirstInSequence={isFirstInSequence}
+            isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
+          />
+        );
+
+      case "link":
+        return (
+          <LinkMessage
+            msg={msg}
             isMe={isMe}
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}

@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
 export interface MessageContent {
-  type: "text" | "image" | "file" | "video" | "audio";
+  type: "text" | "link" | "image" | "file" | "video" | "audio";
   text?: string;
   url?: string;
   name?: string;
@@ -12,7 +12,7 @@ export interface Message {
   _id: string;
   msg_id?: string;
   content: MessageContent[];
-  type: "text" | "image" | "file" | "video" | "audio" | "system_add";
+  type: "text" | "link" | "image" | "file" | "video" | "audio" | "system_add";
   created_at: string;
   createdAt?: string; // For backwards compatibility
   sender_id: String;
@@ -37,7 +37,7 @@ export interface MessageReaction {
 export interface MessageReplyPreview {
   msg_id?: string;
   sender_id: string;
-  type: "text" | "image" | "video" | "file" | "audio" | "system_add";
+  type: "text" | "link" | "image" | "video" | "file" | "audio" | "system_add";
   content: string;
   is_deleted?: boolean;
   is_revoked?: boolean;
@@ -45,7 +45,7 @@ export interface MessageReplyPreview {
 
 export interface MessageAttachment {
   id: string;
-  type: "image" | "file" | "video" | "audio";
+  type: "image" | "file" | "video" | "audio" | "link";
   url: string;
   name: string;
   size?: number;

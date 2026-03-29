@@ -16,7 +16,7 @@ export interface Conversation {
     sender_id: string;
     sender_name: string;
     content: string;
-    type: "text" | "image" | "video" | "file" | "audio";
+    type: "text" | "link" | "image" | "video" | "file" | "audio";
     createdAt: string;
   };
   is_deleted: boolean;

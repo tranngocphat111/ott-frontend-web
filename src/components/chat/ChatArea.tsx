@@ -202,8 +202,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 !nextMsg || nextMsg.sender_id !== msg.sender_id || nextShowTime;
 
               // Nội dung hiển thị cho thông báo hệ thống
-              const notificationContent =
-                msg.content?.[0]?.text || msg.content?.[0]?.name || "";
+              const notificationContent = msg.content?.[0] + "";
 
               return (
                 <React.Fragment key={msg._id || index}>

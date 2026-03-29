@@ -79,6 +79,40 @@ const resolveMimeType = (file: File) => {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 };
 
+const URL_PATTERN =
+  /((https?:\/\/|www\.)[^\s]+|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:\/[^\s]*)?)/i;
+
+const normalizeLink = (rawValue: string): string | null => {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+};
+
+const isStandaloneLink = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  // Chỉ nhận type link khi toàn bộ message là 1 link/domain.
+  const fullMatch = trimmed.match(URL_PATTERN);
+  if (!fullMatch || fullMatch[0] !== trimmed) return false;
+
+  const candidate = trimmed.replace(/[),.!?:;]+$/g, "");
+  return !!normalizeLink(candidate);
+};
+
 export const ChatInput = ({
   conversationId,
   senderId,
@@ -301,11 +335,14 @@ export const ChatInput = ({
     // Sau đó gửi text nếu có
     if (text.trim()) {
       try {
+        const messageType = isStandaloneLink(text) ? "link" : "text";
+        const messageContent = text;
+
         await MessageService.sendMessage(
           conversationId,
           senderId,
-          text,
-          "text",
+          messageContent,
+          messageType,
           0,
           undefined,
           replyToMsgId,
