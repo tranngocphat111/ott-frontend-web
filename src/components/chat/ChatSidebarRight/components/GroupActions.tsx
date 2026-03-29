@@ -43,7 +43,7 @@ const GroupActions: React.FC<GroupActionsProps> = ({
     <div className="border-t border-gray-100 px-4 py-4 space-y-2">
       <button
         onClick={handleDeleteHistory}
-        className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        className="w-full cursor-pointer flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
       >
         <Trash2 size={18} />
         <span>Xoá lịch sử trò chuyện</span>
@@ -52,7 +52,7 @@ const GroupActions: React.FC<GroupActionsProps> = ({
       {isGroupChat && (
         <button
           onClick={handleLeaveGroup}
-          className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          className="w-full cursor-pointer flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
         >
           <LogOut size={18} />
           <span>Rời nhóm</span>

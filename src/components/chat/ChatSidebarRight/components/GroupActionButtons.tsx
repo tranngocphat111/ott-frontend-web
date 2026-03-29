@@ -234,7 +234,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
               <h3 className="text-[15px] font-semibold text-gray-900">Tắt thông báo</h3>
               <button
                 onClick={() => setShowMuteModal(false)}
-                className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+                className="cursor-pointer rounded-md p-1 text-gray-500 hover:bg-gray-100"
               >
                 <X size={16} />
               </button>
@@ -279,7 +279,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
               <button
                 onClick={handleConfirmMute}
                 disabled={loading.mute}
-                className="rounded-md bg-primary-500 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-primary-600 disabled:opacity-60 cursor-pointer"
+                className="cursor-pointer rounded-md bg-primary-500 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-primary-600 disabled:opacity-60"
               >
                 Đồng ý
               </button>

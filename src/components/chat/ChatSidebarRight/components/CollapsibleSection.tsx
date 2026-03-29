@@ -27,7 +27,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     <div className="border-t border-gray-100">
       <button
         onClick={handleClick}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+        className="w-full cursor-pointer flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <span className="text-gray-500">{icon}</span>

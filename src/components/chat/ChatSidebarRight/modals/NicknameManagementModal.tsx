@@ -71,7 +71,7 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
           <button
             onClick={onClose}
             disabled={loading}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            className="cursor-pointer p-1 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X className="w-6 h-6 text-gray-500" />
           </button>
@@ -113,7 +113,7 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
                   <button
                     onClick={() => handleEditClick(member)}
                     disabled={loading}
-                    className="shrink-0 p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                    className="cursor-pointer shrink-0 p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
                   >
                     <Edit2 size={16} />
                   </button>
@@ -135,7 +135,7 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
               <button
                 onClick={handleCancel}
                 disabled={loading}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                className="cursor-pointer p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>

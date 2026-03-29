@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { X, Users, Pin, Image, FileText, Link as LinkIcon } from "lucide-react";
+import { X, Users, Pin, Image, FileText, Link as LinkIcon, UserRoundPen } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
 import { useConversations } from "../../contexts/ConversationsContext";
 import {
@@ -11,6 +11,7 @@ import {
 import type { Message } from "../../types";
 import type {
   ConversationMember,
+  LinkData,
   ViewMode,
   StorageTab,
   ChatSidebarRightProps,
@@ -55,10 +56,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     [],
   );
   const [fileMessagesPreview, setFileMessagesPreview] = useState<Message[]>([]);
-  const [linkMessagesPreview, setLinkMessagesPreview] = useState<Message[]>([]);
+  const [linkMessagesPreview, setLinkMessagesPreview] = useState<LinkData[]>([]);
   const [allMediaMessages, setAllMediaMessages] = useState<Message[]>([]);
   const [allFileMessages, setAllFileMessages] = useState<Message[]>([]);
-  const [allLinkMessages, setAllLinkMessages] = useState<Message[]>([]);
+  const [allLinkMessages, setAllLinkMessages] = useState<LinkData[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("main");
   const [storageTab, setStorageTab] = useState<StorageTab>("media");
   const [loading, setLoading] = useState(false);
@@ -106,6 +107,18 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       }));
   };
 
+  const filterValidLinkData = (items: any[]): LinkData[] => {
+    if (!Array.isArray(items)) return [];
+
+    return items.filter(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        item._id &&
+        Array.isArray(item.links),
+    );
+  };
+
   const loadSidebarData = useCallback(async () => {
     if (!conversation?._id) return;
 
@@ -145,7 +158,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       setPinnedMessages(filterValidMessages(pinnedData));
       const validMedia = filterValidMessages(mediaData);
       const validFiles = filterValidMessages(filesData);
-      const validLinks = filterValidMessages(linksData);
+      const validLinks = filterValidLinkData(linksData);
       setAllMediaMessages(validMedia);
       setAllFileMessages(validFiles);
       setAllLinkMessages(validLinks);
@@ -388,7 +401,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       {error && (
         <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 font-bold">
+          <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">
             ×
           </button>
         </div>
@@ -404,7 +417,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               </h2>
               <button
                 onClick={onClose}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                className="cursor-pointer p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X size={20} className="text-gray-500" />
               </button>
@@ -455,7 +468,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               conversation.type === "private") && (
               <CollapsibleSection
                 title="Biệt danh"
-                icon={<Users size={20} />}
+                icon={<UserRoundPen size={20} />}
                 onClick={() => setShowNicknameModal(true)}
                 showIndicator={false}
               />
@@ -544,11 +557,8 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             initialTab={storageTab}
             onBack={handleBackToMain}
             members={members}
-            messages={[
-              ...allMediaMessages,
-              ...allFileMessages,
-              ...allLinkMessages,
-            ]}
+            messages={[...allMediaMessages, ...allFileMessages]}
+            linkMessages={allLinkMessages}
             onMediaClick={(messageId: string, imageIndex: number) => {
               handleMediaClick(messageId, imageIndex);
             }}

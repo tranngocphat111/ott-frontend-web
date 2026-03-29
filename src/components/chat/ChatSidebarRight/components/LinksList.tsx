@@ -1,38 +1,21 @@
 import React from "react";
 import { Link as LinkIcon } from "lucide-react";
-import type { Message } from "../../../../types";
+import type { LinkData } from "../../../../interfaces";
 
 interface LinksListProps {
-  messages: Message[];
+  messages: LinkData[];
   onViewAll: () => void;
 }
 
 const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
-  const validMessages = (messages || []).filter(msg => 
-    msg && 
-    msg._id && 
-    Array.isArray(msg.content)
+  const validMessages = (messages || []).filter(
+    (msg) => msg && msg._id && Array.isArray(msg.links),
   );
 
-  const allLinks: Array<{message: Message, link: string}> = [];
-  const linkRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+  const allLinks: Array<{ message: LinkData; link: string }> = [];
 
   validMessages.forEach((message) => {
-    const type = String(message.type || "").toLowerCase();
-    if (type !== "text") return;
-
-    const contentArray = Array.isArray(message.content)
-      ? message.content
-      : [message.content];
-
-    const rawText = contentArray
-      .map((content) => (typeof content === "string" ? content : content?.text || ""))
-      .join(" ");
-
-    const matches = rawText.match(linkRegex);
-    if (!matches) return;
-
-    matches.forEach((link) => {
+    message.links.forEach((link) => {
       allLinks.push({ message, link });
     });
   });
@@ -52,7 +35,7 @@ const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
         {allLinks.slice(0, 3).map(({ message, link }, index) => {
           try {
             const urlObj = new URL(link);
-            
+
             // Extract title from link (simplified)
             let title = link;
             if (link.includes('discord.gg')) {
@@ -64,7 +47,7 @@ const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
             } else {
               title = link.length > 40 ? `${link.substring(0, 40)}...` : link;
             }
-            
+
             return (
               <div
                 key={`${message._id}-${index}`}
@@ -81,8 +64,8 @@ const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
                   <p className="text-xs text-amber-700 truncate">{urlObj.hostname}</p>
                 </div>
                 <div className="text-xs text-gray-400 shrink-0">
-                  {message.created_at || message.createdAt 
-                    ? new Date(message.created_at || message.createdAt || "").toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })
+                  {message.createdAt
+                    ? new Date(message.createdAt).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })
                     : "11/01"
                   }
                 </div>
@@ -98,7 +81,7 @@ const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
         onClick={() => {
           onViewAll();
         }}
-        className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+        className="w-full cursor-pointer py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
       >
         Xem tất cả
       </button>

@@ -1,4 +1,5 @@
 import { API_CHAT_SERVER_URL } from "../config/api.config";
+import type { SearchEverythingResponse } from "../types";
 
 export class MessageService {
   static async getPresignedUrl(fileName: string, fileType: string) {
@@ -294,6 +295,40 @@ export class MessageService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching link messages:", error);
+      throw error;
+    }
+  }
+
+  // Unified search: contacts/conversations/messages/files/media
+  static async searchEverything(
+    userId: string,
+    keyword: string,
+    options?: { limit?: number; senderId?: string },
+  ): Promise<SearchEverythingResponse> {
+    try {
+      const params = new URLSearchParams();
+      params.set("q", keyword);
+      if (options?.limit) params.set("limit", String(options.limit));
+      if (options?.senderId) params.set("senderId", options.senderId);
+
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/search/${encodeURIComponent(userId)}?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error searching chat data:", error);
       throw error;
     }
   }

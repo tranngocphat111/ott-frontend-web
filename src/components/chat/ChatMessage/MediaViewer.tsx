@@ -25,6 +25,14 @@ interface MediaViewerProps {
   messages: Message[];
 }
 
+const resolveContentKey = (item: unknown): string => {
+  if (typeof item === "string") return item;
+  if (item && typeof item === "object" && "url" in item) {
+    return String((item as { url?: string }).url || "");
+  }
+  return "";
+};
+
 export const MediaViewer = ({
   isOpen,
   onClose,
@@ -39,19 +47,25 @@ export const MediaViewer = ({
       const type = m.type?.toLowerCase();
       if (type === "image") {
         const content = Array.isArray(m.content) ? m.content : [m.content];
-        content.forEach((c: string, idx: number) => {
+        content.forEach((c, idx) => {
+          const key = resolveContentKey(c);
+          if (!key) return;
+
           items.push({
             messageId: m._id,
-            url: getFullUrl(c),
+            url: getFullUrl(key),
             type: "image",
             imageIndex: idx,
           });
         });
       } else if (type === "video") {
         const content = Array.isArray(m.content) ? m.content : [m.content];
+        const key = resolveContentKey(content[0]);
+        if (!key) continue;
+
         items.push({
           messageId: m._id,
-          url: getFullUrl(content[0]),
+          url: getFullUrl(key),
           type: "video",
           imageIndex: 0,
         });
@@ -131,9 +145,9 @@ export const MediaViewer = ({
   const isVideo = current.type === "video";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/95 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-9999 bg-black/95 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
       {/* HEADER */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-linear-to-b from-black/80 to-transparent">
         <div className="text-white text-sm font-medium ml-2">
           {currentIndex + 1} / {mediaList.length}
         </div>
@@ -212,7 +226,7 @@ export const MediaViewer = ({
         <button
           onClick={() => setCurrentIndex(windowStart - 1)}
           disabled={!hasPrevWindow}
-          className="flex-shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
+          className="shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
         >
           <ChevronLeft size={18} />
         </button>
@@ -229,7 +243,7 @@ export const MediaViewer = ({
                 key={`${item.messageId}-${item.imageIndex}`}
                 onClick={() => setCurrentIndex(actualIndex)}
                 className={`
-                  relative flex-shrink-0 cursor-pointer rounded-md overflow-hidden transition-all duration-200
+                  relative shrink-0 cursor-pointer rounded-md overflow-hidden transition-all duration-200
                   ${isActive
                     ? "w-16 h-16 border-2 border-blue-500 opacity-100 scale-110"
                     : "w-14 h-14 border border-transparent opacity-50 hover:opacity-100 hover:scale-105"}
@@ -263,7 +277,7 @@ export const MediaViewer = ({
         <button
           onClick={() => setCurrentIndex(windowStart + THUMB_WINDOW)}
           disabled={!hasNextWindow}
-          className="flex-shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
+          className="shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
         >
           <ChevronRight size={18} />
         </button>

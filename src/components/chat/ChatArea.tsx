@@ -160,6 +160,108 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
+  useEffect(() => {
+    const applySubtleHighlight = (container: HTMLElement) => {
+      const highlightTarget =
+        (container.firstElementChild as HTMLElement | null) || container;
+
+      highlightTarget.classList.add(
+        "rounded-2xl",
+        "bg-primary-50/70",
+        "shadow-sm",
+        "transition-all",
+        "duration-500",
+      );
+
+      window.setTimeout(() => {
+        highlightTarget.classList.remove(
+          "rounded-2xl",
+          "bg-primary-50/70",
+          "shadow-sm",
+          "transition-all",
+          "duration-500",
+        );
+      }, 1300);
+    };
+
+    const jumpToMessage = (conversationId: string, messageId: string) => {
+      if (!conversationId || !messageId) return;
+      if (conversationId !== activeConversation?._id) return;
+
+      const targetElement = document.getElementById(`chat-msg-${messageId}`);
+      if (!targetElement) return;
+
+      targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      applySubtleHighlight(targetElement);
+    };
+
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<{
+        conversationId: string;
+        messageId: string;
+      }>;
+
+      jumpToMessage(custom.detail?.conversationId, custom.detail?.messageId);
+    };
+
+    window.addEventListener("chat:jump", handler as EventListener);
+    return () => {
+      window.removeEventListener("chat:jump", handler as EventListener);
+    };
+  }, [activeConversation?._id]);
+
+  useEffect(() => {
+    const applySubtleHighlight = (container: HTMLElement) => {
+      const highlightTarget =
+        (container.firstElementChild as HTMLElement | null) || container;
+
+      highlightTarget.classList.add(
+        "rounded-2xl",
+        "bg-primary-50/70",
+        "shadow-sm",
+        "transition-all",
+        "duration-500",
+      );
+
+      window.setTimeout(() => {
+        highlightTarget.classList.remove(
+          "rounded-2xl",
+          "bg-primary-50/70",
+          "shadow-sm",
+          "transition-all",
+          "duration-500",
+        );
+      }, 1300);
+    };
+
+    const rawTarget = sessionStorage.getItem("chat_jump_target");
+    if (!rawTarget) return;
+
+    try {
+      const target = JSON.parse(rawTarget) as {
+        conversationId?: string;
+        messageId?: string;
+      };
+
+      if (target.conversationId !== activeConversation?._id || !target.messageId) {
+        return;
+      }
+
+      const timer = window.setTimeout(() => {
+        const element = document.getElementById(`chat-msg-${target.messageId}`);
+        if (!element) return;
+
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        applySubtleHighlight(element);
+        sessionStorage.removeItem("chat_jump_target");
+      }, 120);
+
+      return () => window.clearTimeout(timer);
+    } catch {
+      sessionStorage.removeItem("chat_jump_target");
+    }
+  }, [messages, activeConversation?._id]);
+
   return (
     <div className="flex-1 flex h-full overflow-hidden relative">
       {/* Main Chat Area */}
@@ -212,25 +314,27 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                     />
                   )}
 
-                  {isSystemMsg ? (
-                    <ChatNotification
-                      type={msg.type}
-                      content={notificationContent}
-                    />
-                  ) : (
-                    <ChatMessage
-                      msg={msg}
-                      isMe={isMe}
-                      currentUserId={normalizedUserId}
-                      isFirstInSequence={isFirstInSequence}
-                      isLastInSequence={isLastInSequence}
-                      onMediaClick={(imageIndex) =>
-                        handleOpenMedia(msg._id, imageIndex)
-                      }
-                      onReply={handleReplyMessage}
-                      onReact={handleReactMessage}
-                    />
-                  )}
+                  <div id={`chat-msg-${msg._id}`}>
+                    {isSystemMsg ? (
+                      <ChatNotification
+                        type={msg.type}
+                        content={notificationContent}
+                      />
+                    ) : (
+                      <ChatMessage
+                        msg={msg}
+                        isMe={isMe}
+                        currentUserId={normalizedUserId}
+                        isFirstInSequence={isFirstInSequence}
+                        isLastInSequence={isLastInSequence}
+                        onMediaClick={(imageIndex) =>
+                          handleOpenMedia(msg._id, imageIndex)
+                        }
+                        onReply={handleReplyMessage}
+                        onReact={handleReactMessage}
+                      />
+                    )}
+                  </div>
                 </React.Fragment>
               );
             })

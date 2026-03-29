@@ -104,7 +104,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
               }`}
             >
               <button
-                className="flex min-w-0 flex-1 items-center gap-3 pr-2 text-left"
+                className="flex cursor-pointer min-w-0 flex-1 items-center gap-3 pr-2 text-left"
                 onClick={() => {
                   window.open(fileUrl, "_blank", "noopener,noreferrer");
                 }}
@@ -132,7 +132,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
               >
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
+                  className="flex cursor-pointer h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
                   title="Tải xuống"
                   onClick={() => window.open(fileUrl, "_blank", "noopener,noreferrer")}
                 >
@@ -140,7 +140,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                 </button>
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
+                  className="flex cursor-pointer h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
                   title="Chia sẻ"
                   onClick={() => copyToClipboard(fileUrl)}
                 >
@@ -150,7 +150,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                 <div className="relative">
                   <button
                     type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
+                    className="flex cursor-pointer h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
                     title="Tùy chọn"
                     onClick={() =>
                       setOpenMenuFileId((prev) => (prev === id ? null : id))
@@ -167,7 +167,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                           copyToClipboard(fileUrl);
                           setOpenMenuFileId(null);
                         }}
-                        className="w-full px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
                       >
                         Chia sẻ
                       </button>
@@ -177,7 +177,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                           window.open(fileUrl, "_blank", "noopener,noreferrer");
                           setOpenMenuFileId(null);
                         }}
-                        className="w-full px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
                       >
                         Lưu vào My Documents
                       </button>
@@ -187,7 +187,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                           window.open(fileUrl, "_blank", "noopener,noreferrer");
                           setOpenMenuFileId(null);
                         }}
-                        className="w-full px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
                       >
                         Xem tin nhắn gốc
                       </button>
@@ -195,7 +195,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                       <button
                         type="button"
                         onClick={() => setOpenMenuFileId(null)}
-                        className="w-full px-4 py-2 text-left text-[14px] text-red-500 hover:bg-red-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-red-500 hover:bg-red-50"
                       >
                         Xóa chỉ ở phía tôi
                       </button>
@@ -211,7 +211,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
         onClick={() => {
           onViewAll();
         }}
-        className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+        className="w-full cursor-pointer py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
       >
         Xem tất cả
       </button>

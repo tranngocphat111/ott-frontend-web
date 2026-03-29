@@ -69,6 +69,7 @@ export interface StorageViewProps {
   initialTab: StorageTab;
   onBack: () => void;
   messages: Message[];
+  linkMessages?: LinkData[];
   members?: ConversationMember[];
   onMediaClick: (messageId: string, imageIndex: number) => void;
 }

@@ -71,7 +71,7 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
               setNewName(displayName || "");
               setShowRenameModal(true);
             }}
-            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            className="cursor-pointer p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
           >
             <Pencil size={14} />
           </button>
@@ -120,13 +120,13 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
                     setNewName(displayName || "");
                     setShowRenameModal(false);
                   }}
-                  className="rounded-md bg-gray-200 px-5 py-2 text-[16px] font-semibold text-gray-700 hover:bg-gray-300"
+                  className="cursor-pointer rounded-md bg-gray-200 px-5 py-2 text-[16px] font-semibold text-gray-700 hover:bg-gray-300"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleSave}
-                  className="rounded-md bg-primary-700 px-5 py-2 text-[16px] font-semibold text-white hover:bg-primary-800"
+                  className="cursor-pointer rounded-md bg-primary-700 px-5 py-2 text-[16px] font-semibold text-white hover:bg-primary-800"
                 >
                   Xác nhận
                 </button>

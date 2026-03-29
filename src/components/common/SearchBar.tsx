@@ -6,6 +6,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   value, 
   onChange, 
   placeholder = 'Tìm kiếm...', 
+  onFocus,
 }) => {
   return (
     <div className="relative">
@@ -14,6 +15,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
         placeholder={placeholder}
         className="text-sm w-full pl-10 pr-4 py-1.5 bg-gray-100 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
       />

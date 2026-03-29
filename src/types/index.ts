@@ -12,3 +12,30 @@ export type { Conversation, ConversationWithParticipant } from './conversation.t
 
 // Category types
 export type { Category } from './category.type';
+
+// Search types
+export type {
+	SearchEverythingResponse,
+	SearchContactItem,
+	SearchConversationItem,
+	SearchMessageItem,
+	SearchFileItem,
+	SearchMediaItem,
+} from './search.type';
+
+// Chat sidebar left types
+export type {
+	FilterMode,
+	SearchTab,
+	SenderOption,
+	ConversationMeta,
+	RecentSearchListProps,
+	SearchMessageRowProps,
+	SenderFilterDropdownProps,
+	SearchContactsSectionProps,
+	SearchConversationsSectionProps,
+	SearchMessagesSectionProps,
+	SearchFilesSectionProps,
+	SearchResultsPanelProps,
+	SidebarHeaderProps,
+} from './chat-sidebar-left.type';

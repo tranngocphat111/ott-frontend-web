@@ -47,7 +47,7 @@ const PinnedMessages: React.FC<PinnedMessagesProps> = ({
             </span>
             <button
               onClick={() => onUnpin(message._id)}
-              className="text-amber-600 hover:text-amber-800 transition-colors"
+              className="cursor-pointer text-amber-600 hover:text-amber-800 transition-colors"
             >
               <X size={14} />
             </button>

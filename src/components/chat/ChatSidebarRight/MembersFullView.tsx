@@ -43,7 +43,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
         <button
           onClick={onBack}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="cursor-pointer p-1 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
@@ -57,7 +57,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
         <div className="px-4 py-2">
           <button
             onClick={onAddMember}
-            className="flex items-center justify-center gap-1.5 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="flex cursor-pointer items-center justify-center gap-1.5 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <UserPlus size={15} className="text-gray-600" />
             <span className="text-[14px] font-medium text-gray-700">Thêm thành viên</span>
@@ -119,7 +119,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                         prev === member.user_id ? null : member.user_id,
                       )
                     }
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     title="Tuỳ chọn thành viên"
                   >
                     <MoreHorizontal size={18} className="text-gray-600" />
@@ -135,7 +135,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                           );
                           setMenuOpenForUserId(null);
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                       >
                         {member.role === "admin"
                           ? "Gỡ phó nhóm"
@@ -147,7 +147,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                           onMemberRemoved(member.user_id);
                           setMenuOpenForUserId(null);
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                        className="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                       >
                         Xóa khỏi nhóm
                       </button>

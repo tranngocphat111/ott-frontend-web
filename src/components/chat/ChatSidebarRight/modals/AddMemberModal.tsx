@@ -99,7 +99,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           </h2>
           <button
             onClick={handleClose}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            className="cursor-pointer p-1 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X className="w-6 h-6 text-gray-500" />
           </button>
@@ -162,14 +162,14 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <div className="flex gap-3">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+              className="cursor-pointer px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
             >
               Hủy
             </button>
             <button
               onClick={handleAddMembers}
               disabled={selectedUsers.size === 0 || loading}
-              className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              className="cursor-pointer px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Đang thêm..." : "Xác nhận"}
             </button>

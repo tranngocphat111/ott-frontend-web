@@ -43,8 +43,6 @@ interface LinkItem extends BaseItem {
   link: string;
 }
 
-const linkRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
-
 const toDate = (dateInput: string | undefined) => {
   if (!dateInput) return null;
   const parsed = new Date(dateInput);
@@ -89,6 +87,7 @@ const StorageView: React.FC<StorageViewProps> = ({
   initialTab,
   onBack,
   messages,
+  linkMessages = [],
   members = [],
   onMediaClick,
 }) => {
@@ -212,32 +211,34 @@ const StorageView: React.FC<StorageViewProps> = ({
         });
       }
 
-      if (type === "text") {
-        const rawText = contentArray
-          .map((item: any) =>
-            typeof item === "string" ? item : String(item?.text || ""),
-          )
-          .join(" ");
+    });
 
-        const matches = rawText.match(linkRegex);
-        if (!matches) return;
+    linkMessages.forEach((item: any) => {
+      const messageId = String(item?._id || item?.msg_id || "");
+      if (!messageId || !Array.isArray(item?.links)) return;
 
-        matches.forEach((link: string, idx: number) => {
-          linkItems.push({
-            id: `${messageId}:link:${idx}`,
-            messageId,
-            senderId,
-            senderName,
-            senderAvatar,
-            date,
-            link,
-          });
+      const senderId = String(item?.sender_id || "");
+      const profile = memberMap.get(senderId);
+      const senderName = profile?.name || senderId || "Unknown";
+      const senderAvatar = profile?.avatar || "";
+      const date = String(item?.createdAt || "");
+
+      item.links.forEach((link: string, idx: number) => {
+        if (!link) return;
+        linkItems.push({
+          id: `${messageId}:link:${idx}`,
+          messageId,
+          senderId,
+          senderName,
+          senderAvatar,
+          date,
+          link,
         });
-      }
+      });
     });
 
     return { mediaItems, fileItems, linkItems };
-  }, [messages, memberMap]);
+  }, [messages, linkMessages, memberMap]);
 
   const senders = useMemo(() => {
     const senderMap = new Map<string, string>();
@@ -386,7 +387,7 @@ const StorageView: React.FC<StorageViewProps> = ({
         onClick={() =>
           setOpenDropdown((prev) => (prev === "sender" ? null : "sender"))
         }
-        className="flex h-9 w-full items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
+        className="flex h-9 w-full cursor-pointer items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
       >
         <span className="truncate">{selectedSenderName}</span>
         <ChevronDown size={14} className="text-gray-500" />
@@ -412,7 +413,7 @@ const StorageView: React.FC<StorageViewProps> = ({
               setSenderFilter("");
               setOpenDropdown(null);
             }}
-            className="mb-1 w-full rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+            className="mb-1 w-full cursor-pointer rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
           >
             Tất cả
           </button>
@@ -425,7 +426,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                   setSenderFilter(sender.id);
                   setOpenDropdown(null);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left hover:bg-gray-50"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-1.5 text-left hover:bg-gray-50"
               >
                 <Avatar src={sender.avatar} name={sender.name} size={28} />
                 <span className="truncate text-[14px] text-gray-800">{sender.name}</span>
@@ -447,7 +448,7 @@ const StorageView: React.FC<StorageViewProps> = ({
         onClick={() =>
           setOpenDropdown((prev) => (prev === "date" ? null : "date"))
         }
-        className="flex h-9 w-full items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
+        className="flex h-9 w-full cursor-pointer items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
       >
         <span className="truncate">{selectedDateLabel}</span>
         <ChevronDown size={14} className="text-gray-500" />
@@ -467,9 +468,9 @@ const StorageView: React.FC<StorageViewProps> = ({
                   setDatePreset(preset.id as DatePreset);
                   setOpenDropdown(null);
                 }}
-                className={`w-full rounded-lg px-3 py-1.5 text-left text-[13px] ${
+                className={`w-full cursor-pointer rounded-lg px-3 py-1.5 text-left text-[13px] ${
                   datePreset === preset.id
-                    ? "bg-amber-50 text-amber-700"
+                    ? "bg-amber-50 text-primary-700"
                     : "text-gray-700 hover:bg-gray-50"
                 }`}
               >
@@ -483,7 +484,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                 setToDateValue("");
                 setOpenDropdown(null);
               }}
-              className="w-full rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+              className="w-full cursor-pointer rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
             >
               Tất cả thời gian
             </button>
@@ -500,7 +501,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                   setFromDate(e.target.value);
                   setDatePreset("custom");
                 }}
-                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-[12px] outline-none focus:border-amber-400"
+                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-[12px] outline-none focus:border-primary-400"
               />
               <input
                 type="date"
@@ -509,7 +510,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                   setToDateValue(e.target.value);
                   setDatePreset("custom");
                 }}
-                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-[12px] outline-none focus:border-amber-400"
+                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-[12px] outline-none focus:border-primary-400"
               />
             </div>
           </div>
@@ -524,7 +525,7 @@ const StorageView: React.FC<StorageViewProps> = ({
         onClick={() =>
           setOpenDropdown((prev) => (prev === "type" ? null : "type"))
         }
-        className="flex h-9 w-full items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
+        className="flex h-9 w-full cursor-pointer items-center justify-between rounded-full bg-gray-100 px-4 text-[13px] text-gray-700"
       >
         <span className="truncate">{fileTypeLabel}</span>
         <ChevronDown size={14} className="text-gray-500" />
@@ -545,7 +546,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                 setFileTypeFilter(item);
                 setOpenDropdown(null);
               }}
-              className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+              className="mb-1 flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
             >
               <FileText size={14} className="text-gray-500" />
               <span>{item}</span>
@@ -556,7 +557,7 @@ const StorageView: React.FC<StorageViewProps> = ({
               setFileTypeFilter("");
               setOpenDropdown(null);
             }}
-            className="w-full rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+            className="w-full cursor-pointer rounded-lg px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-50"
           >
             Tất cả
           </button>
@@ -570,14 +571,14 @@ const StorageView: React.FC<StorageViewProps> = ({
       <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
         <button
           onClick={onBack}
-          className="rounded-full p-1 hover:bg-gray-100 transition-colors"
+          className="cursor-pointer rounded-full p-1 hover:bg-gray-100 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
         <h3 className="flex-1 text-[17px] font-semibold text-gray-900">Kho lưu trữ</h3>
         <button
           onClick={toggleSelectMode}
-          className="text-[14px] font-medium text-gray-800 hover:text-gray-900"
+          className="cursor-pointer text-[14px] font-medium text-gray-800 hover:text-gray-900"
         >
           {isSelectMode ? "Hủy" : "Chọn"}
         </button>
@@ -591,7 +592,7 @@ const StorageView: React.FC<StorageViewProps> = ({
               setActiveTab(tab.id);
               setSearchText("");
             }}
-            className={`flex-1 border-b-2 py-2 text-[14px] font-medium transition-colors ${
+            className={`flex-1 cursor-pointer border-b-2 py-2 text-[14px] font-medium transition-colors ${
               activeTab === tab.id
                 ? "border-amber-700 text-amber-700"
                 : "border-transparent text-gray-700"
@@ -611,7 +612,7 @@ const StorageView: React.FC<StorageViewProps> = ({
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder={activeTab === "files" ? "Tìm kiếm File" : "Tìm kiếm link"}
-              className="h-9 w-full rounded-full border border-gray-200 bg-white py-2 pl-10 pr-4 text-[13px] outline-none focus:border-amber-400"
+              className="h-9 w-full rounded-full border border-gray-200 bg-white py-2 pl-10 pr-4 text-[13px] outline-none focus:border-primary-400"
             />
           </div>
         </div>
@@ -651,7 +652,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                           }
                           onMediaClick(item.messageId, item.imageIndex);
                         }}
-                        className="relative aspect-square overflow-hidden rounded-md bg-gray-100"
+                        className="relative cursor-pointer aspect-square overflow-hidden rounded-md bg-gray-100"
                       >
                         {item.type === "image" ? (
                           <img
@@ -717,7 +718,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                             }
                             window.open(`${URL_S3}${item.key}`, "_blank", "noopener,noreferrer");
                           }}
-                          className={`flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
+                          className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
                             isSelectMode && selectedItemIds.has(item.id)
                               ? "bg-amber-50 ring-1 ring-amber-200"
                               : ""
@@ -727,7 +728,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                             <span
                               className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border ${
                                 selectedItemIds.has(item.id)
-                                  ? "border-amber-700 bg-amber-700 text-white"
+                                  ? "border-primary-700 bg-primary-700 text-white"
                                   : "border-gray-300 bg-white text-transparent"
                               }`}
                             >
@@ -785,7 +786,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                             }
                             window.open(item.link, "_blank", "noopener,noreferrer");
                           }}
-                          className={`flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
+                          className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
                             isSelectMode && selectedItemIds.has(item.id)
                               ? "bg-amber-50 ring-1 ring-amber-200"
                               : ""
@@ -836,14 +837,14 @@ const StorageView: React.FC<StorageViewProps> = ({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-600"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-gray-600"
                 title="Chia sẻ"
               >
                 <Send size={15} />
               </button>
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-red-50 text-red-500"
                 title="Xóa"
               >
                 <Trash2 size={15} />
@@ -851,7 +852,7 @@ const StorageView: React.FC<StorageViewProps> = ({
               <button
                 type="button"
                 onClick={toggleSelectMode}
-                className="text-[17px] font-semibold text-gray-900"
+                className="cursor-pointer text-[17px] font-semibold text-gray-900"
               >
                 Hủy
               </button>
