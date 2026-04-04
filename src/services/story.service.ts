@@ -170,48 +170,53 @@ function mapSuggestedUsers(raw: ApiSuggestedUser[]): StorySuggestedUser[] {
     }));
 }
 
-export async function fetchStories(accountId: string): Promise<StoryReelData> {
+export async function fetchStoryGroups(accountId: string): Promise<StoryUserGroup[]> {
     try {
-        if (!accountId) {
-            return { storyGroups: [], suggestedUsers: [] };
-        }
+        if (!accountId) return [];
 
         const reelRes = await fetch(
-            `${API_MEDIA_SERVER_URL}/stories/reel/${accountId}?suggestionLimit=8`,
+            `${API_MEDIA_SERVER_URL}/stories/reel/${accountId}?suggestionLimit=0`,
         );
 
         if (reelRes.ok) {
             const reel = (await reelRes.json()) as ApiStoryReel;
             if (Array.isArray(reel.storyGroups) && reel.storyGroups.length > 0) {
-                return {
-                    storyGroups: mapStoryGroups(reel.storyGroups),
-                    suggestedUsers: Array.isArray(reel.suggestedUsers) ? mapSuggestedUsers(reel.suggestedUsers) : [],
-                };
+                return mapStoryGroups(reel.storyGroups);
             }
             if (Array.isArray(reel.stories) && reel.stories.length > 0) {
-                return {
-                    storyGroups: groupStories(reel.stories),
-                    suggestedUsers: Array.isArray(reel.suggestedUsers) ? mapSuggestedUsers(reel.suggestedUsers) : [],
-                };
-            }
-            if (Array.isArray(reel.suggestedUsers) && reel.suggestedUsers.length > 0) {
-                return {
-                    storyGroups: [],
-                    suggestedUsers: mapSuggestedUsers(reel.suggestedUsers),
-                };
+                return groupStories(reel.stories);
             }
         }
 
         const fallbackRes = await fetch(`${API_MEDIA_SERVER_URL}/stories`);
-        if (!fallbackRes.ok) return { storyGroups: [], suggestedUsers: [] };
+        if (!fallbackRes.ok) return [];
         const fallbackStories = unwrapList<ApiStory>(await fallbackRes.json());
-        return {
-            storyGroups: groupStories(fallbackStories),
-            suggestedUsers: [],
-        };
+        return groupStories(fallbackStories);
     } catch {
-        return { storyGroups: [], suggestedUsers: [] };
+        return [];
     }
+}
+
+export async function fetchSuggestedUsers(accountId: string, limit = 8): Promise<StorySuggestedUser[]> {
+    try {
+        if (!accountId) return [];
+
+        const reelRes = await fetch(
+            `${API_MEDIA_SERVER_URL}/stories/reel/${accountId}?suggestionLimit=${limit}`,
+        );
+
+        if (!reelRes.ok) return [];
+        const reel = (await reelRes.json()) as ApiStoryReel;
+        if (!Array.isArray(reel.suggestedUsers)) return [];
+        return mapSuggestedUsers(reel.suggestedUsers);
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchStories(accountId: string): Promise<StoryReelData> {
+    const storyGroups = await fetchStoryGroups(accountId);
+    return { storyGroups, suggestedUsers: [] };
 }
 
 export async function createStory(request: StoryCreateRequest): Promise<ApiStory | null> {

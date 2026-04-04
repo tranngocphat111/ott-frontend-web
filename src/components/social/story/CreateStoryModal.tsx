@@ -10,7 +10,7 @@ import {
   Type,
   X,
 } from "lucide-react";
-import { createStory, uploadStoryMedia } from "../../services/story.service";
+import { createStory, uploadStoryMedia } from "../../../services/story.service";
 
 interface Props {
   isOpen: boolean;
@@ -140,9 +140,8 @@ const CreateStoryModal: React.FC<Props> = ({
     if (!file) return;
 
     const localUrl = URL.createObjectURL(file);
-    const nextType: MediaType = file.type.startsWith("video/")
-      ? "video"
-      : "image";
+    const nextType: MediaType =
+      file.type.startsWith("video/") ? "video" : "image";
     setMediaType(nextType);
     setImagePreviewUrl(localUrl);
     setUploadingImage(true);
@@ -162,9 +161,9 @@ const CreateStoryModal: React.FC<Props> = ({
         setImageWidth(video.videoWidth || 720);
         setImageHeight(video.videoHeight || 1280);
         setVideoDuration(
-          Number.isFinite(video.duration)
-            ? Math.round(video.duration * 1000)
-            : 15000,
+          Number.isFinite(video.duration) ?
+            Math.round(video.duration * 1000)
+          : 15000,
         );
       };
       video.src = localUrl;
@@ -288,7 +287,7 @@ const CreateStoryModal: React.FC<Props> = ({
         </div>
         <Smile className="absolute bottom-3 right-3 size-6 text-white/70" />
       </div>
-      : <div
+    : <div
         className={`w-[310px] h-[550px] rounded-2xl relative overflow-hidden shadow-lg border border-white/30 bg-emerald-100 flex items-center justify-center transition ${
           isDragActive ? "ring-4 ring-white/70" : ""
         }`}
@@ -319,6 +318,7 @@ const CreateStoryModal: React.FC<Props> = ({
                 objectFit: "contain",
               }}
             />
+
         : <div className="text-center space-y-3">
             <div className="text-sm text-emerald-900/80 font-medium">
               Kéo ảnh hoặc video vào đây

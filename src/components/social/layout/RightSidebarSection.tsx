@@ -5,7 +5,7 @@ interface Props {
 }
 
 const RightSidebarSection: React.FC<Props> = ({ children }) => (
-  <aside className="shrink-0">{children}</aside>
+  <aside className="shrink-0 sticky top-0">{children}</aside>
 );
 
 export default RightSidebarSection;

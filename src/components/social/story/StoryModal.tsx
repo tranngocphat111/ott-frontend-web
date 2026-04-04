@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { createStory } from "../../services/story.service";
+import { createStory } from "../../../services/story.service";
 
 interface Props {
   isOpen: boolean;

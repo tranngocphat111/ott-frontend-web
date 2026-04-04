@@ -10,7 +10,7 @@ import CenterFeedSection from "../../components/social/layout/CenterFeedSection"
 import RightSidebarSection from "../../components/social/layout/RightSidebarSection";
 import InfiniteScrollIndicator from "../../components/social/feed/InfiniteScrollIndicator";
 import EndOfFeedNotice from "../../components/social/feed/EndOfFeedNotice";
-import StoryFeed from "../../components/social/feed/StoryFeed";
+import StoryFeed from "../../components/social/story/StoryFeed";
 import CreatePostEntry from "../../components/social/feed/CreatePostEntry";
 import { useSocialFeed } from "../../hooks/useSocialFeed";
 
@@ -36,7 +36,7 @@ const SocialFeed: React.FC = () => {
   return (
     <>
       <SocialFeedLayout containerRef={containerRef}>
-        <div className="flex gap-4">
+        <div className="flex gap-4 relative">
           <LeftSidebarSection>
             <SocialLeftSidebar currentUser={currentUser} />
           </LeftSidebarSection>
