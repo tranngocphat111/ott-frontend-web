@@ -1,33 +1,141 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
 @theme {
-  /* Định nghĩa bảng màu Primary */
-  --color-primary-50: #F7F3F0;
-  --color-primary-100: #EFE7E0;
-  --color-primary-200: #DFC0A4;
-  --color-primary-300: #D0A97E;
-  --color-primary-400: #BC9166;
-  --color-primary-500: #AE7F53; /* Primary 500 mặc định */
-  --color-primary-600: #8B6642;
-  --color-primary-700: #694D31;
+  /* Primary colors */
+  --color-primary-50: #f7f3f0;
+  --color-primary-100: #efe7e0;
+  --color-primary-200: #dfc0a4;
+  --color-primary-300: #d0a97e;
+  --color-primary-400: #bc9166;
+  --color-primary-500: #ae7f53;
+  --color-primary-600: #8b6642;
+  --color-primary-700: #694d31;
   --color-primary-800: #463421;
-  --color-primary-900: #231A10;
+  --color-primary-900: #231a10;
 
-  /* Định nghĩa Animations */
+  /* Chat colors */
+  --color-chat-me: #efdccb;
+  --color-chat-me-text: #101828;
+
+  --color-chat-other: #ffffff;
+  --color-chat-other-border: #e5e7eb;
+  --color-chat-other-text: #111827;
+
+  /* Animations */
   --animate-slide-in-left: slideInLeft 0.3s ease-out forwards;
   --animate-fade-in: fadeIn 0.2s ease-out forwards;
   --animate-scale-in: scaleIn 0.2s ease-out forwards;
   --animate-shimmer: shimmer 2s infinite linear;
 
-  /* Định nghĩa Background Images */
-  --background-image-gradient-primary: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-200));
-  --background-image-gradient-sidebar: linear-gradient(180deg, var(--color-primary-500), var(--color-primary-400));
-  --background-image-gradient-chat: linear-gradient(135deg, var(--color-primary-200), var(--color-primary-300));
+  /* Background gradients */
+  --background-image-gradient-primary: linear-gradient(
+    135deg,
+    var(--color-primary-500),
+    var(--color-primary-200)
+  );
+
+  --background-image-gradient-sidebar: linear-gradient(
+    180deg,
+    var(--color-primary-500),
+    var(--color-primary-400)
+  );
+
+  --background-image-gradient-chat: linear-gradient(
+    135deg,
+    var(--color-primary-200),
+    var(--color-primary-300)
+  );
 }
 
-/* Khai báo Keyframes nếu cần */
+/* Keyframes */
 @keyframes slideInLeft {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
-/* ... các keyframes khác */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Utilities */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out forwards;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(174, 127, 83, 0.4) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(174, 127, 83, 0.4);
+    border-radius: 3px;
+    transition: background-color 0.3s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(174, 127, 83, 0.6);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: rgba(174, 127, 83, 0.8);
+  }
+}
