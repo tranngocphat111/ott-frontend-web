@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ConversationsSidebar, ChatArea } from '../components/HomePage';
 import type { Conversation, Message } from '../components/HomePage';
@@ -9,94 +8,116 @@ const HomePage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const [conversations] = useState<Conversation[]>(mockConversations);
   const [messages, setMessages] = useState<Message[]>(mockMessages);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      window.location.href = '/login';
-    }
+    if (!isLoading && !isAuthenticated) window.location.href = '/login';
   }, [isLoading, isAuthenticated]);
 
-  const handleSelectConversation = (conversation: Conversation) => {
-    setSelectedConversation(conversation);
+  const handleSelectConversation = (conv: Conversation) => {
+    setSelectedConversation(conv);
     setIsSidebarOpen(false);
-    // TODO: Fetch messages for selected conversation from API
-    // For now, using mock data
     setMessages(mockMessages);
   };
 
   const handleSendMessage = (content: string) => {
     if (!user || !selectedConversation) return;
-
-    const newMessage: Message = {
+    setMessages(prev => [...prev, {
       id: Date.now().toString(),
       senderId: user.id,
       content,
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent'
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-
-    // TODO: Send message to API
-    console.log('Sending message:', newMessage);
+      status: 'sent',
+    }]);
   };
 
-  const handleNewChat = () => {
-    console.log('New chat clicked');
-    // TODO: Implement new chat functionality
-  };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center animate-pulse">
-            <MessageCircle className="w-8 h-8 text-blue-600" />
-          </div>
-          <p className="text-gray-600">Đang tải...</p>
+  if (isLoading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-primary-50)', fontFamily: 'var(--font-body)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div className="animate-pulse-slow" style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--color-primary-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="animate-spin" style={{ width: 22, height: 22, border: '2.5px solid var(--color-primary-200)', borderTopColor: 'var(--color-primary-500)', borderRadius: '50%' }} />
         </div>
+        <p style={{ fontSize: '0.875rem', color: 'var(--color-primary-500)' }}>Đang tải...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // Not authenticated
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  if (!isAuthenticated || !user) return null;
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
-      {/* Conversations Sidebar */}
-      <ConversationsSidebar
-        conversations={conversations}
-        selectedConversation={selectedConversation}
-        onSelectConversation={handleSelectConversation}
-        onNewChat={handleNewChat}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-
-      {/* Chat Area */}
-      <ChatArea
-        conversation={selectedConversation}
-        messages={messages}
-        currentUserId={user.id}
-        onSendMessage={handleSendMessage}
-      />
-
-      {/* Mobile Menu Button */}
-      {!selectedConversation && (
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 transition-colors z-10"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      overflow: 'hidden',
+      background: 'var(--color-primary-50)',
+      fontFamily: 'var(--font-body)',
+    }}>
+      {/* Mobile overlay — chỉ render khi sidebar mở trên mobile */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="lg:hidden animate-fade-in"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(35,26,16,0.45)', zIndex: 40, backdropFilter: 'blur(2px)' }}
+        />
       )}
+
+      {/* Sidebar — desktop: static trong flex, mobile: fixed slide-in */}
+      <div style={{
+        // Desktop: luôn hiển thị, chiếm không gian trong flex
+        flexShrink: 0,
+        width: 300,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'white',
+        borderRight: '1px solid var(--color-primary-100)',
+        zIndex: 50,
+        // Mobile: fixed overlay
+      }} className="hidden lg:flex">
+        <ConversationsSidebar
+          conversations={conversations}
+          selectedConversation={selectedConversation}
+          onSelectConversation={handleSelectConversation}
+          onNewChat={() => console.log('new chat')}
+          isOpen={false}
+          onClose={() => {}}
+          embedded
+        />
+      </div>
+
+      {/* Mobile sidebar (fixed) */}
+      <div
+        className="lg:hidden"
+        style={{
+          position: 'fixed', top: 0, left: 0, bottom: 0,
+          width: 300, zIndex: 50,
+          transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
+          display: 'flex', flexDirection: 'column',
+          background: 'white',
+          boxShadow: isSidebarOpen ? 'var(--shadow-xl)' : 'none',
+        }}
+      >
+        <ConversationsSidebar
+          conversations={conversations}
+          selectedConversation={selectedConversation}
+          onSelectConversation={handleSelectConversation}
+          onNewChat={() => console.log('new chat')}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </div>
+
+      {/* Chat area — luôn flex-1, không bị đè */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <ChatArea
+          conversation={selectedConversation}
+          messages={messages}
+          currentUserId={user.id}
+          onSendMessage={handleSendMessage}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+        />
+      </div>
     </div>
   );
 };

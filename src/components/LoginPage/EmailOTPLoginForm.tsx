@@ -1,42 +1,33 @@
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { authApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Loader2, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import { SubmitBtn, OtpInput, BackBtn } from './LoginFormParts';
 
-interface EmailOTPLoginFormProps {
-  onSuccess: () => void;
-}
+interface Props { onSuccess: () => void; }
 
-export const EmailOTPLoginForm: React.FC<EmailOTPLoginFormProps> = ({ onSuccess }) => {
+export const EmailOTPLoginForm: React.FC<Props> = ({ onSuccess }) => {
   const { loginWithToken } = useAuth();
-  const [step, setStep] = useState<'email' | 'otp'>('email');
-  const [email, setEmail] = useState('');
+  const { showToast } = useToast();
+  const [step, setStep]       = useState<'email' | 'otp'>('email');
+  const [email, setEmail]     = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     setLoading(true);
-
     try {
-      const response = await authApi.requestEmailOtpLogin(email);
-      setSuccess(response.result?.message || 'OTP đã được gửi đến email của bạn');
+      const res = await authApi.requestEmailOtpLogin(email);
+      showToast(res.result?.message || 'OTP đã được gửi đến email của bạn', 'success', 'Đã gửi');
       setStep('otp');
     } catch (err: any) {
-      if (err.code === 'ACCOUNT_PERMANENTLY_DELETED') {
-        setError('Tài khoản đã bị xóa vĩnh viễn (quá 30 ngày). Vui lòng đăng ký tài khoản mới.');
-      } else if (err.code === 'PHONE_ALREADY_EXISTS' || err.code === 'EMAIL_ALREADY_EXISTS') {
-        setError('Không thể khôi phục tài khoản vì email đã được sử dụng cho tài khoản khác.');
-      } else {
-        setError(err.message || 'Không thể gửi OTP');
-      }
+      const msg =
+        err.code === 'ACCOUNT_PERMANENTLY_DELETED' ? 'Tài khoản đã bị xóa vĩnh viễn. Vui lòng đăng ký mới.' :
+        err.code === 'EMAIL_ALREADY_EXISTS'         ? 'Email đã được sử dụng cho tài khoản khác.' :
+        err.message || 'Không thể gửi OTP';
+      showToast(msg, 'error', 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
     }
@@ -44,136 +35,48 @@ export const EmailOTPLoginForm: React.FC<EmailOTPLoginFormProps> = ({ onSuccess 
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
-
     try {
-      const response = await authApi.verifyEmailOtpLogin({ email, otpCode });
-      
-      if (response.result?.token && response.result?.refreshToken) {
-        await loginWithToken(response.result.token, response.result.refreshToken);
+      const res = await authApi.verifyEmailOtpLogin({ email, otpCode });
+      if (res.result?.token && res.result?.refreshToken) {
+        await loginWithToken(res.result.token, res.result.refreshToken);
         onSuccess();
       }
     } catch (err: any) {
-
-        setError(err.message || 'Mã OTP không hợp lệ');
-      
+      showToast(err.message || 'Mã OTP không hợp lệ', 'error', 'Xác thực thất bại');
     } finally {
       setLoading(false);
     }
   };
 
-  if (step === 'otp') {
-    return (
-      <form onSubmit={handleVerifyOtp} className="space-y-4">
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
+  if (step === 'otp') return (
+    <form onSubmit={handleVerifyOtp} className="space-y-5">
+      {/* Info */}
+      <div className="animate-slide-down" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'var(--color-info-bg)', border: '1px solid var(--color-info-border)' }}>
+        <Mail size={15} style={{ color: 'var(--color-primary-500)', flexShrink: 0 }} />
+        <p style={{ fontSize: '0.8125rem', color: 'var(--color-primary-700)' }}>
+          Mã đã gửi đến <strong style={{ color: 'var(--color-primary-800)' }}>{email}</strong>
+        </p>
+      </div>
 
-        <div className="text-center mb-4">
-          <Mail className="w-12 h-12 text-blue-600 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">
-            Mã OTP đã được gửi đến
-          </p>
-          <p className="font-semibold text-gray-900">{email}</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 text-center">
-            Nhập mã OTP
-          </label>
-          <input
-            type="text"
-            value={otpCode}
-            onChange={(e) => {
-              setOtpCode(e.target.value);
-              setError('');
-            }}
-            placeholder="000000"
-            maxLength={6}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              <span>Đang xác thực...</span>
-            </>
-          ) : (
-            'Xác nhận'
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setStep('email');
-            setOtpCode('');
-            setError('');
-          }}
-          className="w-full text-gray-600 hover:text-gray-800 font-medium"
-        >
-          ← Quay lại
-        </button>
-      </form>
-    );
-  }
+      <OtpInput value={otpCode} onChange={setOtpCode} />
+      <SubmitBtn loading={loading} label="Xác nhận" loadingLabel="Đang xác thực..." />
+      <BackBtn onClick={() => { setStep('email'); setOtpCode(''); }} />
+    </form>
+  );
 
   return (
     <form onSubmit={handleRequestOtp} className="space-y-4">
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-          {success}
-        </div>
-      )}
-
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email
-        </label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError('');
-          }}
-          placeholder="example@email.com"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          required
-        />
+        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, color: 'var(--color-primary-700)' }}>Email</label>
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary-400)', pointerEvents: 'none' }}><Mail size={15} /></span>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required
+            className="focus-ring transition-base"
+            style={{ width: '100%', paddingLeft: 38, paddingRight: 14, paddingTop: 10, paddingBottom: 10, borderRadius: 12, fontSize: '0.875rem', border: '1.5px solid var(--color-primary-200)', background: 'rgba(255,255,255,0.7)', color: 'var(--color-primary-900)', outline: 'none' }} />
+        </div>
       </div>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="animate-spin" size={20} />
-            <span>Đang gửi...</span>
-          </>
-        ) : (
-          'Gửi mã OTP'
-        )}
-      </button>
+      <SubmitBtn loading={loading} label="Gửi mã OTP" loadingLabel="Đang gửi..." />
     </form>
   );
 };

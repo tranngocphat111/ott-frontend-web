@@ -71,9 +71,6 @@ export const authApi = {
     return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, data);
   },
 
-  /**
-   * Request OTP for email login
-   */
   requestEmailOtpLogin: async (email: string): Promise<ApiResponse<OtpResponse>> => {
     const payload = {
       email,

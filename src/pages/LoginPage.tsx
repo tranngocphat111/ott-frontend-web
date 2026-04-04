@@ -1,94 +1,81 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
-import {
-  LoginTabs,
-  PhoneLoginForm,
-  EmailOTPLoginForm,
-  QRCodeLogin,
-  GoogleLoginButton
-} from '../components/LoginPage';
+import { LoginTabs, PhoneLoginForm, EmailOTPLoginForm, QRCodeLogin, GoogleLoginButton } from '../components/LoginPage';
+import logo from '../assets/logo_tach_nen.jpg';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'phone' | 'email' | 'qr'>('phone');
 
-  const handleLoginSuccess = () => {
-    navigate('/home', { replace: true });
-  };
+  const handleLoginSuccess = () => navigate('/home', { replace: true });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-6">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-      </div>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: 'var(--background-image-gradient-subtle)', fontFamily: 'var(--font-body)' }}
+    >
+      {/* Ambient blobs */}
+      <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(174,127,83,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-80px', left: '-80px', width: '280px', height: '280px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(208,169,126,0.11) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-      <div className="relative w-full max-w-md">
+      <div className="w-full max-w-md animate-scale-in">
         {/* Header */}
-        <div className="text-center mb-8">
-          <a href="/" className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center shadow-lg">
-              <MessageCircle className="w-7 h-7 text-white" />
+        <div className="flex flex-col items-center mb-7">
+          <a href="/" className="group flex items-center gap-2.5 mb-4">
+            <div
+              className="transition-base group-hover:scale-105"
+              style={{ width: 44, height: 44, borderRadius: 12, background: 'white', boxShadow: 'var(--shadow-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-primary-100)' }}
+            >
+              <img src={logo} alt="Riff" style={{ width: 28, height: 28, objectFit: 'contain' }} />
             </div>
-            <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-              ZaloChat
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 700, color: 'var(--color-primary-800)' }}>
+              Riff
             </span>
           </a>
-          <p className="text-gray-600">Đăng nhập để tiếp tục</p>
+          <p style={{ fontSize: '0.9rem', color: 'var(--color-primary-500)' }}>Chào mừng trở lại</p>
         </div>
 
-        {/* Login Form Container */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+        {/* Card */}
+        <div
+          className="glass"
+          style={{ borderRadius: 24, padding: '2rem', boxShadow: 'var(--shadow-xl)', position: 'relative' }}
+        >
+          {/* Top accent */}
+          <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: '3px', borderRadius: '0 0 3px 3px', background: 'linear-gradient(90deg, transparent, var(--color-primary-400), transparent)' }} />
+
           <LoginTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-          {activeTab === 'phone' && <PhoneLoginForm onSuccess={handleLoginSuccess} />}
-          {activeTab === 'email' && <EmailOTPLoginForm onSuccess={handleLoginSuccess} />}
-          {activeTab === 'qr' && <QRCodeLogin onSuccess={handleLoginSuccess} />}
+          <div key={activeTab} className="animate-slide-up mt-6">
+            {activeTab === 'phone' && <PhoneLoginForm onSuccess={handleLoginSuccess} />}
+            {activeTab === 'email' && <EmailOTPLoginForm onSuccess={handleLoginSuccess} />}
+            {activeTab === 'qr'    && <QRCodeLogin onSuccess={handleLoginSuccess} />}
+          </div>
 
-          {/* Google Login - Only show for phone and email tabs */}
           {activeTab !== 'qr' && (
             <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
+              <div style={{ position: 'relative', margin: '1.25rem 0' }}>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
+                  <div style={{ width: '100%', borderTop: '1px solid var(--color-primary-100)' }} />
                 </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">Hoặc</span>
+                <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                  <span style={{ padding: '0 12px', background: 'rgba(255,252,250,0.85)', fontSize: '0.8125rem', color: 'var(--color-primary-400)' }}>
+                    Hoặc
+                  </span>
                 </div>
               </div>
-
               <GoogleLoginButton />
             </>
           )}
         </div>
 
-        {/* Register Link */}
-        <div className="text-center mt-6">
-          <p className="text-gray-600">
-            Chưa có tài khoản?{' '}
-            <a href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-              Đăng ký ngay
-            </a>
-          </p>
-        </div>
+        {/* Footer */}
+        <p className="text-center mt-5 text-sm" style={{ color: 'var(--color-primary-500)' }}>
+          Chưa có tài khoản?{' '}
+          <a href="/register" className="font-semibold transition-fast hover:opacity-70" style={{ color: 'var(--color-primary-600)' }}>
+            Đăng ký ngay
+          </a>
+        </p>
       </div>
-
-      {/* Animation Styles */}
-      <style>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-      `}</style>
     </div>
   );
 };

@@ -1,23 +1,19 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { authApi } from '../../services/api';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Phone, Lock, ShieldCheck } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import { Spinner, SubmitBtn, OtpInput, BackBtn } from './LoginFormParts';
 
+interface Props { onSuccess: () => void; }
 
-interface PhoneLoginFormProps {
-  onSuccess: () => void;
-}
-
-export const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onSuccess }) => {
+export const PhoneLoginForm: React.FC<Props> = ({ onSuccess }) => {
   const { login, verify2FA, request2FAOtp } = useAuth();
-  
+  const { showToast } = useToast();
+
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
   const [requires2FA, setRequires2FA] = useState(false);
   const [tempToken, setTempToken] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -25,258 +21,130 @@ export const PhoneLoginForm: React.FC<PhoneLoginFormProps> = ({ onSuccess }) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
-
     try {
       const result = await login(phone, password);
-      
-      // ✅ CHECK: Có cần 2FA không?
       if (result.requires2FA && result.tempToken) {
-        console.log('2FA required, showing OTP form');
         setRequires2FA(true);
         setTempToken(result.tempToken);
-        setLoading(false);
-        return;
-      }
-      
-      // ✅ Login thành công (hoặc auto restore)
-      if (result.authenticated) {
-        console.log('Login successful');
+      } else if (result.authenticated) {
         onSuccess();
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      
-      if (err.code === 'INVALID_CREDENTIALS') {
-        setError('Số điện thoại hoặc mật khẩu không đúng');
-      } else if (err.code === 'PASSWORD_NOT_SET') {
-        setError('Tài khoản chưa có mật khẩu. Vui lòng đăng nhập bằng Google hoặc đặt mật khẩu.');
-      } else {
-        setError(err.message || 'Đăng nhập thất bại');
-      }
+      const msg =
+        err.code === 'INVALID_CREDENTIALS' ? 'Số điện thoại hoặc mật khẩu không đúng' :
+          err.code === 'PASSWORD_NOT_SET' ? 'Tài khoản chưa có mật khẩu. Vui lòng đăng nhập bằng Google.' :
+            err.message || 'Đăng nhập thất bại';
+      showToast(msg, 'error', 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Verify 2FA OTP
   const handleVerify2FA = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!otpCode || otpCode.length !== 6) {
-      setError('Vui lòng nhập mã OTP 6 số');
-      return;
-    }
-
-    setError('');
+    if (otpCode.length !== 6) { showToast('Vui lòng nhập mã OTP 6 số', 'warning'); return; }
     setOtpLoading(true);
-
     try {
       const result = await verify2FA(tempToken, otpCode);
-      
-      if (result.authenticated) {
-        console.log('2FA verification successful');
-        onSuccess();
-      }
+      if (result.authenticated) onSuccess();
     } catch (err: any) {
-      console.error('2FA verification error:', err);
-      
-      if (err.code === 'INVALID_OTP_CODE') {
-        setError('Mã OTP không đúng. Vui lòng kiểm tra lại.');
-      } else if (err.code === 'OTP_EXPIRED') {
-        setError('Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.');
-      } else if (err.code === 'OTP_MAX_ATTEMPTS_EXCEEDED') {
-        setError('Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã OTP mới.');
-      } else {
-        setError(err.message || 'Xác thực thất bại');
-      }
+      const msg =
+        err.code === 'INVALID_OTP_CODE' ? 'Mã OTP không đúng. Vui lòng kiểm tra lại.' :
+          err.code === 'OTP_EXPIRED' ? 'Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.' :
+            err.code === 'OTP_MAX_ATTEMPTS_EXCEEDED' ? 'Nhập sai quá nhiều lần. Vui lòng yêu cầu mã mới.' :
+              err.message || 'Xác thực thất bại';
+      showToast(msg, 'error', 'Xác thực 2FA thất bại');
     } finally {
       setOtpLoading(false);
     }
   };
 
-  // ✅ Request new OTP
   const handleResendOTP = async () => {
-    setError('');
     setOtpLoading(true);
-
     try {
       await request2FAOtp(phone);
-      alert('Mã OTP mới đã được gửi đến email của bạn');
-      setOtpCode(''); // Clear input
+      showToast('Mã OTP mới đã được gửi đến email của bạn', 'success', 'Đã gửi');
+      setOtpCode('');
     } catch (err: any) {
-      console.error('Resend OTP error:', err);
-      setError(err.message || 'Không thể gửi lại OTP');
+      showToast(err.message || 'Không thể gửi lại OTP', 'error');
     } finally {
       setOtpLoading(false);
     }
   };
 
-  // ✅ Back to login form
-  const handleBackToLogin = () => {
-    setRequires2FA(false);
-    setTempToken('');
-    setOtpCode('');
-    setError('');
-  };
-
-  // ✅ Nếu đang ở bước 2FA
-  if (requires2FA) {
-    return (
-      <div className="space-y-4">
-        <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Xác thực 2 yếu tố</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Nhập mã OTP đã được gửi đến email của bạn
-          </p>
+  /* ── 2FA step ── */
+  if (requires2FA) return (
+    <form onSubmit={handleVerify2FA} className="space-y-5">
+      <div className="flex flex-col items-center gap-1 animate-slide-down">
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-primary-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ShieldCheck size={20} style={{ color: 'var(--color-primary-600)' }} />
         </div>
-
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleVerify2FA} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mã OTP
-            </label>
-            <input
-              type="text"
-              value={otpCode}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                setOtpCode(value);
-                setError('');
-              }}
-              placeholder="123456"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
-              maxLength={6}
-              autoFocus
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              Nhập 6 chữ số
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={otpLoading || otpCode.length !== 6}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            {otpLoading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                <span>Đang xác thực...</span>
-              </>
-            ) : (
-              'Xác thực'
-            )}
-          </button>
-
-          <div className="flex items-center justify-between text-sm">
-            <button
-              type="button"
-              onClick={handleBackToLogin}
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              ← Quay lại
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResendOTP}
-              disabled={otpLoading}
-              className="text-blue-600 hover:text-blue-700 disabled:text-gray-400 font-medium"
-            >
-              Gửi lại OTP
-            </button>
-          </div>
-        </form>
+        <p className="font-semibold text-sm" style={{ color: 'var(--color-primary-900)' }}>Xác thực 2 yếu tố</p>
+        <p className="text-xs text-center" style={{ color: 'var(--color-primary-500)' }}>Nhập mã OTP đã được gửi đến email của bạn</p>
       </div>
-    );
-  }
 
+      <OtpInput value={otpCode} onChange={v => setOtpCode(v)} />
+
+      <SubmitBtn loading={otpLoading} label="Xác thực" loadingLabel="Đang xác thực..." disabled={otpCode.length !== 6} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <BackBtn onClick={() => { setRequires2FA(false); setOtpCode(''); }} />
+        <button type="button" onClick={handleResendOTP} disabled={otpLoading}
+          className="transition-fast text-sm font-medium hover:opacity-70"
+          style={{ color: 'var(--color-primary-600)', background: 'none', border: 'none', cursor: 'pointer' }}>
+          Gửi lại OTP
+        </button>
+      </div>
+    </form>
+  );
+
+  /* ── Login step ── */
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      
+      <FormField label="Số điện thoại" icon={<Phone size={15} />}>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="0123 456 789" required
+          className="focus-ring transition-base" style={inputStyle} />
+      </FormField>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Số điện thoại
-        </label>
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => {
-            setPhone(e.target.value);
-            setError('');
-          }}
-          placeholder="0123456789"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mật khẩu
-        </label>
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setError('');
-            }}
-            placeholder="••••••••"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-            required
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+      <FormField label="Mật khẩu" icon={<Lock size={15} />}>
+        <div style={{ position: 'relative' }}>
+          <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+            placeholder="••••••••" required className="focus-ring transition-base" style={{ ...inputStyle, paddingRight: 40 }} />
+          <button type="button" onClick={() => setShowPw(p => !p)}
+            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary-400)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-      </div>
+      </FormField>
 
-      <div className="flex items-center justify-between text-sm">
-        <label className="flex items-center">
-          <input type="checkbox" className="mr-2" />
-          <span className="text-gray-600">Ghi nhớ đăng nhập</span>
-        </label>
-        <a href="/forgot-password" className="text-blue-600 hover:text-blue-700">
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <a href="/forgot-password" className="text-xs font-medium transition-fast hover:opacity-70" style={{ color: 'var(--color-primary-600)' }}>
           Quên mật khẩu?
         </a>
       </div>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="animate-spin" size={20} />
-            <span>Đang đăng nhập...</span>
-          </>
-        ) : (
-          'Đăng nhập'
-        )}
-      </button>
+      <SubmitBtn loading={loading} label="Đăng nhập" loadingLabel="Đang đăng nhập..." />
     </form>
   );
 };
+
+/* ── Shared helpers ── */
+const inputStyle: React.CSSProperties = {
+  width: '100%', paddingLeft: 38, paddingRight: 14, paddingTop: 10, paddingBottom: 10,
+  borderRadius: 12, fontSize: '0.875rem',
+  border: '1.5px solid var(--color-primary-200)',
+  background: 'rgba(255,255,255,0.7)', color: 'var(--color-primary-900)', outline: 'none',
+};
+
+function FormField({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, color: 'var(--color-primary-700)', letterSpacing: '0.02em' }}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary-400)', pointerEvents: 'none' }}>{icon}</span>
+        {children}
+      </div>
+    </div>
+  );
+}

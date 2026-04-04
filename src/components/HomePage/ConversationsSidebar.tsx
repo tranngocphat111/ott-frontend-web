@@ -1,67 +1,89 @@
-import React from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Search, X } from 'lucide-react';
 import { SidebarHeader } from './SidebarHeader';
-import { SearchBar } from './SearchBar';
 import { ConversationItem, type Conversation } from './ConversationItem';
 
-interface ConversationsSidebarProps {
+interface Props {
   conversations: Conversation[];
   selectedConversation: Conversation | null;
-  onSelectConversation: (conversation: Conversation) => void;
+  onSelectConversation: (c: Conversation) => void;
   onNewChat?: () => void;
   isOpen: boolean;
   onClose: () => void;
+  embedded?: boolean; // desktop mode: không cần nút đóng
 }
 
-export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
-  conversations,
-  selectedConversation,
-  onSelectConversation,
-  onNewChat,
-  isOpen,
-  onClose
+export const ConversationsSidebar: React.FC<Props> = ({
+  conversations, selectedConversation, onSelectConversation, onNewChat, onClose, embedded,
 }) => {
+  const [query, setQuery] = useState('');
+  const filtered = conversations.filter(c =>
+    c.name.toLowerCase().includes(query.toLowerCase()) ||
+    c.lastMessage.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
-    <>
-      {/* Sidebar */}
-      <div className={`
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        fixed lg:relative z-30 w-full sm:w-96 h-full bg-white border-r border-gray-200 flex flex-col transition-transform duration-300
-      `}>
-        <SidebarHeader onMenuClick={onClose} />
-        <SearchBar />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Accent top line */}
+      <div style={{ height: 3, flexShrink: 0, background: 'linear-gradient(90deg, var(--color-primary-300), var(--color-primary-500), var(--color-primary-300))' }} />
 
-        {/* New Chat Button */}
-        <div className="p-4 border-b border-gray-200">
-          <button 
-            onClick={onNewChat}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Cuộc trò chuyện mới</span>
-          </button>
+      {/* Header with avatar + menu */}
+      <SidebarHeader onMenuClick={onClose} showClose={!embedded} />
+
+      {/* Search */}
+      <div style={{ padding: '10px 12px', flexShrink: 0 }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary-400)', pointerEvents: 'none' }} />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Tìm kiếm..."
+            className="focus-ring transition-base"
+            style={{ width: '100%', paddingLeft: 32, paddingRight: query ? 30 : 10, paddingTop: 8, paddingBottom: 8, borderRadius: 10, fontSize: '0.8125rem', border: '1.5px solid var(--color-primary-100)', background: 'var(--color-primary-50)', color: 'var(--color-primary-900)', outline: 'none', boxSizing: 'border-box' }}
+          />
+          {query && (
+            <button onClick={() => setQuery('')}
+              style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary-400)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
+              <X size={13} />
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
-          {conversations.map((conv) => (
+      {/* New chat button */}
+      <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
+        <button
+          onClick={onNewChat}
+          className="btn-ripple transition-base"
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: 'white', fontFamily: 'var(--font-body)', background: 'linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))', boxShadow: '0 3px 10px rgba(139,102,66,0.28)' }}
+        >
+          <Plus size={14} /> Cuộc trò chuyện mới
+        </button>
+      </div>
+
+      {/* Section label */}
+      <div style={{ padding: '2px 14px 6px', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-primary-400)' }}>
+          Tin nhắn {filtered.length > 0 && `· ${filtered.length}`}
+        </span>
+      </div>
+
+      {/* Conversation list */}
+      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--color-primary-400)', fontSize: '0.8125rem' }}>
+            Không tìm thấy kết quả
+          </div>
+        ) : filtered.map((conv, i) => (
+          <div key={conv.id} className="animate-fade-in" style={{ animationDelay: `${i * 25}ms` }}>
             <ConversationItem
-              key={conv.id}
               conversation={conv}
               isActive={selectedConversation?.id === conv.id}
               onClick={() => onSelectConversation(conv)}
             />
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-    </>
+    </div>
   );
 };

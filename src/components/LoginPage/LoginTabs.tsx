@@ -6,29 +6,35 @@ interface LoginTabsProps {
   setActiveTab: (tab: 'phone' | 'email' | 'qr') => void;
 }
 
-export const LoginTabs: React.FC<LoginTabsProps> = ({ activeTab, setActiveTab }) => {
-  const tabs = [
-    { id: 'phone' as const, label: 'Số điện thoại', icon: Phone },
-    { id: 'email' as const, label: 'Email OTP', icon: Mail },
-    { id: 'qr' as const, label: 'QR Code', icon: QrCode }
-  ];
+const TABS = [
+  { id: 'phone' as const, label: 'Số điện thoại', icon: Phone },
+  { id: 'email' as const, label: 'Email OTP',     icon: Mail  },
+  { id: 'qr'    as const, label: 'QR Code',        icon: QrCode },
+];
 
-  return (
-    <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-xl">
-      {tabs.map((tab) => (
+export const LoginTabs: React.FC<LoginTabsProps> = ({ activeTab, setActiveTab }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 5, background: 'var(--color-primary-50)', borderRadius: 14, border: '1px solid var(--color-primary-100)' }}>
+    {TABS.map(({ id, label, icon: Icon }) => {
+      const active = activeTab === id;
+      return (
         <button
-          key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all font-medium ${
-            activeTab === tab.id
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-800'
-          }`}
+          key={id}
+          onClick={() => setActiveTab(id)}
+          className="transition-base"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            fontSize: '0.8125rem', fontWeight: active ? 600 : 500,
+            fontFamily: 'var(--font-body)',
+            background: active ? 'white' : 'transparent',
+            color: active ? 'var(--color-primary-700)' : 'var(--color-primary-400)',
+            boxShadow: active ? 'var(--shadow-sm)' : 'none',
+          }}
         >
-          <tab.icon className="w-4 h-4" />
-          <span className="hidden sm:inline">{tab.label}</span>
+          <Icon size={15} />
+          <span className="hidden sm:inline">{label}</span>
         </button>
-      ))}
-    </div>
-  );
-};
+      );
+    })}
+  </div>
+);

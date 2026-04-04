@@ -1,65 +1,36 @@
 import React from 'react';
 
 export interface Conversation {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  online: boolean;
-  isGroup?: boolean;
+  id: string; name: string; avatar: string;
+  lastMessage: string; time: string;
+  unread: number; online: boolean; isGroup?: boolean;
 }
 
-interface ConversationItemProps {
-  conversation: Conversation;
-  isActive: boolean;
-  onClick: () => void;
-}
+interface Props { conversation: Conversation; isActive: boolean; onClick: () => void; }
 
-export const ConversationItem: React.FC<ConversationItemProps> = ({ 
-  conversation, 
-  isActive, 
-  onClick 
-}) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-        isActive ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-      }`}
-    >
-      <div className="relative flex-shrink-0">
-        <img
-          src={conversation.avatar}
-          alt={conversation.name}
-          className="w-12 h-12 rounded-full"
-        />
-        {conversation.online && (
-          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+export const ConversationItem: React.FC<Props> = ({ conversation, isActive, onClick }) => (
+  <button onClick={onClick} className="transition-fast"
+    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', background: isActive ? 'var(--color-primary-50)' : 'transparent', borderLeft: `3px solid ${isActive ? 'var(--color-primary-500)' : 'transparent'}` }}
+    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-primary-50)'; }}
+    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+  >
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <img src={conversation.avatar} alt={conversation.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: isActive ? '2px solid var(--color-primary-300)' : '2px solid transparent' }} />
+      {conversation.online && <div style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: '#22c55e', border: '2px solid white' }} />}
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+        <span style={{ fontSize: '0.875rem', fontWeight: conversation.unread > 0 ? 700 : 600, color: 'var(--color-primary-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>{conversation.name}</span>
+        <span style={{ fontSize: '0.6875rem', color: 'var(--color-primary-400)', flexShrink: 0 }}>{conversation.time}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <p style={{ fontSize: '0.8125rem', color: conversation.unread > 0 ? 'var(--color-primary-700)' : 'var(--color-primary-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontWeight: conversation.unread > 0 ? 500 : 400 }}>{conversation.lastMessage}</p>
+        {conversation.unread > 0 && (
+          <span className="badge-pop" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: 'var(--color-primary-500)', color: 'white', fontSize: '0.6875rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {conversation.unread > 99 ? '99+' : conversation.unread}
+          </span>
         )}
       </div>
-
-      <div className="flex-1 min-w-0 text-left">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-800 truncate">
-            {conversation.name}
-          </h3>
-          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-            {conversation.time}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600 truncate flex-1">
-            {conversation.lastMessage}
-          </p>
-          {conversation.unread > 0 && (
-            <span className="ml-2 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full flex-shrink-0">
-              {conversation.unread}
-            </span>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-};
+    </div>
+  </button>
+);
