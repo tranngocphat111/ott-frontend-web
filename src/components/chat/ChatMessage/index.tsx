@@ -4,29 +4,45 @@ import { TextMessage } from "./TextMessage";
 import { ImageMessage } from "./ImageMessage";
 import { VideoMessage } from "./VideoMessage";
 import { FileMessage } from "./FileMessage";
+import { AudioMessage } from "./AudioMessage";
+import { LinkMessage } from "./LinkMessage";
 
 export const ChatMessage = memo(
   ({
     msg,
     isMe,
+    currentUserId,
     isFirstInSequence,
     isLastInSequence,
-    onMediaClick, // 1. Nhận prop từ ChatArea
+    onMediaClick,
+    onReply,
+    onReact,
   }: {
     msg: any;
     isMe: boolean;
+    currentUserId?: string;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
-    onMediaClick?: () => void;
+    onMediaClick?: (imageIndex: number) => void;
+    onReply?: (msg: any) => void;
+    onReact?: (msg: any, reactionType: string) => void;
   }) => {
-    // 2. 🔥 FIX QUAN TRỌNG: Chuẩn hóa type về chữ thường
     const msgType = msg.type?.toLowerCase();
 
-    // Logic lấy URL an toàn
+    // Cho video/file/audio: chỉ lấy phần tử đầu tiên
     const fullUrl = useMemo(() => {
-      if (msgType === "text") return "";
+      if (msgType === "text" || msgType === "link" || msgType === "image") {
+        return "";
+      }
       const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
       return getFullUrl(content);
+    }, [msg.content, msgType]);
+
+    // Cho ảnh: lấy toàn bộ mảng URL
+    const imageUrls = useMemo(() => {
+      if (msgType !== "image") return [];
+      const content = Array.isArray(msg.content) ? msg.content : [msg.content];
+      return content.map((c: string) => getFullUrl(c));
     }, [msg.content, msgType]);
 
     switch (msgType) {
@@ -34,11 +50,14 @@ export const ChatMessage = memo(
         return (
           <ImageMessage
             msg={msg}
-            url={fullUrl}
+            urls={imageUrls}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
-            onClick={onMediaClick} // 3. Truyền xuống ImageMessage
+            onClick={onMediaClick}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -48,9 +67,12 @@ export const ChatMessage = memo(
             msg={msg}
             url={fullUrl}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
-            onClick={onMediaClick} // 4. Truyền xuống VideoMessage
+            onClick={() => onMediaClick?.(0)}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -62,8 +84,40 @@ export const ChatMessage = memo(
             fileName={msg.fileName}
             size={msg.size}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
+          />
+        );
+
+      case "audio":
+        return (
+          <AudioMessage
+            msg={msg}
+            url={fullUrl}
+            fileName={msg.fileName}
+            size={msg.size}
+            isMe={isMe}
+            currentUserId={currentUserId}
+            isFirstInSequence={isFirstInSequence}
+            isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
+          />
+        );
+
+      case "link":
+        return (
+          <LinkMessage
+            msg={msg}
+            isMe={isMe}
+            currentUserId={currentUserId}
+            isFirstInSequence={isFirstInSequence}
+            isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
 
@@ -73,19 +127,25 @@ export const ChatMessage = memo(
           <TextMessage
             msg={msg}
             isMe={isMe}
+            currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            onReply={onReply}
+            onReact={onReact}
           />
         );
     }
   },
-  // 5. 🔥 TỐI ƯU MEMO
   (prev, next) => {
-    // Chỉ render lại nếu nội dung tin nhắn thay đổi hoặc vị trí (đầu/cuối) thay đổi.
-    // KHÔNG so sánh onMediaClick vì nó luôn thay đổi mỗi lần cha render.
+    const prevReactions = JSON.stringify(prev.msg.reactions || []);
+    const nextReactions = JSON.stringify(next.msg.reactions || []);
+
     return (
       prev.msg._id === next.msg._id &&
       prev.msg.content === next.msg.content &&
+      prevReactions === nextReactions &&
+      prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
+      prev.msg.reply_to?.content === next.msg.reply_to?.content &&
       prev.isFirstInSequence === next.isFirstInSequence &&
       prev.isLastInSequence === next.isLastInSequence
     );

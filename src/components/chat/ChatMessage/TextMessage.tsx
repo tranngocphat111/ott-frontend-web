@@ -5,13 +5,19 @@ import { MessageLayout } from "./MessageLayout";
 export const TextMessage = ({
   msg,
   isMe,
+  currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  onReply,
+  onReact,
 }: {
   msg: Message;
   isMe: boolean;
+  currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  onReply?: (msg: Message) => void;
+  onReact?: (msg: Message, reactionType: string) => void;
 }) => {
   const text = Array.isArray(msg.content)
     ? msg.content.join("")
@@ -21,8 +27,11 @@ export const TextMessage = ({
     <MessageLayout
       msg={msg}
       isMe={isMe}
+      currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      onReply={onReply}
+      onReact={onReact}
     >
       {(borderRadius) => (
         <div

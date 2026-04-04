@@ -1,18 +1,51 @@
 import type { LucideIcon } from "lucide-react";
 
+export interface MessageContent {
+  type: "text" | "link" | "image" | "file" | "video" | "audio";
+  text?: string;
+  url?: string;
+  name?: string;
+  size?: number;
+}
+
 export interface Message {
   _id: string;
-  content: string[] | string;
-  type: "text" | "image" | "file" | "video" | "audio";
-  createdAt: string;
+  msg_id?: string;
+  content: MessageContent[];
+  type: "text" | "link" | "image" | "file" | "video" | "audio" | "system_add";
+  created_at: string;
+  createdAt?: string; // For backwards compatibility
   sender_id: String;
+  conversation_id?: string;
   size?: number;
+  sender_name?: string;
+  reply_to_msg_id?: string | null;
+  reply_to?: MessageReplyPreview | null;
+  reactions?: MessageReaction[];
   attachments?: MessageAttachment[];
+  // Pinned message fields
+  is_pinned?: boolean;
+  pinned_at?: string | null;
+  pinned_by?: string | null;
+}
+
+export interface MessageReaction {
+  user_id: string;
+  type: string;
+}
+
+export interface MessageReplyPreview {
+  msg_id?: string;
+  sender_id: string;
+  type: "text" | "link" | "image" | "video" | "file" | "audio" | "system_add";
+  content: string;
+  is_deleted?: boolean;
+  is_revoked?: boolean;
 }
 
 export interface MessageAttachment {
   id: string;
-  type: "image" | "file" | "video" | "audio";
+  type: "image" | "file" | "video" | "audio" | "link";
   url: string;
   name: string;
   size?: number;
@@ -27,6 +60,8 @@ export interface ChatInputProps {
   conversationId: string;
   senderId: string;
   onSendSuccess: () => void;
+  replyToMessage?: Message | null;
+  onCancelReply?: () => void;
 }
 
 export interface FileMessageProps {

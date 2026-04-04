@@ -13,35 +13,6 @@ const FRIEND_REQUESTS: {
 const SocialRightSidebar: React.FC = () => (
   <aside className="w-80 shrink-0 hidden lg:block">
     <div className="sticky top-4 space-y-5">
-      {/* ── Sponsored ────────────────────────────────── */}
-      <div>
-        <h3 className="font-semibold text-primary-600 mb-3 text-sm uppercase tracking-wide">
-          Được tài trợ
-        </h3>
-        <div className="flex gap-3 cursor-pointer group rounded-xl p-2 hover:bg-primary-100 transition">
-          <div className="size-28 rounded-xl bg-linear-to-br from-orange-400 to-red-500 shrink-0 shadow" />
-          <div>
-            <p className="font-semibold text-sm text-gray-800 group-hover:underline leading-snug">
-              Time to Learn: Up to 90% Off Courses
-            </p>
-            <p className="text-xs text-gray-400 mt-1">courseking.org</p>
-          </div>
-        </div>
-        <div className="flex gap-3 cursor-pointer group rounded-xl p-2 hover:bg-primary-100 transition mt-1">
-          <div className="size-28 rounded-xl bg-linear-to-br from-blue-500 to-indigo-600 shrink-0 shadow flex items-center justify-center">
-            <span className="text-white text-xs font-bold text-center px-1">
-              Happy Lunar New Year 2026
-            </span>
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-800 group-hover:underline leading-snug">
-              Set the pace this Lunar New Year. Save 10% on PTE.
-            </p>
-            <p className="text-xs text-gray-400 mt-1">pearsonpte.com</p>
-          </div>
-        </div>
-      </div>
-
       {/* ── Friend Requests ──────────────────────────── */}
       <div className="border-t border-primary-200 pt-4">
         <div className="flex items-center justify-between mb-3">

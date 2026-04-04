@@ -15,7 +15,8 @@ export interface Participant {
   };
   last_read_message_id: string;
   last_read_at: string;
-  deleted_msg_id: number;
+  deleted_msg_id: string;
+  unread_count?: number;
   nickname?: string;
   joined_at: string;
   roles: 'admin' | 'user';
@@ -27,7 +28,10 @@ export interface Participant {
  */
 export interface ConversationParticipant {
   _id: string;
+  user_id?: string;
   display_name: string;
+  name?: string;
+  nickname?: string;
   avatar?: string;
   status?: 'online' | 'offline' | 'away' | 'busy';
   role?: 'admin' | 'member' | 'owner';

@@ -192,6 +192,41 @@ export async function fetchPostsWithPage(
     }
 }
 
+export async function findPostsWithAuthorized(
+    page: number = 0,
+    size: number = 10,
+    currentUserId?: string,
+): Promise<PostsPage | null> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/posts/page/${currentUserId}?page=${page}&size=${size}&sort=createdAt,desc`,
+            { signal: AbortSignal.timeout(10_000) },
+        );
+        if (!res.ok) return null;
+
+        const data: SpringPage<ApiPost> = await res.json();
+        const colorMap = new Map<string, number>();
+        let colorIdx = 0;
+
+        const posts = (data.content ?? []).map((p) => {
+            if (!colorMap.has(p.accountId)) colorMap.set(p.accountId, colorIdx++);
+            return mapPost(p, colorMap.get(p.accountId)!, currentUserId);
+        });
+
+        return {
+            posts,
+            totalPages: data.totalPages,
+            totalElements: data.totalElements,
+            page: data.number,
+            hasMore: !data.last,
+        };
+    } catch {
+        return null;
+    }
+}
+
+
+
 
 /**
  * Lấy bài post của một user cụ thể.

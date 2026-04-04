@@ -1,4 +1,4 @@
-import type { ConversationParticipant } from './participant.type';
+import type { ConversationParticipant } from "./participant.type";
 
 /**
  * Conversation entity type from backend
@@ -6,7 +6,7 @@ import type { ConversationParticipant } from './participant.type';
  */
 export interface Conversation {
   _id: string;
-  type: 'private' | 'group';
+  type: "private" | "group";
   name: string;
   avatar: string;
   created_by: string;
@@ -14,8 +14,9 @@ export interface Conversation {
   last_message?: {
     msg_id: string;
     sender_id: string;
+    sender_name: string;
     content: string;
-    type: 'text' | 'image' | 'video' | 'file';
+    type: "text" | "link" | "image" | "video" | "file" | "audio";
     createdAt: string;
   };
   is_deleted: boolean;
@@ -33,5 +34,5 @@ export interface Conversation {
  */
 export interface ConversationWithParticipant {
   conversation: Conversation;
-  participant: import('./participant.type').Participant;
+  participant: import("./participant.type").Participant;
 }

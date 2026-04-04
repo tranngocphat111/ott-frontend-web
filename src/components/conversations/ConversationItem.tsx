@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import { MessageCircle, Users, Pin } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
-import ConversationContextMenu from "../modals/conversation/ConversationContextMenu";
-import CategoryManagementModal from "../modals/category/CategoryManagementModal";
+import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
+import CategoryManagementModal from "../modal/category/CategoryManagementModal";
 import type { ConversationItemProps } from "../../interfaces";
 import { ParticipantService } from "../../services";
 import type { Category } from "../../types";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { PiTagSimpleFill } from "react-icons/pi";
 import { FaBellSlash } from "react-icons/fa6";
+import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils";
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   item,
@@ -18,7 +19,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations } = useConversations();
+  const { categories, refreshConversations, updateParticipant } = useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -45,42 +46,25 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                     new Date(participant.settings.mute_until) > new Date());
 
   const getConversationName = (): string => {
-    if (conversation.name) return conversation.name;
-
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].display_name;
-    }
-
-    return "Conversation";
+    return getConversationDisplayName(conversation, currentUserId) || "Conversation";
   };
 
   const getConversationAvatar = (): string | undefined => {
-    // Ưu tiên avatar của conversation (dùng cho group)
-    if (conversation.avatar) return conversation.avatar;
-    
-    // Với private chat, lấy avatar của người kia
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].avatar;
-    }
-    
-    return undefined;
+    return getConversationDisplayAvatar(conversation, currentUserId);
   };
 
   const getLatestMessagePreview = (): string => {
-    // Kiểm tra last_message từ backend
-    if (conversation.last_message?.content) {
-      return conversation.last_message.content;
-    }
+    const lastMsg = conversation.last_message;
+    if (!lastMsg?.content) return "Chưa có tin nhắn";
 
-    return "Chưa có tin nhắn";
+    // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
+    if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
+
+    const prefix = lastMsg.sender_id === currentUserId
+      ? "Bạn"
+      : (lastMsg.sender_name || "");
+
+    return prefix ? `${prefix}: ${lastMsg.content}` : lastMsg.content;
   };
 
   const getTimeDisplay = (): string => {
@@ -90,7 +74,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     return formatTimeAgo(time);
   };
 
-  const hasUnreadMessage = false; // TODO: Implement unread logic
+  const unreadCount = Number(participant.unread_count || 0);
+  const hasUnreadMessage = !isSelected && unreadCount > 0;
+  const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -171,10 +157,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const handleDelete = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa cuộc hội thoại này?")) {
-      console.log("Delete conversation:", conversation._id);
-      // TODO: Implement delete logic
+  const handleDelete = async () => {
+    if (!currentUserId) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử hội thoại này?")) return;
+
+    try {
+      const updatedParticipant = await ParticipantService.deleteConversation(
+        conversation._id,
+        currentUserId,
+      );
+      // Cập nhật deleted_msg_id trong state — Sidebar filter sẽ tự động ẩn conversation
+      updateParticipant(conversation._id, { deleted_msg_id: updatedParticipant.deleted_msg_id });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
+      alert(message);
+      console.error("Error deleting conversation:", error);
     }
   };
 
@@ -226,11 +223,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               )}
             </div>
 
-            {/* Online status indicator for private chats */}
-            {conversation.type === "private" &&
-              conversation.participants?.[0]?.status === "online" && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full ring-2 ring-white shadow-sm" />
-              )}
           </div>
 
           {/* Content */}
@@ -251,11 +243,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center space-x-1 ml-2">
+              <div className="flex items-center space-x-1 ml-2 ">
                 {isMuted && (
                   <FaBellSlash  className="w-4 h-4 text-gray-400" />
                 )}
-                <span className="text-xs text-gray-400 whitespace-nowrap select-none max-w-15">
+                <span className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}>
                   {getTimeDisplay()}
                 </span>
               </div>
@@ -270,13 +262,15 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 />
               )}
 
-              <p className="text-sm text-gray-600 truncate flex-1 select-none">
+              <p className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}>
                 {getLatestMessagePreview()}
               </p>
 
               {/* Unread badge */}
               {hasUnreadMessage && (
-                <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse shrink-0" />
+                <div className="min-w-5 h-5 px-1 rounded-full bg-primary-500 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
+                  {unreadLabel}
+                </div>
               )}
             </div>
           </div>

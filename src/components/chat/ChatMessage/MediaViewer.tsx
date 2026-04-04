@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   X,
   ChevronLeft,
@@ -6,60 +6,87 @@ import {
   Download,
   Play,
   Loader2,
-} from "lucide-react"; // Thêm Loader2
+} from "lucide-react";
 import type { Message } from "../../../types";
 import { getFullUrl } from "../../../utils";
+
+interface MediaItem {
+  messageId: string;
+  url: string;
+  type: string;
+  imageIndex: number;
+}
 
 interface MediaViewerProps {
   isOpen: boolean;
   onClose: () => void;
   initialMessageId: string | null;
+  initialImageIndex?: number;
   messages: Message[];
 }
+
+const resolveContentKey = (item: unknown): string => {
+  if (typeof item === "string") return item;
+  if (item && typeof item === "object" && "url" in item) {
+    return String((item as { url?: string }).url || "");
+  }
+  return "";
+};
 
 export const MediaViewer = ({
   isOpen,
   onClose,
   initialMessageId,
+  initialImageIndex = 0,
   messages,
 }: MediaViewerProps) => {
-  const mediaList = React.useMemo(() => {
-    return messages.filter((m) => {
+  // Flatten tất cả ảnh/video thành danh sách phẳng
+  const mediaList = React.useMemo<MediaItem[]>(() => {
+    const items: MediaItem[] = [];
+    for (const m of messages) {
       const type = m.type?.toLowerCase();
-      return type === "image" || type === "video";
-    });
-  }, [messages]);
+      if (type === "image") {
+        const content = Array.isArray(m.content) ? m.content : [m.content];
+        content.forEach((c, idx) => {
+          const key = resolveContentKey(c);
+          if (!key) return;
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false); // 🔥 State loading tải xuống
-  const thumbContainerRef = useRef<HTMLDivElement>(null);
+          items.push({
+            messageId: m._id,
+            url: getFullUrl(key),
+            type: "image",
+            imageIndex: idx,
+          });
+        });
+      } else if (type === "video") {
+        const content = Array.isArray(m.content) ? m.content : [m.content];
+        const key = resolveContentKey(content[0]);
+        if (!key) continue;
 
-  useEffect(() => {
-    if (isOpen && initialMessageId) {
-      const index = mediaList.findIndex((m) => m._id === initialMessageId);
-      if (index !== -1) {
-        setCurrentIndex(index);
-      } else {
-        setCurrentIndex(0);
-      }
-    }
-  }, [isOpen, initialMessageId, mediaList]);
-
-  // Auto scroll thumbnail
-  useEffect(() => {
-    if (thumbContainerRef.current) {
-      const activeThumb = thumbContainerRef.current.children[
-        currentIndex
-      ] as HTMLElement;
-      if (activeThumb) {
-        activeThumb.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-          inline: "center",
+        items.push({
+          messageId: m._id,
+          url: getFullUrl(key),
+          type: "video",
+          imageIndex: 0,
         });
       }
     }
-  }, [currentIndex, isOpen]);
+    return items;
+  }, [messages]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialMessageId) {
+      const idx = mediaList.findIndex(
+        (item) =>
+          item.messageId === initialMessageId &&
+          item.imageIndex === initialImageIndex,
+      );
+      setCurrentIndex(idx !== -1 ? idx : 0);
+    }
+  }, [isOpen, initialMessageId, initialImageIndex, mediaList]);
 
   const handleNext = useCallback(() => {
     setCurrentIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : prev));
@@ -68,6 +95,13 @@ export const MediaViewer = ({
   const handlePrev = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
   }, []);
+
+  // Thumbnail window: hiển thị tối đa 10 item, tự dịch chuyển theo currentIndex
+  const THUMB_WINDOW = 10;
+  const windowStart = Math.floor(currentIndex / THUMB_WINDOW) * THUMB_WINDOW;
+  const visibleThumbs = mediaList.slice(windowStart, windowStart + THUMB_WINDOW);
+  const hasPrevWindow = windowStart > 0;
+  const hasNextWindow = windowStart + THUMB_WINDOW < mediaList.length;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,38 +114,21 @@ export const MediaViewer = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose, handleNext, handlePrev]);
 
-  // 🔥 HÀM DOWNLOAD MỚI: Tải Blob về để ép trình duyệt lưu file
   const handleDownload = async () => {
-    const currentMedia = mediaList[currentIndex];
-    if (!currentMedia || isDownloading) return;
+    const current = mediaList[currentIndex];
+    if (!current || isDownloading) return;
 
     try {
       setIsDownloading(true);
-
-      const rawContent = Array.isArray(currentMedia.content)
-        ? currentMedia.content[0]
-        : currentMedia.content;
-      const url = getFullUrl(rawContent);
-
-      // 1. Fetch dữ liệu file về dưới dạng Blob
-      const response = await fetch(url);
+      const response = await fetch(current.url);
       const blob = await response.blob();
-
-      // 2. Tạo URL ảo cho Blob này
       const blobUrl = window.URL.createObjectURL(blob);
-
-      // 3. Tạo thẻ a ẩn để click tải xuống
       const link = document.createElement("a");
       link.href = blobUrl;
-
-      // Lấy tên file hoặc đặt tên mặc định
-      const fileName = rawContent.split("/").pop() || `download-${Date.now()}`;
+      const fileName = current.url.split("/").pop() || `download-${Date.now()}`;
       link.download = fileName;
-
       document.body.appendChild(link);
       link.click();
-
-      // 4. Dọn dẹp
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
@@ -124,17 +141,13 @@ export const MediaViewer = ({
 
   if (!isOpen || mediaList.length === 0) return null;
 
-  const currentMedia = mediaList[currentIndex];
-  const rawContent = Array.isArray(currentMedia.content)
-    ? currentMedia.content[0]
-    : currentMedia.content;
-  const mediaUrl = getFullUrl(rawContent);
-  const isVideo = currentMedia.type?.toLowerCase() === "video";
+  const current = mediaList[currentIndex];
+  const isVideo = current.type === "video";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/95 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-9999 bg-black/95 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
       {/* HEADER */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-linear-to-b from-black/80 to-transparent">
         <div className="text-white text-sm font-medium ml-2">
           {currentIndex + 1} / {mediaList.length}
         </div>
@@ -143,7 +156,7 @@ export const MediaViewer = ({
             onClick={handleDownload}
             disabled={isDownloading}
             className="p-2 bg-white/10 rounded-full hover:bg-white/20 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Tải xuống máy"
+            title="Tải xuống"
           >
             {isDownloading ? (
               <Loader2 size={20} className="animate-spin" />
@@ -176,15 +189,15 @@ export const MediaViewer = ({
 
         {isVideo ? (
           <video
-            key={mediaUrl}
-            src={mediaUrl}
+            key={current.url}
+            src={current.url}
             controls
             autoPlay
             className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
           />
         ) : (
           <img
-            src={mediaUrl}
+            src={current.url}
             alt="Full view"
             className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
             onError={(e) => {
@@ -207,33 +220,39 @@ export const MediaViewer = ({
         )}
       </div>
 
-      {/* THUMBNAIL STRIP */}
-      <div className="w-full h-24 bg-black/40 z-50 backdrop-blur-sm border-t border-white/10 flex items-center justify-center py-2">
-        <div
-          ref={thumbContainerRef}
-          className="flex gap-2 overflow-x-auto px-4 max-w-full h-full items-center custom-scrollbar scroll-smooth"
+      {/* THUMBNAIL STRIP — hiển thị tối đa 10, điều hướng bằng mũi tên */}
+      <div className="w-full h-24 bg-black/40 z-50 backdrop-blur-sm border-t border-white/10 flex items-center justify-center gap-2 py-2 px-3">
+        {/* Mũi tên sang trang trước */}
+        <button
+          onClick={() => setCurrentIndex(windowStart - 1)}
+          disabled={!hasPrevWindow}
+          className="shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
         >
-          {mediaList.map((item, index) => {
-            const itemContent = Array.isArray(item.content)
-              ? item.content[0]
-              : item.content;
-            const itemUrl = getFullUrl(itemContent);
-            const isItemVideo = item.type?.toLowerCase() === "video";
-            const isActive = index === currentIndex;
+          <ChevronLeft size={18} />
+        </button>
+
+        {/* 10 thumbnail */}
+        <div className="flex gap-2 items-center h-full">
+          {visibleThumbs.map((item, i) => {
+            const actualIndex = windowStart + i;
+            const isItemVideo = item.type === "video";
+            const isActive = actualIndex === currentIndex;
 
             return (
               <div
-                key={item._id}
-                onClick={() => setCurrentIndex(index)}
+                key={`${item.messageId}-${item.imageIndex}`}
+                onClick={() => setCurrentIndex(actualIndex)}
                 className={`
-                  relative flex-shrink-0 cursor-pointer rounded-md overflow-hidden transition-all duration-200
-                  ${isActive ? "w-16 h-16 border-2 border-blue-500 opacity-100 scale-110" : "w-14 h-14 border border-transparent opacity-50 hover:opacity-100 hover:scale-105"}
+                  relative shrink-0 cursor-pointer rounded-md overflow-hidden transition-all duration-200
+                  ${isActive
+                    ? "w-16 h-16 border-2 border-blue-500 opacity-100 scale-110"
+                    : "w-14 h-14 border border-transparent opacity-50 hover:opacity-100 hover:scale-105"}
                 `}
               >
                 {isItemVideo ? (
                   <div className="w-full h-full bg-gray-900 flex items-center justify-center">
                     <video
-                      src={itemUrl}
+                      src={item.url}
                       className="w-full h-full object-cover pointer-events-none"
                       muted
                     />
@@ -243,7 +262,7 @@ export const MediaViewer = ({
                   </div>
                 ) : (
                   <img
-                    src={itemUrl}
+                    src={item.url}
                     alt="thumb"
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -253,6 +272,15 @@ export const MediaViewer = ({
             );
           })}
         </div>
+
+        {/* Mũi tên sang trang sau */}
+        <button
+          onClick={() => setCurrentIndex(windowStart + THUMB_WINDOW)}
+          disabled={!hasNextWindow}
+          className="shrink-0 p-1.5 rounded-full text-white transition-all disabled:opacity-0 disabled:pointer-events-none bg-white/10 hover:bg-white/20"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
     </div>
   );

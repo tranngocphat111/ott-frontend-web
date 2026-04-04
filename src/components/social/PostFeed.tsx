@@ -1,9 +1,7 @@
 import React from "react";
-import type { Post, PostUser, StoryItem } from "./types";
-import type { ReactionKey } from "./PostCard";
-import CreatePostCard from "./CreatePostCard";
-import StoryReel from "./StoryReel";
-import PostCard from "./PostCard";
+import type { Post, PostUser } from "./types";
+import type { ReactionKey } from "./post/reactions";
+import PostsList from "./feed/PostsList";
 
 interface Props {
   posts: Post[];
@@ -13,28 +11,9 @@ interface Props {
   postReactionCountsMap: Record<string, Record<string, number>>;
   onToggleLike: (id: string, key: ReactionKey | null) => void;
   onDelete: (id: string) => void;
-  onOpenModal: () => void;
-  onOpenWithFeeling?: () => void;
   currentUser: PostUser;
-  stories: StoryItem[];
   loading?: boolean;
 }
-
-/* ── Skeleton for a single post card while loading ─────── */
-const PostSkeleton: React.FC = () => (
-  <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3 animate-pulse">
-    <div className="flex items-center gap-3">
-      <div className="size-10 rounded-full bg-primary-100" />
-      <div className="flex-1 space-y-1.5">
-        <div className="h-3 bg-primary-100 rounded w-32" />
-        <div className="h-2.5 bg-primary-100 rounded w-20" />
-      </div>
-    </div>
-    <div className="h-3 bg-primary-100 rounded w-full" />
-    <div className="h-3 bg-primary-100 rounded w-3/4" />
-    <div className="h-48 bg-primary-100 rounded-xl" />
-  </div>
-);
 
 const PostFeed: React.FC<Props> = ({
   posts,
@@ -42,43 +21,19 @@ const PostFeed: React.FC<Props> = ({
   postReactionCountsMap,
   onToggleLike,
   onDelete,
-  onOpenModal,
-  onOpenWithFeeling,
   currentUser,
-  stories,
   loading = false,
 }) => (
-  <main className="flex-1 min-w-0 max-w-150 mx-auto space-y-4">
-    <CreatePostCard
+  <main className="w-full">
+    <PostsList
+      posts={posts}
+      userReactionMap={userReactionMap}
+      postReactionCountsMap={postReactionCountsMap}
+      onToggleLike={onToggleLike}
+      onDelete={onDelete}
       currentUser={currentUser}
-      onOpenModal={onOpenModal}
-      onOpenWithFeeling={onOpenWithFeeling}
+      loading={loading}
     />
-
-    <StoryReel stories={stories} currentUserAvatar={currentUser.avatar ?? ""} />
-
-    {loading ?
-      <>
-        <PostSkeleton />
-        <PostSkeleton />
-        <PostSkeleton />
-      </>
-    : posts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          initialReaction={userReactionMap[post.id] as ReactionKey | undefined}
-          initialReactionCounts={
-            postReactionCountsMap[post.id] as
-              | Partial<Record<ReactionKey, number>>
-              | undefined
-          }
-          onToggleLike={(key) => onToggleLike(post.id, key)}
-          onDelete={onDelete}
-          currentUser={currentUser}
-        />
-      ))
-    }
   </main>
 );
 

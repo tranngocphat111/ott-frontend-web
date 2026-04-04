@@ -2,7 +2,12 @@ import { Download } from "lucide-react";
 import type { Message } from "../../../types";
 
 import { MessageLayout } from "./MessageLayout";
-import { formatFileSize, getFileExtension, getFileNameFromUrl, getFileTypeData } from "../../../utils";
+import {
+  formatFileSize,
+  getFileExtension,
+  getFileNameFromUrl,
+  getFileTypeData,
+} from "../../../utils";
 
 export const FileMessage = ({
   msg,
@@ -10,16 +15,22 @@ export const FileMessage = ({
   fileName,
   size,
   isMe,
+  currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  onReply,
+  onReact,
 }: {
   msg: Message;
   url: string;
   fileName?: string;
   size?: number;
   isMe: boolean;
+  currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  onReply?: (msg: Message) => void;
+  onReact?: (msg: Message, reactionType: string) => void;
 }) => {
   // 1. Xử lý thông tin File
   const rawFileName = fileName || getFileNameFromUrl(url, "file");
@@ -34,8 +45,11 @@ export const FileMessage = ({
     <MessageLayout
       msg={msg}
       isMe={isMe}
+      currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      onReply={onReply}
+      onReact={onReact}
     >
       {(borderRadius) => (
         <a

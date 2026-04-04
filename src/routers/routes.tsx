@@ -8,6 +8,7 @@ import NotificationsPage from "../pages/NotificationsPage";
 import SettingsPage from "../pages/SettingsPage";
 import SocialPage from "../pages/SocialPage";
 import UserSelectionPage from "../pages/UserSelectionPage";
+import CallPage from "../pages/CallPage";
 import { SocialProfile } from "../pages/social";
 
 /**
@@ -59,6 +60,10 @@ export const routes: RouteObject[] = [
     path: "/social/profile/:userId",
     element: <SocialProfile />,
   },
+  {
+    path: "/call",
+    element: <CallPage />,
+  },
 ];
 
 /**
@@ -74,6 +79,7 @@ export const ROUTE_PATHS = {
   NOTIFICATIONS: "/notifications",
   SETTINGS: "/settings",
   SOCIAL: "/social",
+  CALL: "/call",
   SOCIAL_FEED: "/social",
   SOCIAL_PROFILE: (userId?: string) =>
     userId ? `/social/profile/${userId}` : "/social/profile",
