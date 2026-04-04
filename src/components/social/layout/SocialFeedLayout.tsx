@@ -8,7 +8,7 @@ interface Props {
 const SocialFeedLayout: React.FC<Props> = ({ containerRef, children }) => (
   <div
     ref={containerRef}
-    className="bg-primary-50 w-full min-h-screen overflow-y-auto">
+    className="bg-primary-50 w-full h-screen overflow-y-auto">
     <div className="max-w-350 mx-auto px-4 py-4">{children}</div>
   </div>
 );
