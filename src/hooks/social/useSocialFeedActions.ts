@@ -64,6 +64,9 @@ export const useSocialFeedActions = ({
 
     const handleDeletePost = useCallback(
         async (id: string) => {
+            if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
+                return;
+            }
             setPosts((prev) => prev.filter((p) => p.id !== id));
             await deletePost(id);
         },
