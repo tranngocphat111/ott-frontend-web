@@ -56,6 +56,9 @@ export const usePostActions = (
   };
 
   const handleDeletePost = async (postId: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
+      return;
+    }
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     await deletePost(postId);
   };
