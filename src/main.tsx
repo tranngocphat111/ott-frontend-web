@@ -4,10 +4,10 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 
 import AppRouter from "./routers/AppRouter";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { ConversationsProvider } from "./contexts/ConversationsContext";
 import { UserProvider } from "./contexts/UserContext";
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

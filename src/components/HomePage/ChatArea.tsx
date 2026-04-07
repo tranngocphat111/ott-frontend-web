@@ -40,13 +40,11 @@ export const ChatArea: React.FC<Props> = ({ conversation, messages, currentUserI
           <div style={{ flex: 1, height: 1, background: 'var(--color-primary-100)' }} />
         </div>
 
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <MessageBubble
             key={msg.id}
             message={msg}
             isOwn={msg.senderId === currentUserId}
-            showAvatar={!messages[i - 1] || messages[i - 1].senderId !== msg.senderId}
-            conversation={conversation}
           />
         ))}
         <div ref={bottomRef} />

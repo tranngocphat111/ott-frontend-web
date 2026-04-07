@@ -16,10 +16,10 @@ import type {
   EmailChangeResponse,
   PhoneChangeResponse,
   AccountDeletionResponse,
+  VerifyForgotOtpRequest,
 } from '../../types';
 
 export const accountApi = {
-  // Password Management
   setPassword: async (data: SetPasswordRequest): Promise<ApiResponse<void>> => {
     return apiClient.post('/users/account/password/set', data);
   },
@@ -54,12 +54,15 @@ export const accountApi = {
     return apiClient.post('/users/account/phone/change', data);
   },
 
-  // Account Deletion
   requestDeleteAccount: async (data: RequestDeleteAccountOtpRequest): Promise<ApiResponse<OtpResponse>> => {
     return apiClient.post('/users/account/delete/request', data);
   },
 
   deleteAccount: async (data: DeleteAccountRequest): Promise<ApiResponse<AccountDeletionResponse>> => {
     return apiClient.delete('/users/account', { data });
+  },
+
+  verifyForgotOtp: async (data: VerifyForgotOtpRequest): Promise<ApiResponse<void>> => {
+    return apiClient.post('/users/account/password/forgot/otp/verify', data);
   },
 };

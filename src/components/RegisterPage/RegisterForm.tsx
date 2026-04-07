@@ -7,10 +7,10 @@ type Props = { formData: FormData; loading: boolean; onChange: (e: React.ChangeE
 type Field = { label: string; name: keyof FormData; type: string; placeholder: string; hint?: string; minLength?: number; icon: React.ReactNode; };
 
 const FIELDS: Field[] = [
-  { label: 'Số điện thoại', name: 'phone',           type: 'tel',      placeholder: '0123 456 789', icon: <Phone size={15} /> },
-  { label: 'Email',         name: 'email',            type: 'email',    placeholder: 'you@example.com', icon: <Mail size={15} /> },
-  { label: 'Họ và tên',     name: 'fullName',         type: 'text',     placeholder: 'Nguyễn Văn A',  icon: <User size={15} /> },
-  { label: 'Mật khẩu',      name: 'password',         type: 'password', placeholder: '••••••••', hint: 'Tối thiểu 8 ký tự', minLength: 8, icon: <Lock size={15} /> },
+  { label: 'Số điện thoại', name: 'phone', type: 'tel', placeholder: '0123 456 789', icon: <Phone size={15} /> },
+  { label: 'Email', name: 'email', type: 'email', placeholder: 'you@example.com', icon: <Mail size={15} /> },
+  { label: 'Họ và tên', name: 'fullName', type: 'text', placeholder: 'Nguyễn Văn A', icon: <User size={15} /> },
+  { label: 'Mật khẩu', name: 'password', type: 'password', placeholder: '••••••••', hint: 'Tối thiểu 8 ký tự', minLength: 8, icon: <Lock size={15} /> },
   { label: 'Xác nhận mật khẩu', name: 'confirmPassword', type: 'password', placeholder: '••••••••', icon: <Lock size={15} /> },
 ];
 

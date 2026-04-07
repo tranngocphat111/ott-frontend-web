@@ -3,29 +3,29 @@ import { twoFactorApi } from '../services/api';
 import type {
   TwoFactorAuthStatus,
   Enable2FARequest,
-  Disable2FARequest,
-  ApiError
+  Disable2FARequest
 } from '../types';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { SUCCESS_MESSAGES, getErrorMessage } from '../utils/messageMapping';
 
 export const useTwoFactor = () => {
   const { refreshUser } = useAuth();
+  const { showToast } = useToast();
+
   const [status, setStatus] = useState<TwoFactorAuthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchStatus = async () => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await twoFactorApi.getStatus();
       if (response.result) {
         setStatus(response.result);
       }
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to fetch 2FA status');
+    } catch (err: unknown) {
+      // Fetch ngầm khi load trang nên không cần văng Toast lỗi để tránh phiền người dùng
+      console.error('Failed to fetch 2FA status:', err);
     } finally {
       setIsLoading(false);
     }
@@ -33,16 +33,19 @@ export const useTwoFactor = () => {
 
   const requestEnableOtp = async () => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await twoFactorApi.requestEnable();
+      showToast(SUCCESS_MESSAGES.OTP_SENT || 'Mã OTP đã được gửi đến email của bạn', 'success', 'Đã gửi');
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to request OTP';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      const msg: string = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || (err as { message?: string })?.message || '';
+
+      // Không văng Toast lỗi nếu flow chỉ đang yêu cầu người dùng tạo password hoặc đã bật 2FA rồi
+      if (!msg.includes('password required') && !msg.includes('already enabled') && !msg.includes('đã được bật')) {
+        showToast(getErrorMessage(err), 'error', 'Lỗi');
+      }
+
+      throw err; // Vẫn throw để EnableFlow.tsx chuyển qua bước set-password
     } finally {
       setIsLoading(false);
     }
@@ -50,20 +53,17 @@ export const useTwoFactor = () => {
 
   const enable = async (data: Enable2FARequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await twoFactorApi.enable(data);
       if (response.result) {
         await fetchStatus();
         await refreshUser();
+        showToast(SUCCESS_MESSAGES.TWO_FA_ENABLED || 'Xác thực 2 bước đã được bật!', 'success', 'Thành công');
       }
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to enable 2FA';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Xác thực thất bại');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -71,16 +71,13 @@ export const useTwoFactor = () => {
 
   const requestDisableOtp = async (password: string) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await twoFactorApi.requestDisable({ password });
+      showToast(SUCCESS_MESSAGES.OTP_SENT || 'Mã OTP đã được gửi đến email của bạn', 'success', 'Đã gửi');
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to request OTP';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -88,18 +85,15 @@ export const useTwoFactor = () => {
 
   const disable = async (data: Disable2FARequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await twoFactorApi.disable(data);
       await fetchStatus();
       await refreshUser();
+      showToast(SUCCESS_MESSAGES.TWO_FA_DISABLED || 'Xác thực 2 bước đã được tắt', 'info', 'Đã tắt');
       return response;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to disable 2FA';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi tắt xác thực');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -107,12 +101,12 @@ export const useTwoFactor = () => {
 
   useEffect(() => {
     fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
     status,
     isLoading,
-    error,
     fetchStatus,
     requestEnableOtp,
     enable,

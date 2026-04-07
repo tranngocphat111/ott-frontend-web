@@ -6,10 +6,10 @@ import type {
   UserResponse,
   OtpResponse,
 } from '../../types';
-import { API_ENDPOINTS } from '../../configuration/api';
+import { API_ENDPOINTS } from '../../config/api';
 
 export const userApi = {
-  
+
   requestRegisterOtp: async (
     phone: string,
     email: string,
@@ -24,7 +24,7 @@ export const userApi = {
     return apiClient.post(API_ENDPOINTS.USERS.REQUEST_REGISTER_OTP, payload);
   },
 
-  
+
   register: async (data: {
     phone: string;
     email: string;

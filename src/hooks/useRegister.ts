@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { userApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { SUCCESS_MESSAGES, getErrorMessage } from '../utils/messageMapping';
 
 type Step = 'form' | 'otp';
 
@@ -25,12 +27,11 @@ export const useRegister = () => {
   const [step, setStep] = useState<Step>('form');
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+
+  const { showToast } = useToast();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    setError('');
   };
 
   const validateForm = (): string => {
@@ -43,26 +44,24 @@ export const useRegister = () => {
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
 
     const validationError = validateForm();
     if (validationError) {
-      setError(validationError);
+      showToast(validationError, 'warning', 'Thiếu thông tin');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await userApi.requestRegisterOtp(
+      await userApi.requestRegisterOtp(
         formData.phone,
         formData.email,
         formData.fullName
       );
-      setSuccess(response.result?.message || 'OTP đã được gửi về email của bạn');
+      showToast(SUCCESS_MESSAGES.OTP_SENT, 'success', 'Đã gửi');
       setStep('otp');
-    } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra');
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi');
     } finally {
       setLoading(false);
     }
@@ -70,10 +69,9 @@ export const useRegister = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
     if (!formData.otp || formData.otp.length !== 6) {
-      setError('Vui lòng nhập mã OTP 6 số');
+      showToast('Vui lòng nhập đủ mã OTP 6 số', 'warning', 'Chú ý');
       return;
     }
 
@@ -86,10 +84,12 @@ export const useRegister = () => {
         fullName: formData.fullName,
         otp: formData.otp,
       });
-      setSuccess('Đăng ký thành công! Chuyển đến trang đăng nhập...');
+
+      showToast(SUCCESS_MESSAGES.REGISTER, 'success', 'Thành công');
       setTimeout(() => (window.location.href = '/login'), 2000);
-    } catch (err: any) {
-      setError(err.message || 'Đăng ký thất bại');
+
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Đăng ký thất bại');
     } finally {
       setLoading(false);
     }
@@ -97,16 +97,12 @@ export const useRegister = () => {
 
   const goBack = () => {
     setStep('form');
-    setError('');
-    setSuccess('');
   };
 
   return {
     step,
     formData,
     loading,
-    error,
-    success,
     handleChange,
     handleRequestOtp,
     handleRegister,

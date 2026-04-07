@@ -1,85 +1,86 @@
 import { useState } from 'react';
 import { accountApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { SUCCESS_MESSAGES, getErrorMessage, ERROR_MESSAGES } from '../utils/messageMapping';
 
 export const useForgotPassword = () => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { showToast } = useToast();
 
-  
-  const requestPasswordReset = async (phone: string, email: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      setSuccess(false);
-
-      const response = await accountApi.requestPasswordReset({ phone, email });
-
-      if (response.result) {
-        setSuccess(true);
-        return response.result;
-      }
-
-      throw new Error(response.message || 'Không thể gửi mã OTP');
-    } catch (err: any) {
-      const errorMessage = err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
+  const requestPasswordReset = async (phone: string, email: string): Promise<boolean> => {
+    // Validate cơ bản
+    if (!phone || !email) {
+      showToast(ERROR_MESSAGES[1070] || 'Vui lòng cung cấp cả số điện thoại và email.', 'warning', 'Thông báo');
+      return false;
     }
-  };
 
-  const verifyPasswordReset = async (
-    phone: string,
-    email: string,
-    otp: string,
-    newPassword: string,
-    confirmPassword: string
-  ) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-
-      if (newPassword !== confirmPassword) {
-        throw new Error('Mật khẩu xác nhận không khớp');
-      }
-
-      if (newPassword.length < 6) {
-        throw new Error('Mật khẩu phải có ít nhất 6 ký tự');
-      }
-
-      await accountApi.verifyPasswordReset({
-        phone,
-        email,
-        otp,
-        newPassword,
-        confirmPassword,
-      });
-
-      setSuccess(true);
+      await accountApi.requestPasswordReset({ phone, email });
+      showToast(SUCCESS_MESSAGES.OTP_SENT, 'success', 'Đã gửi mã');
       return true;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Đặt lại mật khẩu thất bại';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Gửi yêu cầu thất bại');
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const resetState = () => {
-    setError(null);
-    setSuccess(false);
-    setLoading(false);
+  const verifyOtp = async (phone: string, email: string, otp: string): Promise<boolean> => {
+    if (otp.length !== 6) {
+      showToast('Vui lòng nhập đầy đủ mã OTP 6 số', 'warning', 'Thông báo');
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      await accountApi.verifyForgotOtp({ phone, email, otp });
+      return true;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Xác thực OTP thất bại');
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return {
-    loading,
-    error,
-    success,
-    requestPasswordReset,
-    verifyPasswordReset,
-    resetState,
+  const resetPassword = async (
+    phone: string, 
+    email: string, 
+    otp: string,
+    newPassword: string, 
+    confirmPassword: string
+  ): Promise<boolean> => {
+    if (newPassword !== confirmPassword) {
+      showToast('Mật khẩu xác nhận không khớp', 'warning', 'Chú ý');
+      return false;
+    }
+
+    if (newPassword.length < 8) {
+      showToast(ERROR_MESSAGES[1302], 'warning', 'Mật khẩu yếu');
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      await accountApi.verifyPasswordReset({ 
+        phone, 
+        email, 
+        otp, 
+        newPassword, 
+        confirmPassword 
+      });
+      
+      showToast('Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.', 'success', 'Thành công');
+      return true;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi đặt lại mật khẩu');
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
+
+  return { loading, requestPasswordReset, verifyOtp, resetPassword };
 };

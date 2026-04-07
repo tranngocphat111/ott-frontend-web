@@ -9,17 +9,16 @@ const LoginPage: React.FC = () => {
 
   const handleLoginSuccess = () => navigate('/home', { replace: true });
 
+
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{ background: 'var(--background-image-gradient-subtle)', fontFamily: 'var(--font-body)' }}
     >
-      {/* Ambient blobs */}
       <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(174,127,83,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '-80px', left: '-80px', width: '280px', height: '280px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(208,169,126,0.11) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div className="w-full max-w-md animate-scale-in">
-        {/* Header */}
         <div className="flex flex-col items-center mb-7">
           <a href="/" className="group flex items-center gap-2.5 mb-4">
             <div
@@ -35,12 +34,11 @@ const LoginPage: React.FC = () => {
           <p style={{ fontSize: '0.9rem', color: 'var(--color-primary-500)' }}>Chào mừng trở lại</p>
         </div>
 
-        {/* Card */}
         <div
           className="glass"
           style={{ borderRadius: 24, padding: '2rem', boxShadow: 'var(--shadow-xl)', position: 'relative' }}
         >
-          {/* Top accent */}
+
           <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: '3px', borderRadius: '0 0 3px 3px', background: 'linear-gradient(90deg, transparent, var(--color-primary-400), transparent)' }} />
 
           <LoginTabs activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -68,7 +66,6 @@ const LoginPage: React.FC = () => {
           )}
         </div>
 
-        {/* Footer */}
         <p className="text-center mt-5 text-sm" style={{ color: 'var(--color-primary-500)' }}>
           Chưa có tài khoản?{' '}
           <a href="/register" className="font-semibold transition-fast hover:opacity-70" style={{ color: 'var(--color-primary-600)' }}>

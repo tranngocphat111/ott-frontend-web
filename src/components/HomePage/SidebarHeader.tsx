@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreVertical, User, Shield, Settings, LogOut, X } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/logo_tach_nen.jpg';
 
 interface Props {
@@ -32,8 +32,8 @@ export const SidebarHeader: React.FC<Props> = ({ onMenuClick, showClose }) => {
   };
 
   const menuItems = [
-    { href: '/profile',  icon: <User size={14} />,     label: 'Trang cá nhân' },
-    { href: '/security', icon: <Shield size={14} />,   label: 'Bảo mật' },
+    { href: '/profile', icon: <User size={14} />, label: 'Trang cá nhân' },
+    { href: '/security', icon: <Shield size={14} />, label: 'Bảo mật' },
     { href: '/settings', icon: <Settings size={14} />, label: 'Cài đặt' },
   ];
 

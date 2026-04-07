@@ -1,12 +1,9 @@
-import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 
-/* Spinner */
 export function Spinner() {
     return <span className="animate-spin" style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block' }} />;
 }
 
-/* Submit button */
 export function SubmitBtn({ loading, label, loadingLabel, disabled }: { loading: boolean; label: string; loadingLabel: string; disabled?: boolean }) {
     return (
         <button type="submit" disabled={loading || disabled}
@@ -18,7 +15,6 @@ export function SubmitBtn({ loading, label, loadingLabel, disabled }: { loading:
     );
 }
 
-/* OTP input */
 export function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
     return (
         <div>
@@ -37,7 +33,6 @@ export function OtpInput({ value, onChange }: { value: string; onChange: (v: str
     );
 }
 
-/* Back button */
 export function BackBtn({ onClick }: { onClick: () => void }) {
     return (
         <button type="button" onClick={onClick} className="transition-fast"

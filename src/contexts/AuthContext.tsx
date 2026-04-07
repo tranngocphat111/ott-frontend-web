@@ -1,5 +1,5 @@
-// context/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { authApi, profileApi, userApi } from '../services/api';
 import type { UserProfileResponse } from '../types';
 
@@ -8,7 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (phone: string, password: string, otpCode?: string) => Promise<{ requires2FA?: boolean; tempToken?: string; requiresPhoneSetup?: boolean; authenticated?: boolean }>;
-  verify2FA: (tempToken: string, otpCode: string) => Promise<{ authenticated: boolean }>;
+  verify2FA: (tempToken: string, otpCode: string, isBackupCode: boolean) => Promise<{ authenticated: boolean }>;
   request2FAOtp: (phone: string) => Promise<void>;
   loginWithToken: (token: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('AuthContext: Fetching user profile...');
       const response = await profileApi.getCurrentProfile();
-      
+
       if (response.result) {
         console.log('AuthContext: User profile fetched:', response.result);
         setUser(response.result);
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (phone: string, password: string, otpCode?: string) => {
     console.log('AuthContext: Local login attempt');
-    
+
     // eslint-disable-next-line no-useless-catch
     try {
       const response = await authApi.localLogin({
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (response.result) {
-        // Case 1: Requires 2FA
+
         if (response.result.requires2FA && response.result.tempToken) {
           console.log('AuthContext: 2FA required');
           return {
@@ -84,42 +84,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
 
-        // Case 2: Normal login success (hoặc auto restore)
+
         if (response.result.token && response.result.refreshToken) {
           console.log('AuthContext: Login successful, storing tokens');
           localStorage.setItem('accessToken', response.result.token);
           localStorage.setItem('refreshToken', response.result.refreshToken);
-          
+
           await fetchUser();
           console.log('AuthContext: User fetched after login');
-          
+
           return { authenticated: true };
         }
       }
 
       throw new Error(response.message || 'Login failed');
-    } catch (error: any) {
+    } catch (error: unknown) {
 
       throw error;
     }
   };
 
-  const verify2FA = async (tempToken: string, otpCode: string) => {
-    console.log('AuthContext: Verifying 2FA OTP');
-    
+  const verify2FA = async (tempToken: string, otpCode: string, isBackupCode: boolean = false) => {
     const response = await authApi.verify2FAOtp({
       tempToken,
       otpCode,
+      isBackupCode,
     });
 
     if (response.result?.token && response.result?.refreshToken) {
-      console.log('AuthContext: 2FA verification successful, storing tokens');
       localStorage.setItem('accessToken', response.result.token);
       localStorage.setItem('refreshToken', response.result.refreshToken);
-      
       await fetchUser();
-      console.log('AuthContext: User fetched after 2FA');
-      
       return { authenticated: true };
     }
 
@@ -128,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const request2FAOtp = async (phone: string) => {
     console.log('AuthContext: Requesting 2FA OTP resend');
-    
+
     const response = await authApi.request2FAOtp({
       phone,
     });
@@ -136,19 +131,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!response.result) {
       throw new Error(response.message || 'Failed to send OTP');
     }
-    
+
     console.log('AuthContext: 2FA OTP sent successfully');
   };
 
   const loginWithToken = async (token: string, refreshToken: string) => {
     console.log('AuthContext: loginWithToken called');
     console.log('AuthContext: Storing tokens in localStorage');
-    
+
     localStorage.setItem('accessToken', token);
     localStorage.setItem('refreshToken', refreshToken);
-    
+
     console.log('AuthContext: Fetching user profile');
-    
+
     try {
       await fetchUser();
       console.log('AuthContext: loginWithToken completed successfully');
@@ -168,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     otp: string
   ) => {
     console.log('AuthContext: Registration attempt');
-    
+
     const response = await userApi.register({
       phone,
       email,
@@ -185,7 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log('AuthContext: Logout initiated');
-    
+
     try {
       const token = localStorage.getItem('accessToken');
       if (token) {
@@ -235,6 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

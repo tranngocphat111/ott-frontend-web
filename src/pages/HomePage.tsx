@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ConversationsSidebar, ChatArea } from '../components/HomePage';
 import type { Conversation, Message } from '../components/HomePage';
 import { mockConversations, mockMessages } from '../data/mockData';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 const HomePage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -32,16 +33,7 @@ const HomePage: React.FC = () => {
     }]);
   };
 
-  if (isLoading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-primary-50)', fontFamily: 'var(--font-body)' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="animate-pulse-slow" style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: '50%', background: 'var(--color-primary-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="animate-spin" style={{ width: 22, height: 22, border: '2.5px solid var(--color-primary-200)', borderTopColor: 'var(--color-primary-500)', borderRadius: '50%' }} />
-        </div>
-        <p style={{ fontSize: '0.875rem', color: 'var(--color-primary-500)' }}>Đang tải...</p>
-      </div>
-    </div>
-  );
+  if (isLoading) return <LoadingScreen message="Đang tải" />;
 
   if (!isAuthenticated || !user) return null;
 
@@ -80,7 +72,7 @@ const HomePage: React.FC = () => {
           onSelectConversation={handleSelectConversation}
           onNewChat={() => console.log('new chat')}
           isOpen={false}
-          onClose={() => {}}
+          onClose={() => { }}
           embedded
         />
       </div>

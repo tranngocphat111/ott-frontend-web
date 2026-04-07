@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 import LandingPage from '../pages/LandingPage';
 import LoginPage from '../pages/LoginPage';
@@ -46,7 +46,7 @@ export const AppRouter: React.FC = () => {
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
-      
+
       <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
       <Route path="/setup-phone" element={<SetupPhonePage />} />
 
@@ -58,7 +58,7 @@ export const AppRouter: React.FC = () => {
       <Route path="/account/phone/change" element={<PrivateRoute><ChangePhonePage /></PrivateRoute>} />
       <Route path="/account/delete" element={<PrivateRoute><DeleteAccountPage /></PrivateRoute>} />
       <Route path="/security/2fa" element={<PrivateRoute><TwoFactorAuthPage /></PrivateRoute>} />
-      
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

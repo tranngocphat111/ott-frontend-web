@@ -13,7 +13,7 @@ import type {
   IntrospectRequest,
   IntrospectResponse,
 } from '../../types';
-import { API_ENDPOINTS } from '../../configuration/api';
+import { API_ENDPOINTS } from '../../config/api';
 
 export const authApi = {
   localLogin: async (data: Omit<LocalLoginRequest, 'deviceId' | 'deviceType' | 'deviceName' | 'deviceInfo' | 'ipAddress' | 'location'>): Promise<ApiResponse<AuthenticationResponse>> => {
@@ -79,9 +79,6 @@ export const authApi = {
     return apiClient.post(API_ENDPOINTS.AUTH.REQUEST_EMAIL_OTP_LOGIN, payload);
   },
 
-  /**
-   * Verify email OTP and login
-   */
   verifyEmailOtpLogin: async (data: {
     email: string;
     otpCode: string;

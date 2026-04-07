@@ -1,32 +1,45 @@
-// hooks/useProfile.ts
 import { useState } from 'react';
 import { profileApi } from '../services/api';
-import type { UserProfileResponse, UpdateProfileRequest, ApiError } from '../types';
-import { useAuth } from '../context/AuthContext';
+import type { UserProfileResponse, UpdateProfileRequest } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage, ERROR_MESSAGES } from '../utils/messageMapping';
 
 export const useProfile = () => {
   const { user, refreshUser } = useAuth();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const updateProfile = async (data: UpdateProfileRequest) => {
+  const updateProfile = async (data: UpdateProfileRequest): Promise<boolean> => {
+    if (data.fullName !== undefined && (data.fullName.trim().length === 0)) {
+      showToast(ERROR_MESSAGES[5004] || 'Vui lòng nhập họ và tên', 'warning', 'Thông báo');
+      return false;
+    }
+
+    if (data.fullName && data.fullName.length > 100) {
+      showToast(ERROR_MESSAGES[1303], 'warning', 'Dữ liệu không hợp lệ');
+      return false;
+    }
+
+    if (data.bio && data.bio.length > 500) {
+      showToast(ERROR_MESSAGES[1307], 'warning', 'Tiểu sử quá dài');
+      return false;
+    }
+
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await profileApi.updateProfile(data);
-      
+
       if (response.result) {
         await refreshUser();
-        return response.result;
+        showToast('Cập nhật hồ sơ thành công!', 'success', 'Thành công');
+        return true;
       }
-      
-      throw new Error(response.message || 'Failed to update profile');
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to update profile';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+
+      throw new Error('Cập nhật thất bại');
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Cập nhật thất bại');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -34,21 +47,18 @@ export const useProfile = () => {
 
   const getProfile = async (userId?: string): Promise<UserProfileResponse | null> => {
     setIsLoading(true);
-    setError(null);
-
     try {
-      const response = userId 
+      const response = userId
         ? await profileApi.getProfile(userId)
         : await profileApi.getCurrentProfile();
-      
+
       if (response.result) {
         return response.result;
       }
       
       return null;
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to get profile');
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi tải thông tin');
       return null;
     } finally {
       setIsLoading(false);
@@ -58,7 +68,6 @@ export const useProfile = () => {
   return {
     user,
     isLoading,
-    error,
     updateProfile,
     getProfile,
   };

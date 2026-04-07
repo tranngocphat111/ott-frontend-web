@@ -1,155 +1,152 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, LogOut } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, Edit } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import { useSessions } from '../hooks/useSessions';
-import { ProfileHeader } from '../components/Profile/ProfileHeader';
-import { EditProfileForm } from '../components/Profile/EditProfileForm';
-import { SecuritySettings } from '../components/Profile/SecuritySettings';
-import { SessionsList } from '../components/Profile/SessionsList';
+import { ProfileHeader } from '../components/ProfilePage/ProfileHeader';
+import { EditProfileForm } from '../components/ProfilePage/EditProfileForm';
+import { SecuritySettings } from '../components/ProfilePage/SecuritySettings';
+import { SessionsList } from '../components/ProfilePage/SessionsList';
 import type { UpdateProfileRequest } from '../types';
+import LoadingScreen from '../components/common/LoadingScreen';
+
+const TABS = [
+  { id: 'info', label: 'Thông tin' },
+  { id: 'security', label: 'Bảo mật' },
+  { id: 'sessions', label: 'Thiết bị' },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { updateProfile } = useProfile();
+  // Lấy thêm hàm cập nhật user (Ví dụ: setUser) từ Context
+  const { user, updateProfile } = useAuth();
+  const { updateProfile: updateProfileApi } = useProfile();
   const { sessions, revokeSession, revokeAllOtherSessions } = useSessions();
+  const [showEdit, setShowEdit] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('info');
+  const [minLoadDone, setMinLoadDone] = useState(false);
 
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'security' | 'sessions'>('info');
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadDone(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const handleUpdateProfile = async (data: UpdateProfileRequest) => {
-    try {
-      await updateProfile(data);
-      setShowEditProfile(false);
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-    }
+    try { await updateProfile(data); setShowEdit(false); }
+    catch (e) { console.error(e); }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  if (!minLoadDone) return <LoadingScreen message="Đang tải" />;
+
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div style={{ minHeight: '100vh', background: 'var(--background-image-gradient-subtle)', fontFamily: 'var(--font-body)' }}>
+
+      {/* Sticky nav */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(255,252,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--color-primary-100)', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button
             onClick={() => navigate('/home')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            className="transition-base"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--color-primary-600)', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-primary-100)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Quay lại</span>
+            <ArrowLeft size={16} /> Quay lại
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="font-medium">Đăng xuất</span>
-          </button>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--color-primary-800)' }}>
+            Trang cá nhân
+          </span>
+
+          <div style={{ width: 80 }} /> {/* spacer */}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* Profile Header */}
+      {/* Body */}
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px 48px' }}>
+
+        {/* Profile header card */}
         <ProfileHeader
           user={user}
-          onEditAvatar={() => console.log('Edit avatar')}
-          onEditCover={() => console.log('Edit cover')}
+          onProfileUpdate={(updatedProfile) => {
+
+            updateProfile(updatedProfile); 
+          }}
         />
 
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('info')}
-              className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'info'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Thông tin cá nhân
-            </button>
-            <button
-              onClick={() => setActiveTab('security')}
-              className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'security'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Bảo mật
-            </button>
-            <button
-              onClick={() => setActiveTab('sessions')}
-              className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'sessions'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Thiết bị ({sessions?.total || 0})
-            </button>
+        {/* Tabs + content card */}
+        <div style={{ marginTop: 20, background: 'white', borderRadius: 20, border: '1px solid var(--color-primary-100)', boxShadow: 'var(--shadow-md)', overflow: 'hidden' }}>
+
+          {/* Tab bar */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--color-primary-100)', background: 'var(--color-primary-50)' }}>
+            {TABS.map(tab => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="transition-base"
+                  style={{
+                    flex: 1, padding: '14px 8px', border: 'none', cursor: 'pointer',
+                    background: 'transparent', fontFamily: 'var(--font-body)',
+                    fontSize: '0.875rem', fontWeight: active ? 700 : 500,
+                    color: active ? 'var(--color-primary-800)' : 'var(--color-primary-400)',
+                    borderBottom: active ? '2.5px solid var(--color-primary-500)' : '2.5px solid transparent',
+                    marginBottom: -1,
+                  }}
+                >
+                  {tab.label}
+                  {tab.id === 'sessions' && sessions && (
+                    <span style={{ marginLeft: 5, fontSize: '0.75rem', background: active ? 'var(--color-primary-500)' : 'var(--color-primary-200)', color: active ? 'white' : 'var(--color-primary-600)', borderRadius: 8, padding: '1px 6px', fontWeight: 600 }}>
+                      {sessions.total}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="p-6">
-            {/* Personal Info Tab */}
+          {/* Tab content */}
+          <div key={activeTab} className="animate-fade-in" style={{ padding: '24px 20px' }}>
+
+            {/* ── Info tab ── */}
             {activeTab === 'info' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-gray-900">Thông tin cá nhân</h2>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 700, color: 'var(--color-primary-900)' }}>
+                    Thông tin cá nhân
+                  </h2>
                   <button
-                    onClick={() => setShowEditProfile(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    onClick={() => setShowEdit(true)}
+                    className="btn-ripple transition-base"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: 'white', fontFamily: 'var(--font-body)', background: 'linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))', boxShadow: '0 3px 10px rgba(139,102,66,0.28)' }}
                   >
-                    <Edit className="w-4 h-4" />
-                    Chỉnh sửa
+                    <Edit size={13} /> Chỉnh sửa
                   </button>
                 </div>
 
-                <div className="space-y-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   <InfoRow label="Họ và tên" value={user.fullName} />
                   <InfoRow label="Số điện thoại" value={user.phone} verified={user.isPhoneVerified} />
                   <InfoRow label="Email" value={user.email} verified={user.isEmailVerified} />
-                  <InfoRow label="Giới thiệu" value={user.bio || 'Chưa cập nhật'} />
-                  <InfoRow
-                    label="Ngày sinh"
-                    value={user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
-                  />
-                  <InfoRow
-                    label="Giới tính"
-                    value={
-                      user.gender === 'MALE' ? 'Nam' : user.gender === 'FEMALE' ? 'Nữ' : 'Khác'
-                    }
-                  />
-                  <InfoRow
-                    label="Ngày tham gia"
-                    value={new Date(user.createdAt).toLocaleDateString('vi-VN')}
-                  />
+                  <InfoRow label="Giới thiệu" value={user.bio || undefined} />
+                  <InfoRow label="Ngày sinh" value={user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN') : undefined} />
+                  <InfoRow label="Giới tính" value={user.gender === 'MALE' ? 'Nam' : user.gender === 'FEMALE' ? 'Nữ' : 'Khác'} />
+                  <InfoRow label="Ngày tham gia" value={new Date(user.createdAt).toLocaleDateString('vi-VN')} />
                   {user.lastLoginAt && (
-                    <InfoRow
-                      label="Đăng nhập gần nhất"
-                      value={new Date(user.lastLoginAt).toLocaleString('vi-VN')}
-                    />
+                    <InfoRow label="Đăng nhập gần nhất" value={new Date(user.lastLoginAt).toLocaleString('vi-VN')} />
                   )}
                 </div>
               </div>
             )}
 
-            {/* Security Tab */}
+            {/* ── Security tab ── */}
             {activeTab === 'security' && (
               <SecuritySettings
                 user={user}
@@ -161,9 +158,11 @@ const ProfilePage: React.FC = () => {
                 onToggle2FA={() => navigate('/security/2fa')}
                 onDeleteAccount={() => navigate('/account/delete')}
               />
+
+
             )}
 
-            {/* Sessions Tab */}
+            {/* ── Sessions tab ── */}
             {activeTab === 'sessions' && sessions && (
               <SessionsList
                 sessions={sessions.sessions}
@@ -175,30 +174,28 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
-      {showEditProfile && (
-        <EditProfileForm
-          user={user}
-          onSave={handleUpdateProfile}
-          onCancel={() => setShowEditProfile(false)}
-        />
+      {/* Edit modal */}
+      {showEdit && (
+        <EditProfileForm user={user} onSave={handleUpdateProfile} onCancel={() => setShowEdit(false)} />
       )}
     </div>
   );
 };
 
-// Helper Component
-const InfoRow: React.FC<{ label: string; value?: string; verified?: boolean }> = ({
-  label,
-  value,
-  verified,
-}) => (
-  <div className="flex items-center justify-between py-3 border-b last:border-0">
-    <span className="text-sm font-medium text-gray-600">{label}</span>
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-900">{value || 'Chưa cập nhật'}</span>
+/* ── InfoRow ── */
+const InfoRow: React.FC<{ label: string; value?: string; verified?: boolean }> = ({ label, value, verified }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-primary-50)' }}
+    className="transition-fast"
+    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-primary-50)')}
+    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+  >
+    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-primary-500)', minWidth: 140, paddingLeft: 4 }}>{label}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 4 }}>
+      <span style={{ fontSize: '0.875rem', color: value ? 'var(--color-primary-900)' : 'var(--color-primary-300)', fontStyle: value ? 'normal' : 'italic' }}>
+        {value || 'Chưa cập nhật'}
+      </span>
       {verified && (
-        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
+        <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--color-success-bg)', color: 'var(--color-success-text)', fontSize: '0.6875rem', fontWeight: 700, border: '1px solid var(--color-success-border)' }}>
           Đã xác thực
         </span>
       )}

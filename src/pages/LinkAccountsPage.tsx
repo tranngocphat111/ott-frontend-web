@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Chrome, CheckCircle, XCircle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { otpApi } from '../services/api/otp.api';
 import { linkingApi } from '../services/api/linking.api';
 import Header from '../components/Header';

@@ -1,4 +1,3 @@
-// hooks/useAccount.ts
 import { useState } from 'react';
 import { accountApi } from '../services/api';
 import type {
@@ -6,112 +5,108 @@ import type {
   ChangePasswordRequest,
   ChangeEmailRequest,
   ChangePhoneRequest,
-  DeleteAccountRequest,
-  ApiError
+  DeleteAccountRequest
 } from '../types';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage } from '../utils/messageMapping';
 
 export const useAccount = () => {
   const { refreshUser, logout } = useAuth();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
+  // 1. Thiết lập mật khẩu lần đầu (cho tk Google/OTP chưa có pass)
   const setPassword = async (data: SetPasswordRequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await accountApi.setPassword(data);
-      await refreshUser();
-      return response;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to set password';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      if (response.result) {
+        await refreshUser();
+        showToast('Thiết lập mật khẩu thành công!', 'success', 'Thành công');
+      }
+      return response.result;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi thiết lập');
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 2. Đổi mật khẩu đang sử dụng
   const changePassword = async (data: ChangePasswordRequest) => {
-    setIsLoading(true);
-    setError(null);
 
+    setIsLoading(true);
     try {
       const response = await accountApi.changePassword(data);
       if (response.result) {
-        // Password changed successfully, sessions revoked
-        // User needs to login again
-        await logout();
+        showToast('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'success', 'Thành công');
+        // Sau khi đổi pass thành công, logout để đảm bảo an toàn
+        setTimeout(async () => {
+          await logout();
+        }, 1500);
       }
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to change password';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi đổi mật khẩu');
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 3. Thay đổi Email (Sau khi đã verify OTP)
   const changeEmail = async (data: ChangeEmailRequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await accountApi.changeEmail(data);
       if (response.result) {
         await refreshUser();
+        showToast('Cập nhật email thành công', 'success', 'Thành công');
       }
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to change email';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi cập nhật email');
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 4. Thay đổi số điện thoại (Sau khi đã verify OTP)
   const changePhone = async (data: ChangePhoneRequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await accountApi.changePhone(data);
       if (response.result) {
         await refreshUser();
+        showToast('Cập nhật số điện thoại thành công', 'success', 'Thành công');
       }
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to change phone';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi cập nhật số điện thoại');
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 5. Xóa tài khoản vĩnh viễn
   const deleteAccount = async (data: DeleteAccountRequest) => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const response = await accountApi.deleteAccount(data);
       if (response.result) {
-        // Account deleted, logout
-        await logout();
+        showToast('Tài khoản đã được xóa thành công. Tạm biệt bạn!', 'success', 'Thành công');
+        setTimeout(async () => {
+          await logout();
+        }, 2000);
       }
       return response.result;
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to delete account';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi xóa tài khoản');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +114,6 @@ export const useAccount = () => {
 
   return {
     isLoading,
-    error,
     setPassword,
     changePassword,
     changeEmail,

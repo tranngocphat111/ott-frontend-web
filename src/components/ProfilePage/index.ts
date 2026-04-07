@@ -1,4 +1,3 @@
-// components/Profile/index.ts
 export { ProfileHeader } from './ProfileHeader';
 export { EditProfileForm } from './EditProfileForm';
 export { SecuritySettings } from './SecuritySettings';

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import type { ApiResponse, ApiError } from '../../types';
-import { API_CONFIG } from '../../configuration/api';
+import { type ApiResponse, type ApiError, DeviceType } from '../../types';
+import { API_CONFIG } from '../../config/api';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_CONFIG.BASE_URL,
@@ -48,6 +48,23 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('refreshToken');
 
+      const publicRoutes = [
+        '/password/forgot',
+        '/password/forgot/otp/verify',
+        '/password/forgot/verify',
+        '/auth/login',
+        '/auth/register',
+      ];
+
+      const isPublicRoute = publicRoutes.some(route =>
+        originalRequest.url?.includes(route)
+      );
+
+      if (isPublicRoute) {
+        return Promise.reject(apiError);
+      }
+
+      // Phần còn lại giữ nguyên
       if (!refreshToken) {
         redirectToLogin();
         return Promise.reject(apiError);
@@ -117,11 +134,18 @@ export const getDeviceId = (): string => {
   return deviceId;
 };
 
-export const getDeviceType = (): 'MOBILE' | 'TABLET' | 'DESKTOP' => {
+export const getDeviceType = (): DeviceType => {
   const ua = navigator.userAgent;
-  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return 'TABLET';
-  if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle/.test(ua)) return 'MOBILE';
-  return 'DESKTOP';
+
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+    return DeviceType.TABLET;
+  }
+
+  if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle/.test(ua)) {
+    return DeviceType.MOBILE;
+  }
+
+  return DeviceType.DESKTOP;
 };
 
 export const getDeviceName = (): string => {

@@ -1,24 +1,14 @@
-import { useEffect } from 'react';
 import { useRegister } from '../hooks/useRegister';
 import RegisterForm from '../components/RegisterPage/RegisterForm';
 import OtpForm from '../components/RegisterPage/OtpForm';
-import { useToast } from '../context/ToastContext';
 import logo from '../assets/logo_tach_nen.jpg';
 
 export default function RegisterPage() {
-  const { showToast } = useToast();
+  
   const {
-    step, formData, loading, error, success,
+    step, formData, loading,
     handleChange, handleRequestOtp, handleRegister, goBack,
   } = useRegister();
-
-  useEffect(() => {
-    if (error) showToast(error, 'error', 'Có lỗi xảy ra');
-  }, [error]);
-
-  useEffect(() => {
-    if (success) showToast(success, 'success', 'Thành công');
-  }, [success]);
 
   return (
     <div

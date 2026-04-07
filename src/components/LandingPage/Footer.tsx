@@ -118,8 +118,8 @@ const Footer = () => (
           color: 'var(--color-primary-600)',
         }}
       >
-        <span>© 2025 Riff. All rights reserved.</span>
-        <span>Made with care in Việt Nam 🇻🇳</span>
+        <span>Riff</span>
+        
       </div>
     </div>
   </footer>

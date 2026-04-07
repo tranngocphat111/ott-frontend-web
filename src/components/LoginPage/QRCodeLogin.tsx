@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { QrCode, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useQRCode } from '../../hooks/useQRCode';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { QrCodeStatus } from '../../types/enums';
 import logo from '../../assets/logo_tach_nen.jpg';
 
@@ -153,19 +153,19 @@ export const QRCodeLogin: React.FC<Props> = ({ onSuccess }) => {
           {/* Expired */}
           {(qrStatus?.status === QrCodeStatus.EXPIRED ||
             qrCode?.status === QrCodeStatus.EXPIRED) && (
-            <QrStatePlaceholder
-              icon={<XCircle size={40} style={{ color: 'var(--color-primary-400)' }} />}
-              label="QR đã hết hạn"
-              action={
-                <ActionBtn
-                  onClick={handleNew}
-                  label="Tạo mã mới"
-                  icon={<RefreshCw size={13} />}
-                />
-              }
-              bg="var(--color-primary-50)"
-            />
-          )}
+              <QrStatePlaceholder
+                icon={<XCircle size={40} style={{ color: 'var(--color-primary-400)' }} />}
+                label="QR đã hết hạn"
+                action={
+                  <ActionBtn
+                    onClick={handleNew}
+                    label="Tạo mã mới"
+                    icon={<RefreshCw size={13} />}
+                  />
+                }
+                bg="var(--color-primary-50)"
+              />
+            )}
 
           {/* QR đẹp */}
           {qrCode?.qrData &&

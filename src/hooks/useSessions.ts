@@ -1,76 +1,77 @@
-// hooks/useSessions.ts
 import { useState, useEffect } from 'react';
 import { sessionApi } from '../services/api';
-import type { UserSessionsResponse, ApiError } from '../types';
+import type { UserSessionsResponse } from '../types';
+import { useToast } from '../contexts/ToastContext';
+import { getErrorMessage } from '../utils/messageMapping';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useSessions = () => {
   const [sessions, setSessions] = useState<UserSessionsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
+  const { logout } = useAuth();
 
   const fetchSessions = async () => {
     setIsLoading(true);
-    setError(null);
 
     try {
       const response = await sessionApi.getUserSessions();
       if (response.result) {
         setSessions(response.result);
       }
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to fetch sessions');
+    } catch (err: unknown) {
+      // Đã bật Toast báo lỗi cho hàm fetch
+      showToast(getErrorMessage(err), 'error', 'Lỗi tải danh sách thiết bị');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const revokeSession = async (sessionId: string) => {
+  const revokeSession = async (sessionId: string): Promise<boolean> => {
     setIsLoading(true);
-    setError(null);
 
     try {
       await sessionApi.revokeSession(sessionId);
-      await fetchSessions(); // Refresh sessions list
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to revoke session';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      showToast('Đã đăng xuất thiết bị thành công', 'success');
+      await fetchSessions();
+      return true;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất thiết bị');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const revokeAllOtherSessions = async () => {
+  const revokeAllOtherSessions = async (): Promise<boolean> => {
     setIsLoading(true);
-    setError(null);
 
     try {
       await sessionApi.revokeAllOtherSessions();
-      await fetchSessions(); // Refresh sessions list
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to revoke sessions';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      showToast('Đã đăng xuất các thiết bị khác thành công', 'success');
+      await fetchSessions();
+      return true;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất thiết bị khác');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const revokeAllSessions = async () => {
+  const revokeAllSessions = async (): Promise<boolean> => {
     setIsLoading(true);
-    setError(null);
 
     try {
       await sessionApi.revokeAllSessions();
-      // This will log out the user
-    } catch (err) {
-      const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Failed to revoke all sessions';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      showToast('Đã đăng xuất khỏi tất cả thiết bị', 'success');
+
+      // Xóa toàn bộ token và đẩy user ra trang Login
+      await logout();
+      return true;
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -78,12 +79,12 @@ export const useSessions = () => {
 
   useEffect(() => {
     fetchSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
     sessions,
     isLoading,
-    error,
     fetchSessions,
     revokeSession,
     revokeAllOtherSessions,
