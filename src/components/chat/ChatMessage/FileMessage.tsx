@@ -18,8 +18,12 @@ export const FileMessage = ({
   currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  isTopBoundary,
   onReply,
   onReact,
+  onRevoke,
+  onDelete,
+  onPin,
 }: {
   msg: Message;
   url: string;
@@ -29,8 +33,12 @@ export const FileMessage = ({
   currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  isTopBoundary?: boolean;
   onReply?: (msg: Message) => void;
   onReact?: (msg: Message, reactionType: string) => void;
+  onRevoke?: (msg: Message) => void;
+  onDelete?: (msg: Message) => void;
+  onPin?: (msg: Message) => void;
 }) => {
   // 1. Xử lý thông tin File
   const rawFileName = fileName || getFileNameFromUrl(url, "file");
@@ -48,8 +56,12 @@ export const FileMessage = ({
       currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      isTopBoundary={isTopBoundary}
       onReply={onReply}
       onReact={onReact}
+      onRevoke={onRevoke}
+      onDelete={onDelete}
+      onPin={onPin}
     >
       {(borderRadius) => (
         <a
@@ -57,7 +69,7 @@ export const FileMessage = ({
           target="_blank"
           rel="noopener noreferrer"
           className={`
-            group flex items-center gap-3 p-2.5 pr-4 border transition-all cursor-pointer min-w-[220px] max-w-[300px] shadow-sm
+            group flex items-center gap-3 p-2.5 pr-4 border transition-all cursor-pointer min-w-55 max-w-75 shadow-sm
             ${borderRadius}
             ${
               isMe

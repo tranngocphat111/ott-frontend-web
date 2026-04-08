@@ -81,6 +81,34 @@ const ChatPage: React.FC = () => {
     return () => socketService.offIncomingCall(onIncomingCall);
   }, [normalizedUserId]);
 
+  useEffect(() => {
+    const handleConversationDissolved = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string }>;
+      const dissolvedConversationId = String(
+        custom.detail?.conversationId || "",
+      );
+
+      if (
+        dissolvedConversationId &&
+        selectedConversation?._id === dissolvedConversationId
+      ) {
+        setSelectedConversation(null);
+      }
+    };
+
+    window.addEventListener(
+      "chat:conversation-dissolved",
+      handleConversationDissolved as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "chat:conversation-dissolved",
+        handleConversationDissolved as EventListener,
+      );
+    };
+  }, [selectedConversation?._id]);
+
   return (
     <ConversationsProvider>
       <div className="flex h-full w-full" style={{ zoom: 0.9}}>
@@ -125,15 +153,12 @@ const ChatPage: React.FC = () => {
                   <MessageCircle className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Chào mừng đến với Chat App
+                  Chào mừng đến với Riff App
                 </h2>
                 <p className="text-gray-600 mb-6">
                   Chọn một cuộc hội thoại để bắt đầu trò chuyện
                 </p>
-                <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Sẵn sàng</span>
-                </div>
+                
               </div>
             </div>
           )}

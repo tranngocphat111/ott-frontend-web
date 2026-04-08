@@ -29,6 +29,10 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
 
   const editingMember = validMembers.find((m) => m.user_id === editingUserId);
 
+  const getDisplayName = useCallback((member: ConversationMember) => {
+    return (member.nickname || "").trim() || member.name || member.user_id;
+  }, []);
+
   const handleEditClick = useCallback((member: ConversationMember) => {
     setEditingUserId(member.user_id);
     setEditingNickname((member.nickname || "").trim());
@@ -78,7 +82,7 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
         </div>
 
         {/* Members List */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3">
           {validMembers.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-sm text-gray-500">
@@ -96,15 +100,17 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar
                       src={member.avatar}
-                      name={member.name}
+                      name={getDisplayName(member)}
                       size={40}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {member.name}
+                        {getDisplayName(member)}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {(member.nickname || "").trim() || "Đặt biệt danh"}
+                        {(member.nickname || "").trim()
+                          ? `Tên thật: ${member.name || member.user_id}`
+                          : "Đặt biệt danh"}
                       </p>
                     </div>
                   </div>
@@ -149,7 +155,7 @@ const NicknameManagementModal: React.FC<NicknameManagementModalProps> = ({
 
             <div className="px-6 py-4">
               <p className="text-sm text-gray-600 mb-3">
-                {editingMember.name || editingMember.user_id}
+                {getDisplayName(editingMember)}
               </p>
               <input
                 type="text"

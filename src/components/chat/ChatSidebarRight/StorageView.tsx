@@ -147,7 +147,10 @@ const StorageView: React.FC<StorageViewProps> = ({
     const map = new Map<string, { name: string; avatar: string }>();
     members.forEach((member) => {
       map.set(member.user_id, {
-        name: member.name || member.user_id,
+        name:
+          (member.nickname || "").trim() ||
+          (member.name || "").trim() ||
+          member.user_id,
         avatar: member.avatar || "",
       });
     });
@@ -418,7 +421,7 @@ const StorageView: React.FC<StorageViewProps> = ({
             Tất cả
           </button>
 
-          <div className="max-h-56 overflow-y-auto">
+          <div className="max-h-56 overflow-y-auto custom-scrollbar">
             {filteredSenders.map((sender) => (
               <button
                 key={sender.id}
@@ -629,7 +632,7 @@ const StorageView: React.FC<StorageViewProps> = ({
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto ${isSelectMode ? "pb-20" : ""}`}>
+      <div className={`flex-1 overflow-y-auto custom-scrollbar ${isSelectMode ? "pb-20" : ""}`}>
         {activeTab === "media" && (
           <>
             {filteredMedia.length === 0 ? (

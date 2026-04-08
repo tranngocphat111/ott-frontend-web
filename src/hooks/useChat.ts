@@ -1,19 +1,41 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MessageService, socketService } from "../services";
 import type { Message } from "../interfaces";
 
-const CHAT_API_URL = import.meta.env.VITE_CHAT_API_URL || "http://localhost:5000/api";
+const CHAT_API_URL =
+  import.meta.env.VITE_CHAT_API_URL || "http://localhost:5000/api";
+
+const getRevokedReplyContent = () => ["Tin nhắn đã được thu hồi"];
 
 export const useChat = (conversationId: string, userId?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [hasMoreAfter, setHasMoreAfter] = useState(false);
+  const messagesRef = useRef<Message[]>([]);
+
+  const compareMessageIds = useCallback((left: string, right: string) => {
+    try {
+      const leftId = BigInt(left);
+      const rightId = BigInt(right);
+      if (leftId === rightId) return 0;
+      return leftId > rightId ? 1 : -1;
+    } catch {
+      if (left === right) return 0;
+      return left > right ? 1 : -1;
+    }
+  }, []);
 
   // Reset messages khi đổi conversation, tránh dùng tin nhắn cũ
   useEffect(() => {
     setMessages([]);
     setHasMore(true);
+    setHasMoreAfter(false);
   }, [conversationId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   /**
    * Load initial messages (last 20 from Redis cache)
@@ -23,25 +45,30 @@ export const useChat = (conversationId: string, userId?: string) => {
     if (!conversationId) return;
     setLoading(true);
     try {
-      const response = await fetch(
-        `${CHAT_API_URL}/conversations/${conversationId}/messages`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const listUrl = userId
+        ? `${CHAT_API_URL}/conversations/${conversationId}/messages?userId=${encodeURIComponent(userId)}`
+        : `${CHAT_API_URL}/conversations/${conversationId}/messages`;
+
+      const response = await fetch(listUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       const data = await response.json();
 
       if (data.success) {
         console.log(
-          `✓ Loaded ${data.messageCount} messages (source: ${data.source})`
+          `✓ Loaded ${data.messageCount} messages (source: ${data.source})`,
         );
-        setMessages(data.messages || []);
-        // If loaded 20 messages, likely more exist
-        setHasMore(data.messageCount === 20);
+        const nextMessages = data.messages || [];
+        messagesRef.current = nextMessages;
+        setMessages(nextMessages);
+        // Do not hard-stop by visible count (it may be <20 due to deleted_for filtering).
+        // Keep loading enabled while we still have any message anchor to request older pages.
+        setHasMore(nextMessages.length > 0);
+        setHasMoreAfter(false);
       } else {
         console.error("Error loading messages:", data.error);
       }
@@ -50,7 +77,9 @@ export const useChat = (conversationId: string, userId?: string) => {
       // Fallback to old method if new API fails
       try {
         const data = await MessageService.getMessages(conversationId, userId);
+        messagesRef.current = data;
         setMessages(data);
+        setHasMoreAfter(false);
       } catch (fallbackError) {
         console.error("Fallback method also failed:", fallbackError);
       }
@@ -62,43 +91,178 @@ export const useChat = (conversationId: string, userId?: string) => {
   /**
    * Load older messages (pagination - scroll up)
    */
-  const loadOlderMessages = useCallback(async () => {
-    if (!conversationId || messages.length === 0 || !hasMore) return;
+  const loadOlderMessages = useCallback(
+    async (force = false) => {
+      const currentMessages = messagesRef.current;
 
-    // Get oldest message (by msg_id, since we use Snowflake)
-    const oldestMessage = messages[0];
-    const beforeMsgId = oldestMessage.msg_id; // Use msg_id instead of timestamp!
+      if (
+        !conversationId ||
+        currentMessages.length === 0 ||
+        (!hasMore && !force)
+      ) {
+        return false;
+      }
+
+      // Get oldest message (by msg_id, since we use Snowflake)
+      const oldestMessage = currentMessages[0];
+      const beforeMsgId = oldestMessage.msg_id; // Use msg_id instead of timestamp!
+
+      try {
+        console.log("📥 Loading older messages...");
+        setLoading(true);
+
+        const response = await fetch(
+          `${CHAT_API_URL}/conversations/${conversationId}/messages/older?before=${beforeMsgId}&limit=20${userId ? `&userId=${encodeURIComponent(userId)}` : ""}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          console.log(`✓ Loaded ${data.messageCount} older messages`);
+          // Prepend older messages
+          setMessages((prev) => {
+            const nextMessages = [...(data.messages || []), ...prev];
+            messagesRef.current = nextMessages;
+            return nextMessages;
+          });
+          setHasMore(data.hasMore || false);
+          return (data.messages || []).length > 0;
+        } else {
+          console.error("Error loading older messages:", data.error);
+        }
+      } catch (error) {
+        console.error("Load older messages failed:", error);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+      return false;
+    },
+    [conversationId, messages, hasMore, userId],
+  );
+
+  const loadMessageContext = useCallback(
+    async (messageId: string, before = 20, after = 20) => {
+      if (!conversationId || !messageId) return false;
+
+      try {
+        const data = await MessageService.getMessageContext(
+          conversationId,
+          messageId,
+          userId,
+          before,
+          after,
+        );
+
+        if (!data?.success) return false;
+
+        const nextMessages = data.messages || [];
+        messagesRef.current = nextMessages;
+        setMessages(nextMessages);
+        setHasMore(Boolean(data.hasMoreBefore ?? nextMessages.length > 0));
+        setHasMoreAfter(Boolean(data.hasMoreAfter));
+        return nextMessages.length > 0;
+      } catch (error) {
+        console.error("Load message context failed:", error);
+        return false;
+      }
+    },
+    [conversationId, userId],
+  );
+
+  const loadMessageContextAfterLast = useCallback(async () => {
+    if (!conversationId) {
+      return {
+        appendedCount: 0,
+        hasMoreAfter: false,
+      };
+    }
+
+    const currentMessages = messagesRef.current;
+    const lastMessage = currentMessages[currentMessages.length - 1] as
+      | (Message & { _id?: string; msg_id?: string })
+      | undefined;
+    const anchorId = String(lastMessage?.msg_id || lastMessage?._id || "");
+
+    if (!anchorId) {
+      return {
+        appendedCount: 0,
+        hasMoreAfter: false,
+      };
+    }
 
     try {
-      console.log("📥 Loading older messages...");
-      setLoading(true);
-
-      const response = await fetch(
-        `${CHAT_API_URL}/conversations/${conversationId}/messages/older?before=${beforeMsgId}&limit=20`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      const data = await MessageService.getMessageContext(
+        conversationId,
+        anchorId,
+        userId,
+        0,
+        20,
       );
 
-      const data = await response.json();
-
-      if (data.success) {
-        console.log(`✓ Loaded ${data.messageCount} older messages`);
-        // Prepend older messages
-        setMessages((prev) => [...(data.messages || []), ...prev]);
-        setHasMore(data.hasMore || false);
-      } else {
-        console.error("Error loading older messages:", data.error);
+      if (!data?.success) {
+        return {
+          appendedCount: 0,
+          hasMoreAfter: false,
+        };
       }
+
+      const candidateMessages = (data.messages || []) as Array<
+        Message & { _id?: string; msg_id?: string }
+      >;
+
+      const newerMessages = candidateMessages.filter((message) => {
+        const messageId = String(message.msg_id || message._id || "");
+        if (!messageId || messageId === anchorId) return false;
+        return compareMessageIds(messageId, anchorId) > 0;
+      });
+
+      let appendedCount = 0;
+
+      if (newerMessages.length > 0) {
+        setMessages((prev) => {
+          const existed = new Set(
+            prev.map((item: Message & { _id?: string; msg_id?: string }) =>
+              String(item.msg_id || item._id || ""),
+            ),
+          );
+
+          const appendable = newerMessages.filter((item) => {
+            const itemId = String(item.msg_id || item._id || "");
+            if (!itemId || existed.has(itemId)) return false;
+            existed.add(itemId);
+            return true;
+          });
+
+          appendedCount = appendable.length;
+          if (appendable.length === 0) return prev;
+
+          const nextMessages = [...prev, ...appendable];
+          messagesRef.current = nextMessages;
+          return nextMessages;
+        });
+      }
+
+      const nextHasMoreAfter = Boolean(data.hasMoreAfter);
+      setHasMoreAfter(nextHasMoreAfter);
+      return {
+        appendedCount,
+        hasMoreAfter: nextHasMoreAfter,
+      };
     } catch (error) {
-      console.error("Load older messages failed:", error);
-    } finally {
-      setLoading(false);
+      console.error("Load newer message context failed:", error);
+      return {
+        appendedCount: 0,
+        hasMoreAfter: false,
+      };
     }
-  }, [conversationId, messages, hasMore]);
+  }, [compareMessageIds, conversationId, userId]);
 
   /**
    * Handle new message from Socket.IO
@@ -115,7 +279,7 @@ export const useChat = (conversationId: string, userId?: string) => {
         return [...prev, msg];
       });
     },
-    [conversationId]
+    [conversationId],
   );
 
   /**
@@ -136,10 +300,10 @@ export const useChat = (conversationId: string, userId?: string) => {
             };
           }
           return message;
-        })
+        }),
       );
     },
-    [conversationId]
+    [conversationId],
   );
 
   /**
@@ -147,13 +311,65 @@ export const useChat = (conversationId: string, userId?: string) => {
    */
   const handleMessageDeleted = useCallback(
     (payload: any) => {
-      if (payload.conversationId !== conversationId) return;
+      const payloadConvId =
+        payload.conversation_id?.toString() || payload.conversationId;
+
+      if (payloadConvId !== conversationId) return;
 
       setMessages((prev) =>
-        prev.filter((message: any) => message._id !== payload.messageId)
+        prev.filter(
+          (message: any) =>
+            message._id !== payload.messageId &&
+            message.msg_id !== payload.msg_id,
+        ),
       );
     },
-    [conversationId]
+    [conversationId],
+  );
+
+  const handleMessageRevoked = useCallback(
+    (payload: any) => {
+      const payloadConvId =
+        payload.conversation_id?.toString() || payload.conversationId;
+
+      if (payloadConvId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((message: any) => {
+          const replyTargetId =
+            message.reply_to_msg_id || message.reply_to?.msg_id;
+
+          if (
+            message.msg_id !== payload.msg_id &&
+            message._id !== payload._id &&
+            replyTargetId !== payload.msg_id
+          ) {
+            return message;
+          }
+
+          if (replyTargetId === payload.msg_id) {
+            return {
+              ...message,
+              reply_to: {
+                ...(message.reply_to || {}),
+                msg_id: payload.msg_id,
+                is_revoked: true,
+                is_deleted: false,
+                content: getRevokedReplyContent()[0],
+              },
+            };
+          }
+
+          return {
+            ...message,
+            content: payload.content || ["Tin nhắn đã được thu hồi"],
+            is_revoked: true,
+            reactions: [],
+          };
+        }),
+      );
+    },
+    [conversationId],
   );
 
   /**
@@ -179,10 +395,38 @@ export const useChat = (conversationId: string, userId?: string) => {
             ...message,
             reactions: payload.reactions || [],
           };
-        })
+        }),
       );
     },
-    [conversationId]
+    [conversationId],
+  );
+
+  const handleMessagePin = useCallback(
+    (payload: any) => {
+      const payloadConvId =
+        payload.conversation_id?.toString() || payload.conversationId;
+
+      if (payloadConvId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((message: any) => {
+          if (
+            message.msg_id !== payload.msg_id &&
+            message._id !== payload._id
+          ) {
+            return message;
+          }
+
+          return {
+            ...message,
+            is_pinned: !!payload.is_pinned,
+            pinned_at: payload.pinned_at || null,
+            pinned_by: payload.pinned_by || null,
+          };
+        }),
+      );
+    },
+    [conversationId],
   );
 
   useEffect(() => {
@@ -191,19 +435,25 @@ export const useChat = (conversationId: string, userId?: string) => {
     socketService.onNewMessage(handleNewMessage);
     socketService.onMessageReaction(handleReactionUpdate);
 
-    // Add new event listeners for edit/delete
-    if (socketService.socket) {
-      socketService.socket.on("tin_nhan_da_chinh_sua", handleMessageEdited);
-      socketService.socket.on("tin_nhan_da_xoa", handleMessageDeleted);
+    // Add new event listeners for edit/delete/revoke
+    const socket = socketService.getSocket();
+    if (socket) {
+      socket.on("tin_nhan_da_chinh_sua", handleMessageEdited);
+      socket.on("tin_nhan_da_xoa", handleMessageDeleted);
+      socket.on("tin_nhan_thu_hoi", handleMessageRevoked);
+      socket.on("tin_nhan_pin", handleMessagePin);
     }
 
     return () => {
       socketService.offNewMessage(handleNewMessage);
       socketService.offMessageReaction(handleReactionUpdate);
 
-      if (socketService.socket) {
-        socketService.socket.off("tin_nhan_da_chinh_sua", handleMessageEdited);
-        socketService.socket.off("tin_nhan_da_xoa", handleMessageDeleted);
+      const socket = socketService.getSocket();
+      if (socket) {
+        socket.off("tin_nhan_da_chinh_sua", handleMessageEdited);
+        socket.off("tin_nhan_da_xoa", handleMessageDeleted);
+        socket.off("tin_nhan_thu_hoi", handleMessageRevoked);
+        socket.off("tin_nhan_pin", handleMessagePin);
       }
     };
   }, [
@@ -213,7 +463,18 @@ export const useChat = (conversationId: string, userId?: string) => {
     handleReactionUpdate,
     handleMessageEdited,
     handleMessageDeleted,
+    handleMessageRevoked,
+    handleMessagePin,
   ]);
 
-  return { messages, loadMessages, loadOlderMessages, loading, hasMore };
+  return {
+    messages,
+    loadMessages,
+    loadOlderMessages,
+    loadMessageContext,
+    loadMessageContextAfterLast,
+    loading,
+    hasMore,
+    hasMoreAfter,
+  };
 };

@@ -1,5 +1,21 @@
+const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '');
+
+const buildApiBaseUrl = (): string => {
+  const directUrl = import.meta.env.VITE_API_URL as string | undefined;
+  if (directUrl) {
+    return normalizeBaseUrl(directUrl);
+  }
+
+  const gatewayBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (gatewayBase) {
+    return `${normalizeBaseUrl(gatewayBase)}/riff/api`;
+  }
+
+  return 'http://localhost:8080/riff/api';
+};
+
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL,
+  BASE_URL: buildApiBaseUrl(),
   TIMEOUT: 30000,
   HEADERS: {
     'Content-Type': 'application/json',

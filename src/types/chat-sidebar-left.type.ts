@@ -20,6 +20,7 @@ export interface SenderOption {
 export interface ConversationMeta {
   name: string;
   avatar: string;
+  senderNameById?: Record<string, string>;
 }
 
 export interface RecentSearchListProps {
@@ -73,6 +74,7 @@ export interface SearchMessagesSectionProps {
 export interface SearchFilesSectionProps {
   files: SearchFileItem[];
   searchTab: SearchTab;
+  conversationMetaMap: Map<string, ConversationMeta>;
   onOpenConversation: (conversationId: string, messageId?: string) => void;
   highlightKeyword: (text: string) => ReactNode;
 }

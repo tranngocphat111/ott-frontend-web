@@ -57,7 +57,7 @@ export interface MembersFullViewProps {
   members: ConversationMember[];
   ownerId: string;
   currentUserId: string;
-  isOwner: boolean;
+  isManager: boolean;
   onBack: () => void;
   onMemberRemoved: (userId: string) => void;
   onMemberRoleUpdated: (userId: string, newRole: "admin" | "user") => void;
@@ -94,7 +94,9 @@ export interface PinnedMessagesProps {
 export interface GroupActionsProps {
   conversation: Conversation;
   currentUserId: string;
+  isOwner?: boolean;
   onLeaveSuccess: () => void;
+  onActionSuccess?: () => Promise<void> | void;
 }
 
 export interface AddMemberModalProps {

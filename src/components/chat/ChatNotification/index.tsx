@@ -31,11 +31,11 @@ export const ChatNotification: React.FC<ChatNotificationProps> = ({
   };
 
   return (
-    <div className="flex justify-center my-6 w-full px-10">
+    <div className="flex justify-center my-2.5 w-full px-6">
       <div
         className={`
         flex items-center gap-2.5 
-        px-4 py-1.5 
+        px-3.5 py-1.5 
         rounded-full 
         border 
         shadow-[0_2px_10px_-3px_rgba(0,0,0,0.07)]

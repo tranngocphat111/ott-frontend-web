@@ -4,6 +4,7 @@ import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
 import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
 import CategoryManagementModal from "../modal/category/CategoryManagementModal";
+import { ConfirmModal } from "../modal/ConfirmModal";
 import type { ConversationItemProps } from "../../interfaces";
 import { ParticipantService } from "../../services";
 import type { Category } from "../../types";
@@ -27,6 +28,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   } | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
 
   useEffect(() => {
     // Find and set current category from participant settings
@@ -60,9 +63,19 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
     if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
 
-    const prefix = lastMsg.sender_id === currentUserId
-      ? "Bạn"
-      : (lastMsg.sender_name || "");
+    const senderParticipant = (conversation.participants || []).find((participant) => {
+      const participantId = String(participant.user_id || participant._id || "");
+      return participantId === String(lastMsg.sender_id || "");
+    });
+
+    const preferredSenderName =
+      (senderParticipant?.nickname || "").trim() ||
+      (senderParticipant?.display_name || "").trim() ||
+      (senderParticipant?.name || "").trim() ||
+      (lastMsg.sender_name || "").trim();
+
+    const prefix =
+      lastMsg.sender_id === currentUserId ? "Bạn" : preferredSenderName;
 
     return prefix ? `${prefix}: ${lastMsg.content}` : lastMsg.content;
   };
@@ -157,10 +170,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!currentUserId) return;
-    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử hội thoại này?")) return;
+  const handleDelete = () => {
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleConfirmDeleteConversation = async () => {
+    if (!currentUserId || isDeletingConversation) return;
+
+    setIsDeletingConversation(true);
     try {
       const updatedParticipant = await ParticipantService.deleteConversation(
         conversation._id,
@@ -168,10 +185,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       );
       // Cập nhật deleted_msg_id trong state — Sidebar filter sẽ tự động ẩn conversation
       updateParticipant(conversation._id, { deleted_msg_id: updatedParticipant.deleted_msg_id });
+      setIsDeleteModalOpen(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
-      alert(message);
+      window.alert(message);
       console.error("Error deleting conversation:", error);
+    } finally {
+      setIsDeletingConversation(false);
     }
   };
 
@@ -299,6 +319,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           setIsCategoryModalOpen(false);
         }}
         userId={currentUserId || ""}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Xóa hội thoại"
+        message="Bạn có chắc chắn muốn xóa lịch sử hội thoại này không? Bạn vẫn có thể nhận lại tin nhắn mới từ cuộc trò chuyện này sau đó."
+        confirmText={isDeletingConversation ? "Đang xóa..." : "Xóa hội thoại"}
+        cancelText="Hủy"
+        isDangerous={true}
+        onConfirm={handleConfirmDeleteConversation}
+        onCancel={() => {
+          if (!isDeletingConversation) {
+            setIsDeleteModalOpen(false);
+          }
+        }}
       />
     </>
   );

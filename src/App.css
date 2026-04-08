@@ -1,2 +1,5 @@
 /* App specific styles - kept minimal, use Tailwind classes instead */
 
+.custom-scrollbar {
+  overflow-anchor: none; /* Tắt mặc định của trình duyệt để JS kiểm soát hoàn toàn */
+}

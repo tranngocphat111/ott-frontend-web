@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import NavigationSidebar from '../navigation/NavigationSidebar';
 import ChatSidebarLeft from '../chat/ChatSidebarLeft';
 import type { ConversationWithParticipant } from '../../types';
@@ -11,6 +12,30 @@ const ChatLayout: React.FC = () => {
   const handleConversationSelect = (item: ConversationWithParticipant) => {
     setSelectedConversation(item);
   };
+
+  useEffect(() => {
+    const handleConversationDissolved = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string }>;
+      if (
+        custom.detail?.conversationId &&
+        selectedConversation?.conversation._id === custom.detail.conversationId
+      ) {
+        setSelectedConversation(null);
+      }
+    };
+
+    window.addEventListener(
+      'chat:conversation-dissolved',
+      handleConversationDissolved as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'chat:conversation-dissolved',
+        handleConversationDissolved as EventListener,
+      );
+    };
+  }, [selectedConversation?.conversation._id]);
 
   const handleNavItemClick = (itemId: string) => {
     setActiveNavItem(itemId);
@@ -42,7 +67,7 @@ const ChatLayout: React.FC = () => {
                 <div className="w-12 h-12 bg-white/30 rounded-full"></div>
               </div>
               <h2 className="text-2xl font-bold text-primary-500 mb-2">
-                Chào mừng đến với Chat App
+                Chào mừng đến với Riff 
               </h2>
               <p className="text-primary-400 mb-6">
                 Chọn một cuộc hội thoại để bắt đầu trò chuyện

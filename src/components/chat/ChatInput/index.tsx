@@ -14,9 +14,16 @@ import {
   Mic,
   Pause,
   Play,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  FileText,
+  Link2,
+  Music,
 } from "lucide-react";
 import { MessageService } from "../../../services";
 import type { ChatInputProps } from "../../../types/message.type";
+import { getFullUrl } from "../../../utils";
+import { getFileNameFromUrl } from "../../../utils";
 import { EmojiPicker } from "./EmojiPicker";
 import { UploadProgress } from "./UploadProgress";
 import { ImageInput } from "./ImageInput";
@@ -213,6 +220,8 @@ export const ChatInput = ({
 
   const getReplyPreviewText = () => {
     if (!replyToMessage) return "";
+    if (replyToMessage.is_deleted) return "Tin nhắn đã bị xóa";
+    if (replyToMessage.is_revoked) return "Tin nhắn đã được thu hồi";
     if (replyToMessage.type === "image") return "[Hình ảnh]";
     if (replyToMessage.type === "video") return "[Video]";
     if (replyToMessage.type === "audio") return "[Âm thanh]";
@@ -223,6 +232,196 @@ export const ChatInput = ({
       : replyToMessage.content;
 
     return String(raw || "").trim() || "[Tin nhắn]";
+  };
+
+  const renderReplyPreview = () => {
+    if (!replyToMessage) return null;
+
+    if (replyToMessage.is_deleted || replyToMessage.is_revoked) {
+      return (
+        <div className="text-xs text-slate-500 truncate">
+          {getReplyPreviewText()}
+        </div>
+      );
+    }
+
+    if (replyToMessage.type === "image") {
+      const imageUrls = (
+        Array.isArray(replyToMessage.content)
+          ? replyToMessage.content
+          : [replyToMessage.content]
+      )
+        .filter(Boolean)
+        .map((item) => String(item));
+      const previewUrl = imageUrls[0] ? getFullUrl(imageUrls[0]) : "";
+
+      return (
+        <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 max-w-full">
+          {imageUrls.length > 1 ? (
+            <div className="grid grid-cols-2 gap-0.5 w-10 h-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white">
+              {imageUrls.slice(0, 4).map((url, index) => (
+                <div
+                  key={index}
+                  className="relative overflow-hidden bg-slate-100"
+                >
+                  <img
+                    src={getFullUrl(url)}
+                    alt="reply-image"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {index === 3 && imageUrls.length > 4 && (
+                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-[10px] font-semibold">
+                      +{imageUrls.length - 4}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="reply-image"
+              className="w-8 h-8 rounded-md object-cover border border-slate-200"
+              loading="lazy"
+            />
+          ) : (
+            <span className="w-8 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
+              <ImageIcon size={14} className="text-slate-500" />
+            </span>
+          )}
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs text-slate-600 truncate font-medium">
+              Ảnh
+            </span>
+            {imageUrls.length > 1 && (
+              <span className="text-[11px] text-slate-500 truncate">
+                Cụm {imageUrls.length} ảnh
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (replyToMessage.type === "video") {
+      const raw = Array.isArray(replyToMessage.content)
+        ? replyToMessage.content[0]
+        : replyToMessage.content;
+      const previewUrl = raw ? getFullUrl(raw) : "";
+      const fileName = raw ? getFileNameFromUrl(previewUrl, "Video") : "Video";
+
+      return (
+        <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+          {previewUrl ? (
+            <video
+              src={previewUrl}
+              className="w-10 h-8 rounded-md object-cover border border-slate-200 bg-black"
+              muted
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <span className="w-10 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
+              <VideoIcon size={14} className="text-slate-500" />
+            </span>
+          )}
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs text-slate-600 truncate font-medium">
+              {fileName}
+            </span>
+            <span className="text-[11px] text-slate-500 truncate">
+              {getReplyPreviewText()}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    if (replyToMessage.type === "file") {
+      const raw = Array.isArray(replyToMessage.content)
+        ? replyToMessage.content[0]
+        : replyToMessage.content;
+      const fileName = raw
+        ? getFileNameFromUrl(getFullUrl(raw), "File")
+        : "File";
+
+      return (
+        <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+          <span className="w-8 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
+            <FileText size={14} className="text-slate-500" />
+          </span>
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs text-slate-600 truncate font-medium">
+              {fileName}
+            </span>
+            <span className="text-[11px] text-slate-500 truncate">Tệp tin</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (replyToMessage.type === "audio") {
+      const raw = Array.isArray(replyToMessage.content)
+        ? replyToMessage.content[0]
+        : replyToMessage.content;
+      const fileName = raw
+        ? getFileNameFromUrl(getFullUrl(raw), "audio")
+        : "audio";
+
+      return (
+        <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+          <span className="w-8 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
+            <Music size={14} className="text-slate-500" />
+          </span>
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs text-slate-600 truncate font-medium">
+              {fileName}
+            </span>
+            <span className="text-[11px] text-slate-500 truncate">
+              Âm thanh
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    if (replyToMessage.type === "link") {
+      const linkText = Array.isArray(replyToMessage.content)
+        ? replyToMessage.content[0]
+        : replyToMessage.content;
+
+      return (
+        <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+          <span className="w-8 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
+            <Link2 size={14} className="text-slate-500" />
+          </span>
+          <div className="min-w-0 flex flex-col">
+            <span className="text-xs text-slate-600 truncate font-medium">
+              Liên kết
+            </span>
+            <span className="text-[11px] text-slate-500 truncate">
+              {String(linkText || "")}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-xs text-slate-500 truncate">
+        {getReplyPreviewText()}
+      </div>
+    );
+  };
+
+  const getReplyTargetName = () => {
+    if (!replyToMessage) return "tin nhắn";
+    if (String(replyToMessage.sender_id || "") === String(senderId || "")) {
+      return "chính mình";
+    }
+    if (replyToMessage.sender_name) return replyToMessage.sender_name;
+    return "tin nhắn";
   };
 
   // --- Upload helpers (được gọi khi Send) ---
@@ -264,7 +463,7 @@ export const ChatInput = ({
         replyToMsgId,
       );
       setUploadProgress(100);
-      onSendSuccess();
+      await onSendSuccess();
       if (replyToMsgId) onCancelReply?.();
     } catch (err) {
       console.error(err);
@@ -302,7 +501,7 @@ export const ChatInput = ({
         replyToMsgId,
       );
       setUploadProgress(100);
-      onSendSuccess();
+      await onSendSuccess();
       if (replyToMsgId) onCancelReply?.();
     } catch (err) {
       console.error(err);
@@ -349,7 +548,7 @@ export const ChatInput = ({
         );
         setText("");
         if (textInputRef.current) textInputRef.current.style.height = "auto";
-        onSendSuccess();
+        await onSendSuccess();
         if (replyToMsgId) onCancelReply?.();
       } catch {
         alert("Gửi tin nhắn thất bại");
@@ -609,20 +808,17 @@ export const ChatInput = ({
       )}
 
       {replyToMessage && (
-        <div className="mb-2 flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-          <CornerUpLeft size={14} className="mt-0.5 text-slate-500" />
+        <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <CornerUpLeft size={14} className="text-slate-500" />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-slate-700">
-              Trả lời{" "}
-              {replyToMessage.sender_id === senderId ? "chính bạn" : "tin nhắn"}
+              Trả lời {getReplyTargetName()}
             </div>
-            <div className="text-xs text-slate-500 truncate">
-              {getReplyPreviewText()}
-            </div>
+            {renderReplyPreview()}
           </div>
           <button
             onClick={onCancelReply}
-            className="p-1 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
+            className="self-center p-1 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
             title="Huỷ trả lời"
           >
             <X size={14} />
@@ -694,7 +890,7 @@ export const ChatInput = ({
           >
             <SendHorizonal
               size={18}
-              className="translate-x-[1px] translate-y-[0.5px]"
+              className="translate-x-px translate-y-[0.5px]"
             />
           </button>
         </div>

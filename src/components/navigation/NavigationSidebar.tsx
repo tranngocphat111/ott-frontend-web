@@ -1,13 +1,11 @@
 import React from "react";
 import {
   MessageCircle,
-  Users,
-  Settings,
   Phone,
-  Video,
   Bell,
-  Search,
   Dribbble,
+  Settings,
+  User,
 } from "lucide-react";
 import NavigationItem from "./NavigationItem";
 import UserProfile from "./UserProfile";
@@ -29,40 +27,16 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       isActive: activeItem === "chat",
     },
     {
-      id: "contacts",
-      icon: <Users className="w-6 h-6" />,
-      label: "Danh bạ",
-      isActive: activeItem === "contacts",
-    },
-    {
-      id: "search",
-      icon: <Search className="w-6 h-6" />,
-      label: "Tìm kiếm",
-      isActive: activeItem === "search",
-    },
-    {
-      id: "calls",
-      icon: <Phone className="w-6 h-6" />,
-      label: "Cuộc gọi",
-      isActive: activeItem === "calls",
-    },
-    {
-      id: "video",
-      icon: <Video className="w-6 h-6" />,
-      label: "Video",
-      isActive: activeItem === "video",
-    },
-    {
-      id: "notifications",
-      icon: <Bell className="w-6 h-6" />,
-      label: "Thông báo",
-      isActive: activeItem === "notifications",
-    },
-    {
       id: "social",
       icon: <Dribbble className="w-6 h-6" />,
       label: "Mạng xã hội",
       isActive: activeItem === "social",
+    },
+    {
+      id: "call",
+      icon: <Phone className="w-6 h-6" />,
+      label: "Gọi video",
+      isActive: activeItem === "call",
     },
   ];
 
@@ -78,14 +52,23 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         ))}
       </div>
 
-      {/* Settings */}
-      <button
-        onClick={() => onItemClick?.("settings")}
-        className="p-3 text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-xl transition-all duration-200"
-        title="Cài đặt"
-      >
-        <Settings className="w-6 h-6" />
-      </button>
+      {/* Profile & Settings */}
+      <div className="flex flex-col space-y-2">
+        <button
+          onClick={() => onItemClick?.("profile")}
+          className="p-3 text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-xl transition-all duration-200"
+          title="Hồ sơ cá nhân"
+        >
+          <User className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => onItemClick?.("settings")}
+          className="p-3 text-gray-600 hover:bg-gray-100 hover:text-primary-500 rounded-xl transition-all duration-200"
+          title="Cài đặt"
+        >
+          <Settings className="w-6 h-6" />
+        </button>
+      </div>
     </div>
   );
 };

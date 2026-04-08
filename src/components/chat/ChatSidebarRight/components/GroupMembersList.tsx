@@ -26,6 +26,11 @@ const GroupMembersList: React.FC<GroupMembersListProps> = ({
   const displayedMembers = validMembers.slice(0, 6);
   const hasMoreMembers = validMembers.length > 6;
 
+  const getDisplayName = (member: ConversationMember) =>
+    (member.nickname || "").trim() ||
+    (member.name || "").trim() ||
+    `User ${member.user_id.slice(-4)}`;
+
   if (validMembers.length === 0) {
     return (
       <div className="text-center py-4">
@@ -41,13 +46,13 @@ const GroupMembersList: React.FC<GroupMembersListProps> = ({
           <div key={member.user_id} className="flex items-center gap-3">
             <Avatar 
               src={member.avatar || ""} 
-              name={member.name || `User ${member.user_id.slice(-4)}`} 
+              name={getDisplayName(member)} 
               size={32} 
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900 text-sm truncate">
-                  {member.name || `User ${member.user_id.slice(-4)}`}
+                  {getDisplayName(member)}
                   {member.user_id === currentUserId && " (Bạn)"}
                 </span>
                 {member.role === "admin" && (

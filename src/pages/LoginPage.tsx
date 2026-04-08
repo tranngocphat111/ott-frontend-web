@@ -7,7 +7,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'phone' | 'email' | 'qr'>('phone');
 
-  const handleLoginSuccess = () => navigate('/home', { replace: true });
+  const handleLoginSuccess = () => navigate('/chat', { replace: true });
 
 
   return (

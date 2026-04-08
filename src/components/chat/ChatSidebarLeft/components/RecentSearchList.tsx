@@ -12,7 +12,7 @@ const RecentSearchList: React.FC<RecentSearchListProps> = ({
   onClearAllHistory,
 }) => {
   return (
-    <div className="h-full overflow-y-auto border-t border-gray-100 pb-4">
+    <div className="h-full overflow-y-auto custom-scrollbar border-t border-gray-100 pb-4">
       <div className="flex items-center justify-between px-4 pt-3">
         <h4 className="text-[16px] font-semibold text-gray-800">Tìm gần đây</h4>
         {historyConversations.length > 0 && (

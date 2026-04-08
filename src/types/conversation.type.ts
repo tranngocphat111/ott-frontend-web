@@ -20,6 +20,8 @@ export interface Conversation {
     createdAt: string;
   };
   is_deleted: boolean;
+  is_self_conversation?: boolean;
+  self_owner_id?: string | null;
   background: string;
   createdAt: string;
   updatedAt: string;

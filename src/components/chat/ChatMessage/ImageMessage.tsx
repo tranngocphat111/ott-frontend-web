@@ -8,9 +8,13 @@ export const ImageMessage = ({
   currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  isTopBoundary,
   onClick,
   onReply,
   onReact,
+  onRevoke,
+  onDelete,
+  onPin,
 }: {
   msg: Message;
   urls: string[];
@@ -18,9 +22,13 @@ export const ImageMessage = ({
   currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  isTopBoundary?: boolean;
   onClick?: (imageIndex: number) => void;
   onReply?: (msg: Message) => void;
   onReact?: (msg: Message, reactionType: string) => void;
+  onRevoke?: (msg: Message) => void;
+  onDelete?: (msg: Message) => void;
+  onPin?: (msg: Message) => void;
 }) => {
   const count = urls.length;
 
@@ -37,7 +45,7 @@ export const ImageMessage = ({
         src={url}
         alt="Attachment"
         className="w-full h-full object-cover"
-        loading="lazy"
+        loading="eager"
       />
     </div>
   );
@@ -57,7 +65,7 @@ export const ImageMessage = ({
             src={urls[0]}
             alt="Attachment"
             className="block max-w-full h-auto object-cover max-h-100 min-w-25"
-            loading="lazy"
+            loading="eager"
           />
         </div>
       );
@@ -84,7 +92,7 @@ export const ImageMessage = ({
                 src={url}
                 alt="Attachment"
                 className="w-full h-full object-cover"
-                loading="lazy"
+                loading="eager"
               />
             </div>
           ))}
@@ -111,7 +119,7 @@ export const ImageMessage = ({
               src={urls[0]}
               alt="Attachment"
               className="w-full h-full object-cover"
-              loading="lazy"
+              loading="eager"
             />
           </div>
           {/* 2 ảnh còn lại xếp dọc bên phải */}
@@ -141,7 +149,7 @@ export const ImageMessage = ({
                 src={url}
                 alt="Attachment"
                 className="w-full h-full object-cover"
-                loading="lazy"
+                loading="eager"
               />
             </div>
           ))}
@@ -172,7 +180,7 @@ export const ImageMessage = ({
               src={url}
               alt="Attachment"
               className="w-full h-full object-cover"
-              loading="lazy"
+              loading="eager"
             />
             {i === 5 && remaining > 0 && (
               <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-xl font-bold pointer-events-none">
@@ -192,8 +200,12 @@ export const ImageMessage = ({
       currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      isTopBoundary={isTopBoundary}
       onReply={onReply}
       onReact={onReact}
+      onRevoke={onRevoke}
+      onDelete={onDelete}
+      onPin={onPin}
     >
       {(borderRadius) => renderGrid(borderRadius)}
     </MessageLayout>

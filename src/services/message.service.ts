@@ -113,6 +113,80 @@ export class MessageService {
     }
   }
 
+  static async getMessageContext(
+    conversationId: string,
+    messageId: string,
+    userId?: string,
+    before: number = 20,
+    after: number = 20,
+  ) {
+    try {
+      const params = new URLSearchParams();
+      params.set("messageId", messageId);
+      params.set("before", String(before));
+      params.set("after", String(after));
+      if (userId) {
+        params.set("userId", userId);
+      }
+
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/${conversationId}/messages/around?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching message context:", error);
+      throw error;
+    }
+  }
+
+  static async getOlderMessages(
+    conversationId: string,
+    beforeMsgId: string,
+    limit: number = 50,
+    userId?: string,
+  ) {
+    try {
+      const params = new URLSearchParams();
+      params.set("before", String(beforeMsgId));
+      params.set("limit", String(limit));
+      if (userId) {
+        params.set("userId", userId);
+      }
+
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/${conversationId}/messages/older?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching older messages:", error);
+      throw error;
+    }
+  }
+
   static async reactToMessage(
     conversationId: string,
     msgId: string,
@@ -143,6 +217,64 @@ export class MessageService {
     }
   }
 
+  static async revokeMessage(
+    conversationId: string,
+    msgId: string,
+    userId: string,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/revoke`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error revoking message:", error);
+      throw error;
+    }
+  }
+
+  static async deleteMessage(
+    conversationId: string,
+    msgId: string,
+    userId: string,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/delete`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      throw error;
+    }
+  }
+
   // Pin/Unpin message
   static async pinMessage(
     conversationId: string,
@@ -164,7 +296,16 @@ export class MessageService {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
+        throw new Error(errorMessage);
       }
 
       return await response.json();
@@ -245,6 +386,36 @@ export class MessageService {
       return await response.json();
     } catch (error) {
       console.error("Error fetching media messages:", error);
+      throw error;
+    }
+  }
+
+  // Get media messages around a target message (_id or msg_id)
+  static async getMediaAroundTarget(
+    conversationId: string,
+    messageId: string,
+    before = 10,
+    after = 10,
+  ) {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/media-around?messageId=${encodeURIComponent(messageId)}&before=${before}&after=${after}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching media around target:", error);
       throw error;
     }
   }

@@ -46,6 +46,11 @@ export const getConversationDisplayName = (
   currentUserId?: string,
 ): string => {
   if (conversation.type === "private") {
+    const explicitName = String(conversation.name || "").trim();
+    if (conversation.is_self_conversation && explicitName) {
+      return explicitName;
+    }
+
     const other = getOtherParticipant(conversation, currentUserId);
     return resolveParticipantName(other);
   }

@@ -6,6 +6,7 @@ import { VideoMessage } from "./VideoMessage";
 import { FileMessage } from "./FileMessage";
 import { AudioMessage } from "./AudioMessage";
 import { LinkMessage } from "./LinkMessage";
+import { RevokedMessage } from "./RevokedMessage";
 
 export const ChatMessage = memo(
   ({
@@ -14,20 +15,65 @@ export const ChatMessage = memo(
     currentUserId,
     isFirstInSequence,
     isLastInSequence,
+    isTopBoundary,
     onMediaClick,
     onReply,
     onReact,
+    onRevoke,
+    onDelete,
+    onPin,
   }: {
     msg: any;
     isMe: boolean;
     currentUserId?: string;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
+    isTopBoundary?: boolean;
     onMediaClick?: (imageIndex: number) => void;
     onReply?: (msg: any) => void;
     onReact?: (msg: any, reactionType: string) => void;
+    onRevoke?: (msg: any) => void;
+    onDelete?: (msg: any) => void;
+    onPin?: (msg: any) => void;
   }) => {
     const msgType = msg.type?.toLowerCase();
+    const isDeleted = !!msg.is_deleted;
+    const isRevoked = !!msg.is_revoked;
+
+    if (isRevoked) {
+      return (
+        <RevokedMessage
+          msg={msg}
+          isMe={isMe}
+          currentUserId={currentUserId}
+          isFirstInSequence={isFirstInSequence}
+          isLastInSequence={isLastInSequence}
+          isTopBoundary={isTopBoundary}
+        />
+      );
+    }
+
+    if (isDeleted) {
+      const placeholder = "Tin nhắn đã bị xóa";
+
+      return (
+        <TextMessage
+          msg={{
+            ...msg,
+            type: "text",
+            content: [placeholder],
+            reply_to: null,
+            reply_to_msg_id: null,
+            reactions: [],
+          }}
+          isMe={isMe}
+          currentUserId={currentUserId}
+          isFirstInSequence={isFirstInSequence}
+          isLastInSequence={isLastInSequence}
+          isTopBoundary={isTopBoundary}
+        />
+      );
+    }
 
     // Cho video/file/audio: chỉ lấy phần tử đầu tiên
     const fullUrl = useMemo(() => {
@@ -55,9 +101,13 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onClick={onMediaClick}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
 
@@ -70,9 +120,13 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onClick={() => onMediaClick?.(0)}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
 
@@ -87,8 +141,12 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
 
@@ -103,8 +161,12 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
 
@@ -116,8 +178,12 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
 
@@ -130,8 +196,12 @@ export const ChatMessage = memo(
             currentUserId={currentUserId}
             isFirstInSequence={isFirstInSequence}
             isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
             onReply={onReply}
             onReact={onReact}
+            onRevoke={onRevoke}
+            onDelete={onDelete}
+            onPin={onPin}
           />
         );
     }
@@ -139,13 +209,18 @@ export const ChatMessage = memo(
   (prev, next) => {
     const prevReactions = JSON.stringify(prev.msg.reactions || []);
     const nextReactions = JSON.stringify(next.msg.reactions || []);
+    const prevReplyTo = JSON.stringify(prev.msg.reply_to || null);
+    const nextReplyTo = JSON.stringify(next.msg.reply_to || null);
 
     return (
       prev.msg._id === next.msg._id &&
       prev.msg.content === next.msg.content &&
       prevReactions === nextReactions &&
+      prev.msg.is_deleted === next.msg.is_deleted &&
+      prev.msg.is_revoked === next.msg.is_revoked &&
+      prev.msg.is_pinned === next.msg.is_pinned &&
       prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
-      prev.msg.reply_to?.content === next.msg.reply_to?.content &&
+      prevReplyTo === nextReplyTo &&
       prev.isFirstInSequence === next.isFirstInSequence &&
       prev.isLastInSequence === next.isLastInSequence
     );

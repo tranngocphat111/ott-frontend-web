@@ -23,6 +23,8 @@ export interface Message {
   reply_to?: MessageReplyPreview | null;
   reactions?: MessageReaction[];
   attachments?: MessageAttachment[];
+  is_deleted?: boolean;
+  is_revoked?: boolean;
   // Pinned message fields
   is_pinned?: boolean;
   pinned_at?: string | null;
@@ -37,8 +39,14 @@ export interface MessageReaction {
 export interface MessageReplyPreview {
   msg_id?: string;
   sender_id: string;
+  sender_name?: string;
   type: "text" | "link" | "image" | "video" | "file" | "audio" | "system_add";
   content: string;
+  raw_content?: string;
+  file_name?: string;
+  url?: string;
+  media_urls?: string[];
+  media_count?: number;
   is_deleted?: boolean;
   is_revoked?: boolean;
 }
@@ -59,7 +67,7 @@ export interface ChatNotificationProps {
 export interface ChatInputProps {
   conversationId: string;
   senderId: string;
-  onSendSuccess: () => void;
+  onSendSuccess: () => void | Promise<void>;
   replyToMessage?: Message | null;
   onCancelReply?: () => void;
 }

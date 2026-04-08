@@ -7,7 +7,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   members,
   ownerId,
   currentUserId,
-  isOwner,
+  isManager,
   onBack,
   onMemberRemoved,
   onMemberRoleUpdated,
@@ -31,7 +31,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   };
 
   const canManageMember = (member: (typeof validMembers)[number]) => {
-    if (!isOwner) return false;
+    if (!isManager) return false;
     if (member.user_id === currentUserId) return false;
     if (member.user_id === ownerId) return false;
     return true;
@@ -53,7 +53,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
       </div>
 
       {/* Add Member Button */}
-      {isOwner && (
+      {isManager && (
         <div className="px-4 py-2">
           <button
             onClick={onAddMember}
@@ -73,7 +73,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
       </div>
 
       {/* Members List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="px-4 py-2">
           {validMembers.map((member) => (
             <div

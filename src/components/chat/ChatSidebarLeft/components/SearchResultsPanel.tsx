@@ -72,7 +72,7 @@ const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
   ];
 
   return (
-    <div className="h-full overflow-y-auto border-t border-gray-100 pb-4">
+    <div className="h-full overflow-y-auto custom-scrollbar border-t border-gray-100 pb-4">
       <div className="sticky top-0 z-10 bg-white px-4 pt-2">
         <div className="flex items-center gap-3 border-b border-gray-100 pb-2 text-sm font-semibold text-gray-700">
           {tabButtons.map((tab) => (
@@ -137,6 +137,7 @@ const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
           <SearchFilesSection
             files={searchResults.files}
             searchTab={searchTab}
+            conversationMetaMap={conversationMetaMap}
             onOpenConversation={onOpenConversation}
             highlightKeyword={highlightKeyword}
           />

@@ -26,16 +26,24 @@ export const LinkMessage = ({
   currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  isTopBoundary,
   onReply,
   onReact,
+  onRevoke,
+  onDelete,
+  onPin,
 }: {
   msg: Message;
   isMe: boolean;
   currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  isTopBoundary?: boolean;
   onReply?: (msg: Message) => void;
   onReact?: (msg: Message, reactionType: string) => void;
+  onRevoke?: (msg: Message) => void;
+  onDelete?: (msg: Message) => void;
+  onPin?: (msg: Message) => void;
 }) => {
   const text = Array.isArray(msg.content)
     ? msg.content.join("")
@@ -67,8 +75,12 @@ export const LinkMessage = ({
       currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      isTopBoundary={isTopBoundary}
       onReply={onReply}
       onReact={onReact}
+      onRevoke={onRevoke}
+      onDelete={onDelete}
+      onPin={onPin}
     >
       {(borderRadius) => (
         <div
@@ -128,7 +140,7 @@ export const LinkMessage = ({
                         : "bg-black/5 group-hover/link:bg-black/10"
                     }`}
                   >
-                    <div className="text-[14px] leading-relaxed break-words font-medium">
+                    <div className="text-[14px] leading-relaxed wrap-break-word font-medium">
                       {text}
                     </div>
 

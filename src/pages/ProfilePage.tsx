@@ -51,7 +51,7 @@ const ProfilePage: React.FC = () => {
       <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(255,252,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--color-primary-100)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/chat')}
             className="transition-base"
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--color-primary-600)', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-primary-100)')}

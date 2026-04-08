@@ -35,6 +35,7 @@ const GroupInfoHeader: React.FC<GroupInfoHeaderProps> = ({
       try {
         await ConversationService.updateConversation(conversation._id, {
           name: nextName,
+          requesterId: currentUserId,
         });
 
         // Cập nhật ngay tại chỗ để user thấy tức thì

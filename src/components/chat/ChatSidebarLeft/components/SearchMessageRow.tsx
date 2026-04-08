@@ -9,11 +9,17 @@ const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
   highlightKeyword,
 }) => {
   const conversationMeta = conversationMetaMap.get(msg.conversation_id);
+  const senderDisplayName =
+    conversationMeta?.senderNameById?.[msg.sender_id] ||
+    msg.sender_name ||
+    msg.sender_id;
 
   return (
     <button
       key={msg._id}
-      onClick={() => onOpenConversation(msg.conversation_id, msg._id)}
+      onClick={() =>
+        onOpenConversation(msg.conversation_id, msg.msg_id || msg._id)
+      }
       className="w-full cursor-pointer rounded-lg px-2 py-2 text-left hover:bg-gray-50"
     >
       <div className="flex items-center gap-2.5">
@@ -36,7 +42,7 @@ const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
           </div>
 
           <p className="mb-1 line-clamp-2 text-[15px] text-gray-800">
-            <span className="font-medium text-gray-700">{msg.sender_name}:</span>{" "}
+            <span className="font-medium text-gray-700">{senderDisplayName}:</span>{" "}
             {highlightKeyword(msg.preview)}
           </p>
         </div>

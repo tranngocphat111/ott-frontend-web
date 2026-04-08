@@ -113,6 +113,18 @@ class SocketService {
     }
   }
 
+  onGroupDissolved(callback: (payload: { conversationId: string }) => void) {
+    this.socket?.on("giai_tan_nhom", callback);
+  }
+
+  offGroupDissolved(callback?: (payload: { conversationId: string }) => void) {
+    if (callback) {
+      this.socket?.off("giai_tan_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("giai_tan_nhom");
+    }
+  }
+
   getSocket(): Socket | null {
     return this.socket;
   }

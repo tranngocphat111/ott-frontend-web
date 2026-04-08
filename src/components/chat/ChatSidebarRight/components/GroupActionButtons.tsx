@@ -142,6 +142,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
 
   const isGroupChat = conversation.type === "group";
   const isPrivateChat = conversation.type === "private";
+  const canManageGroup = participant?.roles === "admin";
 
   return (
     <>
@@ -197,7 +198,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
           </span>
         </button>
 
-        {isGroupChat && (
+        {isGroupChat && canManageGroup && (
           <button
             onClick={() => {
               onAddMember();

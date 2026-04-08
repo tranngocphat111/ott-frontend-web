@@ -123,7 +123,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         </div>
 
         {/* User List */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-4">
           <h3 className="text-sm font-medium text-gray-600 mb-3">Gợi ý</h3>
           <div className="space-y-2">
             {filteredUsers.map((user) => {

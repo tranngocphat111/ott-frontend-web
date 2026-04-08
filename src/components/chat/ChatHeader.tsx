@@ -3,7 +3,10 @@ import React from "react";
 import { Phone, Video, PanelRightOpen, PanelRightClose } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
-import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils";
+import {
+  getConversationDisplayAvatar,
+  getConversationDisplayName,
+} from "../../utils";
 
 interface ChatHeaderProps extends ChatAreaProps {
   // Props từ bản HEAD (Call logic)

@@ -91,7 +91,12 @@ export class ConversationService {
   // Update conversation (name, avatar)
   static async updateConversation(
     conversationId: string,
-    updateData: { name?: string; avatar?: string; background?: string },
+    updateData: {
+      name?: string;
+      avatar?: string;
+      background?: string;
+      requesterId?: string;
+    },
   ): Promise<Conversation> {
     try {
       const response = await fetch(
@@ -114,6 +119,34 @@ export class ConversationService {
       return await response.json();
     } catch (error) {
       console.error("Error updating conversation:", error);
+      throw error;
+    }
+  }
+
+  static async dissolveGroup(
+    conversationId: string,
+    userId: string,
+  ): Promise<{ success: boolean; conversationId: string }> {
+    try {
+      const response = await fetch(
+        `${API_CHAT_SERVER_URL}/conversations/${conversationId}/dissolve/${userId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to dissolve group");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error dissolving group:", error);
       throw error;
     }
   }

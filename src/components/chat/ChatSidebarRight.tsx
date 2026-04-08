@@ -1,5 +1,15 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { X, Users, Pin, Image, FileText, Link as LinkIcon, UserRoundPen } from "lucide-react";
+import {
+  X,
+  Users,
+  Pin,
+  Image,
+  FileText,
+  Link as LinkIcon,
+  UserRoundPen,
+  Info,
+  Clock3,
+} from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
 import { useConversations } from "../../contexts/ConversationsContext";
 import {
@@ -29,6 +39,7 @@ import GroupActions from "./ChatSidebarRight/components/GroupActions";
 import AddMemberModal from "./ChatSidebarRight/modals/AddMemberModal";
 import NicknameManagementModal from "./ChatSidebarRight/modals/NicknameManagementModal";
 import CreateGroupModal from "../modal/group/CreateGroupModal";
+import { ConfirmModal } from "../modal/ConfirmModal";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
 
 // Import views
@@ -56,7 +67,9 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     [],
   );
   const [fileMessagesPreview, setFileMessagesPreview] = useState<Message[]>([]);
-  const [linkMessagesPreview, setLinkMessagesPreview] = useState<LinkData[]>([]);
+  const [linkMessagesPreview, setLinkMessagesPreview] = useState<LinkData[]>(
+    [],
+  );
   const [allMediaMessages, setAllMediaMessages] = useState<Message[]>([]);
   const [allFileMessages, setAllFileMessages] = useState<Message[]>([]);
   const [allLinkMessages, setAllLinkMessages] = useState<LinkData[]>([]);
@@ -73,6 +86,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerMessageId, setViewerMessageId] = useState<string | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState(0);
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<{
+    userId: string;
+    displayName: string;
+  } | null>(null);
 
   // Helper to safely filter valid messages
   const filterValidMessages = (messages: any[]): Message[] => {
@@ -154,8 +171,27 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         linksResult.status === "fulfilled" ? linksResult.value : [];
 
       const mappedMembers = filterValidMembers(membersData);
+      const memberNameById = new Map<string, string>();
+      mappedMembers.forEach((member) => {
+        const preferredName =
+          (member.nickname || "").trim() ||
+          (member.name || "").trim() ||
+          `User ${String(member.user_id).slice(-4)}`;
+        memberNameById.set(member.user_id, preferredName);
+      });
+
       setMembers(mappedMembers);
-      setPinnedMessages(filterValidMessages(pinnedData));
+      setPinnedMessages(
+        filterValidMessages(pinnedData).map((message) => {
+          const senderId = String((message as any).sender_id || "");
+          const preferredName = memberNameById.get(senderId);
+          if (!preferredName) return message;
+          return {
+            ...message,
+            sender_name: preferredName,
+          };
+        }),
+      );
       const validMedia = filterValidMessages(mediaData);
       const validFiles = filterValidMessages(filesData);
       const validLinks = filterValidLinkData(linksData);
@@ -190,6 +226,26 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     }
   }, [isOpen, conversation?._id, loadSidebarData]);
 
+  useEffect(() => {
+    const handlePinnedUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string }>;
+      if (custom.detail?.conversationId !== conversation?._id) return;
+      if (!isOpen) return;
+      void loadSidebarData();
+    };
+
+    window.addEventListener(
+      "chat:pinned-updated",
+      handlePinnedUpdated as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "chat:pinned-updated",
+        handlePinnedUpdated as EventListener,
+      );
+    };
+  }, [conversation?._id, isOpen, loadSidebarData]);
+
   // Load available users for create group modal
   useEffect(() => {
     if (showCreateGroupModal) {
@@ -223,7 +279,18 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         currentUser._id,
         false,
       );
-      setPinnedMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+      setPinnedMessages((prev) =>
+        prev.filter(
+          (msg) =>
+            String(msg.msg_id || "") !== String(messageId) &&
+            String(msg._id || "") !== String(messageId),
+        ),
+      );
+      window.dispatchEvent(
+        new CustomEvent("chat:pinned-updated", {
+          detail: { conversationId: conversation._id },
+        }),
+      );
     } catch (error) {
       console.error("Error unpinning message:", error);
       setError("Không thể bỏ ghim tin nhắn");
@@ -238,16 +305,31 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     if (!userId) return;
 
     if (!currentUser?._id || !conversation?._id) return;
-    if (!window.confirm("Bạn có chắc muốn xóa thành viên này khỏi nhóm?"))
+
+    const target = members.find((item) => item.user_id === userId);
+    const displayName =
+      (target?.nickname || "").trim() ||
+      (target?.name || "").trim() ||
+      `User ${String(userId).slice(-4)}`;
+
+    setRemoveMemberTarget({ userId, displayName });
+  };
+
+  const handleConfirmRemoveMember = async () => {
+    if (!removeMemberTarget || !currentUser?._id || !conversation?._id) {
+      setRemoveMemberTarget(null);
       return;
+    }
 
     try {
       await ParticipantService.removeMember(
         conversation._id,
-        userId,
+        removeMemberTarget.userId,
         currentUser._id,
       );
+      setRemoveMemberTarget(null);
       await loadSidebarData();
+      await refreshConversations(currentUser._id || currentUser.user_id || "");
     } catch (error) {
       console.error("Error removing member:", error);
       setError(
@@ -377,10 +459,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   };
 
   const isGroupChat = conversation?.type === "group";
+  const isSelfConversation = Boolean(conversation?.is_self_conversation);
   const isOwner = currentUser?._id === conversation?.created_by;
   const currentParticipant = conversations.find(
     (item) => item.conversation._id === conversation._id,
   )?.participant;
+  const isManager = Boolean(isOwner || currentParticipant?.roles === "admin");
 
   // Safety checks
   if (!isOpen || !conversation) return null;
@@ -388,7 +472,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   // Debug logging
   if (loading) {
     return (
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 overflow-y-auto">
+      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
         </div>
@@ -396,17 +480,73 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     );
   }
 
+  const mb = 1024 * 1024;
+  const storageLimitMB = 500;
+
+  const getMessageSize = (message: Message) => {
+    const messageSize = Number((message as any)?.size || 0);
+    if (Number.isFinite(messageSize) && messageSize > 0) return messageSize;
+
+    const content = Array.isArray(message.content)
+      ? message.content
+      : [message.content];
+    const contentSize = content.reduce((total, item: any) => {
+      const itemSize = Number(item?.size || 0);
+      return total + (Number.isFinite(itemSize) ? itemSize : 0);
+    }, 0);
+
+    return contentSize > 0 ? contentSize : 0;
+  };
+
+  const storageByType = {
+    image: allMediaMessages
+      .filter((item) => item.type === "image")
+      .reduce((sum, item) => sum + getMessageSize(item), 0),
+    video: allMediaMessages
+      .filter((item) => item.type === "video")
+      .reduce((sum, item) => sum + getMessageSize(item), 0),
+    file: allFileMessages.reduce((sum, item) => sum + getMessageSize(item), 0),
+    other: 0,
+  };
+
+  const usedBytes =
+    storageByType.image +
+    storageByType.video +
+    storageByType.file +
+    storageByType.other;
+  const usedMB = Math.min(storageLimitMB, usedBytes / mb);
+  const usagePercent = Math.max(
+    0,
+    Math.min(100, (usedMB / storageLimitMB) * 100),
+  );
+
+  const imagePercent =
+    usedBytes > 0 ? (storageByType.image / usedBytes) * usagePercent : 0;
+  const videoPercent =
+    usedBytes > 0 ? (storageByType.video / usedBytes) * usagePercent : 0;
+  const filePercent =
+    usedBytes > 0 ? (storageByType.file / usedBytes) * usagePercent : 0;
+  const otherPercent = Math.max(
+    0,
+    usagePercent - imagePercent - videoPercent - filePercent,
+  );
+
+  const selfTitle = (conversation.name || "My Documents").trim() || "My Documents";
+
   return (
     <>
       {error && (
         <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 font-bold cursor-pointer"
+          >
             ×
           </button>
         </div>
       )}
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 overflow-y-auto">
+      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 z-40 overflow-y-auto custom-scrollbar">
         {/* MAIN VIEW */}
         {viewMode === "main" && (
           <>
@@ -424,25 +564,126 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             </div>
 
             {/* Group Info Header */}
-            {conversation._id && (
+            {isSelfConversation ? (
+              <div className="border-b border-gray-100 bg-gray-50/35 pb-4">
+                <div className="px-4 py-5 text-center">
+                  <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-blue-500/15 ring-2 ring-blue-200 flex items-center justify-center text-blue-600 text-2xl">
+                    <span role="img" aria-label="my-documents">
+                      📁
+                    </span>
+                  </div>
+                  <h3 className="text-[30px] font-semibold text-slate-800 leading-8 mb-2">
+                    {selfTitle}
+                  </h3>
+                  <p className="text-sm text-slate-500">
+                    Lưu trữ và truy cập nhanh những nội dung quan trọng của bạn
+                    ngay trên Zalo
+                  </p>
+                </div>
+
+                <div className="mx-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[15px] font-semibold text-slate-800">
+                      Dung lượng
+                    </span>
+                    <span className="text-sm text-slate-500">
+                      {usedMB.toFixed(1)} MB / {storageLimitMB} MB
+                    </span>
+                  </div>
+
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                    {usagePercent > 0 && (
+                      <div className="flex h-full">
+                        <div
+                          className="bg-orange-500"
+                          style={{ width: `${imagePercent}%` }}
+                        />
+                        <div
+                          className="bg-emerald-500"
+                          style={{ width: `${videoPercent}%` }}
+                        />
+                        <div
+                          className="bg-yellow-500"
+                          style={{ width: `${filePercent}%` }}
+                        />
+                        <div
+                          className="bg-slate-400"
+                          style={{ width: `${otherPercent}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-orange-500" />
+                      Ảnh
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                      Video
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+                      File
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      Khác
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleViewAllMedia}
+                    className="mt-3 w-full rounded-lg bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-300"
+                  >
+                    Xem và dọn dẹp {selfTitle}
+                  </button>
+
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-left">
+                    <div className="mb-1 flex items-center gap-2 text-slate-700">
+                      <Info size={16} className="text-primary-500" />
+                      <span className="text-sm font-medium">
+                        Nâng cấp dung lượng {selfTitle}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-5">
+                      Mở rộng dung lượng lên đến 100GB và tự động bảo toàn dữ
+                      liệu trò chuyện với zCloud.
+                    </p>
+                    <button className="mt-2 rounded-md bg-blue-100 px-2.5 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-100">
+                      Thêm dung lượng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              conversation._id && (
               <GroupInfoHeader
                 conversation={conversation}
                 memberCount={members.length}
                 onUpdate={(updates) =>
                   updateConversation?.(conversation._id, updates)
                 }
-                isAdmin={isOwner}
+                isAdmin={isManager}
                 currentUserId={currentUser?._id || currentUser?.user_id}
               />
+              )
             )}
 
             {/* Action Buttons */}
-            {conversation._id && (
+            {!isSelfConversation && conversation._id && (
               <GroupActionButtons
                 conversation={conversation}
                 participant={currentParticipant}
                 currentUserId={currentUser?._id || ""}
-                onAddMember={() => setShowAddMemberModal(true)}
+                onAddMember={() => {
+                  if (!isManager) {
+                    setError("Chỉ trưởng nhóm hoặc phó nhóm mới có thể thêm thành viên");
+                    return;
+                  }
+                  setShowAddMemberModal(true);
+                }}
                 onCreateGroup={() => setShowCreateGroupModal(true)}
                 onParticipantUpdated={(updates) => {
                   updateParticipant(conversation._id, updates);
@@ -451,7 +692,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             )}
 
             {/* Group-only sections */}
-            {conversation.type === "group" && (
+            {!isSelfConversation && conversation.type === "group" && (
               <>
                 <CollapsibleSection
                   title="Thành viên nhóm"
@@ -464,7 +705,8 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             )}
 
             {/* Nickname section for both group and private */}
-            {(conversation.type === "group" ||
+            {!isSelfConversation &&
+              (conversation.type === "group" ||
               conversation.type === "private") && (
               <CollapsibleSection
                 title="Biệt danh"
@@ -475,7 +717,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             )}
 
             <CollapsibleSection
-              title="Bảng tin nhóm"
+              title={isSelfConversation ? "Danh sách nhắc hẹn" : "Bảng tin nhóm"}
               icon={<Pin size={20} />}
               badge={pinnedMessages.length}
               defaultOpen={true}
@@ -526,12 +768,32 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             </CollapsibleSection>
 
             {/* Group Actions */}
-            {conversation._id && (
+            {!isSelfConversation && conversation._id && (
               <GroupActions
                 conversation={conversation}
                 currentUserId={currentUser?._id || ""}
+                isOwner={isOwner}
                 onLeaveSuccess={onClose}
+                onActionSuccess={async () => {
+                  if (currentUser?._id || currentUser?.user_id) {
+                    await refreshConversations(
+                      currentUser._id || currentUser.user_id || "",
+                    );
+                  }
+                }}
               />
+            )}
+
+            {isSelfConversation && (
+              <div className="px-4 py-3 border-t border-slate-100 bg-white">
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center justify-center gap-2"
+                >
+                  <Clock3 size={16} />
+                  Danh sách nhắc hẹn
+                </button>
+              </div>
             )}
           </>
         )}
@@ -542,11 +804,17 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             members={members}
             ownerId={conversation.created_by}
             currentUserId={currentUser?._id || ""}
-            isOwner={isOwner}
+            isManager={isManager}
             onBack={handleBackToMain}
             onMemberRemoved={handleMemberRemoved}
             onMemberRoleUpdated={handleRoleUpdated}
-            onAddMember={() => setShowAddMemberModal(true)}
+            onAddMember={() => {
+              if (!isManager) {
+                setError("Chỉ trưởng nhóm hoặc phó nhóm mới có thể thêm thành viên");
+                return;
+              }
+              setShowAddMemberModal(true);
+            }}
           />
         )}
 
@@ -569,9 +837,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       <MediaViewer
         isOpen={viewerOpen}
         onClose={() => setViewerOpen(false)}
+        conversationId={conversation._id}
         initialMessageId={viewerMessageId}
         initialImageIndex={viewerImageIndex}
-        messages={allMediaMessages}
+        seedMessages={allMediaMessages}
       />
 
       {/* Modals */}
@@ -606,6 +875,17 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           categories={categories}
         />
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(removeMemberTarget)}
+        title="Xóa thành viên"
+        message={`Bạn có chắc muốn xóa ${removeMemberTarget?.displayName || "thành viên này"} khỏi nhóm?`}
+        confirmText="Xóa khỏi nhóm"
+        cancelText="Hủy"
+        isDangerous={true}
+        onConfirm={handleConfirmRemoveMember}
+        onCancel={() => setRemoveMemberTarget(null)}
+      />
     </>
   );
 };

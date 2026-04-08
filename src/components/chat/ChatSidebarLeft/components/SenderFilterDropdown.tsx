@@ -45,7 +45,7 @@ const SenderFilterDropdown: React.FC<SenderFilterDropdownProps> = ({
             Tất cả người gửi
           </button>
 
-          <div className="max-h-56 overflow-y-auto">
+          <div className="max-h-56 overflow-y-auto custom-scrollbar">
             {filteredSenderOptions.map((sender) => (
               <button
                 key={sender.id}
