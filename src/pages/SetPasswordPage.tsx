@@ -18,7 +18,6 @@ const SetPasswordPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
 
-  // Redirect nếu đã có mật khẩu
   React.useEffect(() => {
     if (user?.hasPassword) {
       navigate('/profile');
@@ -31,7 +30,7 @@ const SetPasswordPage: React.FC = () => {
     if (!formData.password) {
       newErrors.password = 'Vui lòng nhập mật khẩu';
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+      newErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
     }
 
     if (!formData.confirmPassword) {
@@ -55,10 +54,7 @@ const SetPasswordPage: React.FC = () => {
       });
 
       setSuccess(true);
-
-      setTimeout(() => {
-        navigate('/profile');
-      }, 1800);
+      setTimeout(() => navigate('/profile'), 1800);
     } catch (error) {
       console.error('Failed to set password:', error);
     }
@@ -111,7 +107,6 @@ const SetPasswordPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Password */}
             <div>
               <label className="block text-sm font-semibold text-[var(--color-primary-700)] mb-2">
                 Mật khẩu mới
@@ -175,7 +170,7 @@ const SetPasswordPage: React.FC = () => {
               <ul className="text-sm text-[var(--color-info-text)] space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-[var(--color-primary-500)] rounded-full mt-2 flex-shrink-0" />
-                  Ít nhất 6 ký tự
+                  Ít nhất 8 ký tự
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-[var(--color-primary-500)] rounded-full mt-2 flex-shrink-0" />

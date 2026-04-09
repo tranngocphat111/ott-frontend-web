@@ -42,7 +42,7 @@ export const useSetupPhone = () => {
       });
       if (response.result?.token && response.result?.refreshToken) {
         await loginWithToken(response.result.token, response.result.refreshToken);
-        navigate('/home', { replace: true });
+        navigate('/chat', { replace: true });
       }
     } catch (err: unknown) {
       showToast(
