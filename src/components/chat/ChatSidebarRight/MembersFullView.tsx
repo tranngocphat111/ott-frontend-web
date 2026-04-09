@@ -53,17 +53,15 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
       </div>
 
       {/* Add Member Button */}
-      {isManager && (
-        <div className="px-4 py-2">
-          <button
-            onClick={onAddMember}
-            className="flex cursor-pointer items-center justify-center gap-1.5 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            <UserPlus size={15} className="text-gray-600" />
-            <span className="text-[14px] font-medium text-gray-700">Thêm thành viên</span>
-          </button>
-        </div>
-      )}
+      <div className="px-4 py-2">
+        <button
+          onClick={onAddMember}
+          className="flex cursor-pointer items-center justify-center gap-1.5 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+        >
+          <UserPlus size={15} className="text-gray-600" />
+          <span className="text-[14px] font-medium text-gray-700">Thêm thành viên</span>
+        </button>
+      </div>
 
       {/* Members Count Header */}
       <div className="px-4 py-2">

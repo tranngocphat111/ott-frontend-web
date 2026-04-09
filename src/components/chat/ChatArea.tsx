@@ -1311,7 +1311,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         >
           {primaryPinnedMessage && (
             <div
-              className="shrink-0 full sticky top-0 -mx-4 px-2 w-[calc(100%+2.5rem)] z-50 "
+              className="shrink-0 full sticky top-0 -mx-4 px-2 w-[calc(100%+2.5rem)] z-40 "
               style={{
                 transform: "translate3d(0, 0, 0)", 
                 willChange: "transform", // Báo trước cho trình duyệt để tối ưu

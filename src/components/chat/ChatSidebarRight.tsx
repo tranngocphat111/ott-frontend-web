@@ -678,10 +678,6 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 participant={currentParticipant}
                 currentUserId={currentUser?._id || ""}
                 onAddMember={() => {
-                  if (!isManager) {
-                    setError("Chỉ trưởng nhóm hoặc phó nhóm mới có thể thêm thành viên");
-                    return;
-                  }
                   setShowAddMemberModal(true);
                 }}
                 onCreateGroup={() => setShowCreateGroupModal(true)}
@@ -809,10 +805,6 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             onMemberRemoved={handleMemberRemoved}
             onMemberRoleUpdated={handleRoleUpdated}
             onAddMember={() => {
-              if (!isManager) {
-                setError("Chỉ trưởng nhóm hoặc phó nhóm mới có thể thêm thành viên");
-                return;
-              }
               setShowAddMemberModal(true);
             }}
           />
