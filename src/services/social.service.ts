@@ -19,7 +19,19 @@ export interface ApiUser {
     location: string | null;
     relationshipStatus: string | null;
 }
-
+export interface RelationshipResponse {
+    id: string;
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatarUrl: string;
+    receiverId: string;
+    receiverUsername: string;
+    receiverAvatarUrl: string;
+    status: "PENDING" | "ACCEPTED" | "BLOCKED" | "REMOVED";
+    type: "FRIEND",
+    createAt: Date,
+    acceptedAt: Date
+}
 export interface ApiRelationshipResponse {
     id: string;
     requesterId: string;
@@ -114,6 +126,42 @@ export async function fetchFriends(userId: string): Promise<FriendOption[]> {
     }
 }
 
+export async function fetchRelationshipOf(
+    user1: string,
+    user2?: string,
+): Promise<RelationshipResponse | null> {
+    try {
+        const params = new URLSearchParams({ user1 });
+        if (user2) params.set("user2", user2);
+
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships?${params.toString()}`,
+            { signal: AbortSignal.timeout(5_000) },
+        );
+
+        if (!res.ok) return null;
+
+        return (await res.json()) as RelationshipResponse;
+    } catch {
+        return null;
+    }
+}
+
+export async function cancelRelationship(id: string | null): Promise<boolean> {
+    if (!id) return false;
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${id}/cancel`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        if (!res.ok) throw new Error("Không thể xóa lời mời kết bạn");
+        return true;
+    } catch (error) {
+        console.log(error);
+        return false;
+    }
+}
+
 export async function fetchPendingRequests(
     userId: string,
 ): Promise<FriendRequestOption[]> {
@@ -164,16 +212,18 @@ export async function rejectFriendRequest(
 
 export async function sendFriendRequest(
     requesterId: string,
-    receiverId: string,
-): Promise<boolean> {
+    receiverId?: string,
+): Promise<any> {
     try {
         const res = await fetch(
             `${API_MEDIA_SERVER_URL}/relationships/send?requesterId=${requesterId}&receiverId=${receiverId}`,
             { method: "POST", signal: AbortSignal.timeout(5_000) },
         );
-        return res.ok;
-    } catch {
-        return false;
+        if (!res.ok) throw new Error("Gửi kết bạn thất bại.")
+        return await res.json();
+    } catch (error) {
+        console.error(error)
+        return null;
     }
 }
 
