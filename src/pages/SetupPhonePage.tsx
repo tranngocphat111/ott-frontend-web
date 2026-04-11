@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Phone, ArrowLeft, MessageCircle } from 'lucide-react';
 import { useSetupPhone } from '../hooks/useSetupPhone';
 
-
+import defaultAvatar from '../assets/avatar.png';
 
 const SetupPhonePage: React.FC = () => {
   const navigate = useNavigate();
@@ -99,17 +99,11 @@ const SetupPhonePage: React.FC = () => {
               border: '1px solid var(--color-primary-100)',
             }}>
               {googleUserInfo.picture ? (
-                <img src={googleUserInfo.picture} alt={googleUserInfo.name}
+                <img src={defaultAvatar}
                   style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }} />
               ) : (
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--color-primary-200)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-primary-700)',
-                }}>
-                  {googleUserInfo.name.charAt(0).toUpperCase()}
-                </div>
+                <img src={defaultAvatar}
+                  style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }} />
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-primary-900)', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -16,16 +16,12 @@ export const useAccount = () => {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Thiết lập mật khẩu lần đầu (cho tk Google/OTP chưa có pass)
   const setPassword = async (data: SetPasswordRequest) => {
     setIsLoading(true);
     try {
-      const response = await accountApi.setPassword(data);
-      if (response.result) {
-        await refreshUser();
-        showToast('Thiết lập mật khẩu thành công!', 'success', 'Thành công');
-      }
-      return response.result;
+      await accountApi.setPassword(data);
+      await refreshUser(); 
+      showToast('Thiết lập mật khẩu thành công!', 'success', 'Thành công');
     } catch (err: unknown) {
       showToast(getErrorMessage(err), 'error', 'Lỗi thiết lập');
       throw err;

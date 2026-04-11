@@ -63,62 +63,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (phone: string, password: string, otpCode?: string) => {
-    console.log('AuthContext: Local login attempt');
-
-    // eslint-disable-next-line no-useless-catch
     try {
-      const response = await authApi.localLogin({
-        phone,
-        password,
-        otpCode,
-      });
-
+      const response = await authApi.localLogin({ phone, password, otpCode });
       if (response.result) {
-
         if (response.result.requires2FA && response.result.tempToken) {
-          console.log('AuthContext: 2FA required');
-          return {
-            requires2FA: true,
-            tempToken: response.result.tempToken,
-            authenticated: false,
-          };
+          return { requires2FA: true, tempToken: response.result.tempToken, authenticated: false };
         }
-
-
         if (response.result.token && response.result.refreshToken) {
-          console.log('AuthContext: Login successful, storing tokens');
           localStorage.setItem('accessToken', response.result.token);
           localStorage.setItem('refreshToken', response.result.refreshToken);
-
           await fetchUser();
-          console.log('AuthContext: User fetched after login');
-
           return { authenticated: true };
         }
       }
-
       throw new Error(response.message || 'Login failed');
-    } catch (error: unknown) {
-
-      throw error;
+    } finally {
+      // setIsLoading(false)
     }
   };
 
-  const verify2FA = async (tempToken: string, otpCode: string, isBackupCode: boolean = false) => {
-    const response = await authApi.verify2FAOtp({
-      tempToken,
-      otpCode,
-      isBackupCode,
-    });
+  const verify2FA = async (tempToken: string, otpCode: string, isBackupCode = false) => {
 
-    if (response.result?.token && response.result?.refreshToken) {
-      localStorage.setItem('accessToken', response.result.token);
-      localStorage.setItem('refreshToken', response.result.refreshToken);
-      await fetchUser();
-      return { authenticated: true };
+    // eslint-disable-next-line no-useless-catch
+    try {
+      const response = await authApi.verify2FAOtp({ tempToken, otpCode, isBackupCode });
+      if (response.result?.token && response.result?.refreshToken) {
+        localStorage.setItem('accessToken', response.result.token);
+        localStorage.setItem('refreshToken', response.result.refreshToken);
+        await fetchUser();
+        return { authenticated: true };
+      }
+      throw new Error(response.message || '2FA verification failed');
+    } catch (err) {
+      throw err;
     }
-
-    throw new Error(response.message || '2FA verification failed');
   };
 
   const request2FAOtp = async (phone: string) => {
@@ -136,19 +114,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginWithToken = async (token: string, refreshToken: string) => {
-    console.log('AuthContext: loginWithToken called');
-    console.log('AuthContext: Storing tokens in localStorage');
-
-    localStorage.setItem('accessToken', token);
-    localStorage.setItem('refreshToken', refreshToken);
-
-    console.log('AuthContext: Fetching user profile');
-
     try {
+      localStorage.setItem('accessToken', token);
+      localStorage.setItem('refreshToken', refreshToken);
       await fetchUser();
-      console.log('AuthContext: loginWithToken completed successfully');
     } catch (error) {
-      console.error('AuthContext: loginWithToken failed:', error);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       throw error;

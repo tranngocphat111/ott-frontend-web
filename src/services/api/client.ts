@@ -33,10 +33,11 @@ const addRefreshSubscriber = (cb: (token: string) => void) => {
   refreshSubscribers.push(cb);
 };
 
-apiClient.interceptors.response.use(
-  (response) => response.data,
 
-  async (error: AxiosError<ApiResponse>) => {
+apiClient.interceptors.response.use(
+  (response) => response.data,  
+
+  async (error: AxiosError<ApiResponse>) => {  
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     const apiError: ApiError = {
@@ -64,7 +65,6 @@ apiClient.interceptors.response.use(
         return Promise.reject(apiError);
       }
 
-      // Phần còn lại giữ nguyên
       if (!refreshToken) {
         redirectToLogin();
         return Promise.reject(apiError);
@@ -108,6 +108,8 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         refreshSubscribers = [];
+        isRefreshing = false;
+        window.dispatchEvent(new Event('auth:logout'));
         redirectToLogin();
         return Promise.reject(apiError);
       } finally {

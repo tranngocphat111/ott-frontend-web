@@ -29,7 +29,6 @@ export const ProfileHeader: React.FC<Props> = ({ user, onProfileUpdate }) => {
     onProfileUpdate?.(profile);
   };
 
-  // Logic mới: Clone user ra và chèn ảnh mới vào ngay lập tức
   const handleActiveChanged = (newUrl: string, type: PhotoType) => {
     const updatedUser = { ...user }; 
     if (type === PhotoType.AVATAR) {
@@ -78,7 +77,6 @@ export const ProfileHeader: React.FC<Props> = ({ user, onProfileUpdate }) => {
             </div>
           )}
 
-          {/* Nút đổi ảnh bìa */}
           <button
             onClick={() => openModal(PhotoType.COVER)}
             className="transition-base"
@@ -166,20 +164,7 @@ export const ProfileHeader: React.FC<Props> = ({ user, onProfileUpdate }) => {
               </p>
             )}
 
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 10px',
-              borderRadius: 999,
-              background: 'var(--color-primary-50)',
-              color: 'var(--color-primary-700)',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              marginBottom: 10,
-            }}>
-              <Phone size={12} /> {user.phone}
-            </div>
+            
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px' }}>
               {([
