@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { sessionApi } from '../services/api';
 import type { UserSessionsResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -11,25 +11,32 @@ export const useSessions = () => {
   const { showToast } = useToast();
   const { logout } = useAuth();
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     setIsLoading(true);
-
     try {
       const response = await sessionApi.getUserSessions();
+      
       if (response.result) {
         setSessions(response.result);
+
+        if (response.result.total === 0) {
+          showToast('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.', 'warning', 'Thông báo');
+          setTimeout(async () => {
+            await logout();
+          }, 1500);
+        }
       }
     } catch (err: unknown) {
-      // Đã bật Toast báo lỗi cho hàm fetch
-      showToast(getErrorMessage(err), 'error', 'Lỗi tải danh sách thiết bị');
+      // Chỉ hiển thị lỗi tải nếu thực sự là lỗi từ server/mạng, 
+      // không phải do danh sách trống
+      showToast(getErrorMessage(err), 'error', 'Lỗi kết nối');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, showToast]);
 
   const revokeSession = async (sessionId: string): Promise<boolean> => {
     setIsLoading(true);
-
     try {
       await sessionApi.revokeSession(sessionId);
       showToast('Đã đăng xuất thiết bị thành công', 'success');
@@ -45,7 +52,6 @@ export const useSessions = () => {
 
   const revokeAllOtherSessions = async (): Promise<boolean> => {
     setIsLoading(true);
-
     try {
       await sessionApi.revokeAllOtherSessions();
       showToast('Đã đăng xuất các thiết bị khác thành công', 'success');
@@ -61,12 +67,9 @@ export const useSessions = () => {
 
   const revokeAllSessions = async (): Promise<boolean> => {
     setIsLoading(true);
-
     try {
       await sessionApi.revokeAllSessions();
       showToast('Đã đăng xuất khỏi tất cả thiết bị', 'success');
-
-      // Xóa toàn bộ token và đẩy user ra trang Login
       await logout();
       return true;
     } catch (err: unknown) {
@@ -79,8 +82,7 @@ export const useSessions = () => {
 
   useEffect(() => {
     fetchSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchSessions]);
 
   return {
     sessions,

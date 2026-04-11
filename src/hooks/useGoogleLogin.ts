@@ -46,7 +46,7 @@ export const useGoogleLogin = () => {
         await loginWithToken(result.token, result.refreshToken);
         
         showToast(SUCCESS_MESSAGES.LOGIN, 'success', 'Thành công');
-        navigate('/home', { replace: true });
+        navigate('/chat', { replace: true });
         return true;
       }
 

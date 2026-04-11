@@ -6,6 +6,7 @@ interface Props {
   sessions: SessionInfo[];
   onRevokeSession: (id: string) => void;
   onRevokeAllOthers: () => void;
+  onRevokeAll: () => void;
 }
 
 const DEVICE_ICONS: Record<string, typeof Monitor> = {
@@ -21,7 +22,7 @@ const formatDate = (d: string) => {
   return new Date(d).toLocaleDateString('vi-VN');
 };
 
-export const SessionsList: React.FC<Props> = ({ sessions, onRevokeSession, onRevokeAllOthers }) => {
+export const SessionsList: React.FC<Props> = ({ sessions, onRevokeSession, onRevokeAll }) => {
   const others = sessions.filter(s => !s.isCurrent);
 
   return (
@@ -31,12 +32,14 @@ export const SessionsList: React.FC<Props> = ({ sessions, onRevokeSession, onRev
           Thiết bị đã đăng nhập
         </h2>
         {others.length > 0 && (
-          <button onClick={onRevokeAllOthers} className="transition-fast"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-error-text)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px 8px', borderRadius: 8, fontFamily: 'var(--font-body)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-error-bg)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-            <LogOut size={13} /> Đăng xuất tất cả
-          </button>
+          <>
+            <button onClick={onRevokeAll} className="transition-fast"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-error-text)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px 8px', borderRadius: 8, fontFamily: 'var(--font-body)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-error-bg)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <LogOut size={13} /> Đăng xuất tất cả thiết bị
+            </button>
+          </>
         )}
       </div>
 

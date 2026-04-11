@@ -21,7 +21,7 @@ type TabId = typeof TABS[number]['id'];
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
-  const { sessions, revokeSession, revokeAllOtherSessions } = useSessions();
+  const { sessions, revokeSession, revokeAllOtherSessions, revokeAllSessions } = useSessions();
   const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('info');
   const [minLoadDone, setMinLoadDone] = useState(false);
@@ -168,6 +168,7 @@ const ProfilePage: React.FC = () => {
                 sessions={sessions.sessions}
                 onRevokeSession={revokeSession}
                 onRevokeAllOthers={revokeAllOtherSessions}
+                onRevokeAll={revokeAllSessions}
               />
             )}
           </div>

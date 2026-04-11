@@ -34,11 +34,34 @@ export const useRegister = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
+
+
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const validateForm = (): string => {
     const { phone, email, password, confirmPassword, fullName } = formData;
-    if (!phone || !email || !password || !fullName) return 'Vui lòng điền đầy đủ thông tin';
-    if (password !== confirmPassword) return 'Mật khẩu xác nhận không khớp';
-    if (password.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
+
+    if (!phone || !email || !password || !fullName) {
+      return 'Vui lòng điền đầy đủ thông tin';
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return 'Email không hợp lệ (ví dụ: example@gmail.com)';
+    }
+
+    if (!PHONE_REGEX.test(phone)) {
+      return 'Số điện thoại không hợp lệ';
+    }
+
+    if (password.length < 8) {
+      return 'Mật khẩu phải có ít nhất 8 ký tự';
+    }
+
+    if (password !== confirmPassword) {
+      return 'Mật khẩu xác nhận không khớp';
+    }
+
     return '';
   };
 
