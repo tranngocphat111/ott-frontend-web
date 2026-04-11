@@ -8,6 +8,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   isDangerous?: boolean;
+  hideCancelButton?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +20,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText = "Gỡ",
   cancelText = "Hủy",
   isDangerous = false,
+  hideCancelButton = false,
   onConfirm,
   onCancel,
 }) => {
@@ -46,12 +48,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-primary-600 hover:bg-primary-100 transition-colors font-medium text-sm"
-          >
-            {cancelText}
-          </button>
+          {!hideCancelButton && (
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 rounded-xl text-primary-600 hover:bg-primary-100 transition-colors font-medium text-sm"
+            >
+              {cancelText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             className={`px-5 py-2 rounded-xl font-semibold text-sm text-white shadow-sm transition-all active:scale-95 ${

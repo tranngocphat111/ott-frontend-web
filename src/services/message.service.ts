@@ -341,10 +341,16 @@ export class MessageService {
   }
 
   // Get pinned messages
-  static async getPinnedMessages(conversationId: string) {
+  static async getPinnedMessages(conversationId: string, userId?: string) {
     try {
+      const params = new URLSearchParams();
+      if (userId) {
+        params.set("userId", userId);
+      }
+
+      const query = params.toString();
       const response = await fetch(
-        `${API_CHAT_SERVER_URL}/messages/${conversationId}/pinned`,
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/pinned${query ? `?${query}` : ""}`,
         {
           method: "GET",
           headers: {

@@ -2,14 +2,29 @@ import React, { useEffect, useRef, useState } from "react";
 import { Clock3, Download, Ellipsis, Reply } from "lucide-react";
 import { URL_S3 } from "../../../../config/api.config";
 import type { Message } from "../../../../types";
-import { getFileTypeData, getFileTypeLabel } from "../../../../utils/fileTypeUtils";
+import {
+  getFileTypeData,
+  getFileTypeLabel,
+} from "../../../../utils/fileTypeUtils";
+import { MessageService } from "../../../../services";
 
 interface FilesListProps {
   messages: Message[];
   onViewAll: () => void;
+  currentUserId?: string;
+  currentConversationId?: string;
+  selfConversationId?: string;
+  onDataChanged?: () => void;
 }
 
-const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
+const FilesList: React.FC<FilesListProps> = ({
+  messages,
+  onViewAll,
+  currentUserId,
+  currentConversationId,
+  selfConversationId,
+  onDataChanged,
+}) => {
   const [openMenuFileId, setOpenMenuFileId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -24,13 +39,16 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const validMessages = (messages || []).filter(msg => 
-    msg && 
-    msg._id && 
-    Array.isArray(msg.content)
+  const validMessages = (messages || []).filter(
+    (msg) => msg && msg._id && Array.isArray(msg.content),
   );
 
-  const allFiles: Array<{id: string, message: Message, key: string, size?: number}> = [];
+  const allFiles: Array<{
+    id: string;
+    message: Message;
+    key: string;
+    size?: number;
+  }> = [];
   validMessages.forEach((message) => {
     const type = String(message.type || "").toLowerCase();
     if (type !== "file") return;
@@ -82,6 +100,82 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
     navigator.clipboard.writeText(text).catch(() => undefined);
   };
 
+  const handleSaveToMyDocuments = async (message: Message, key: string) => {
+    const senderId = String(currentUserId || "");
+    const targetConversationId = String(selfConversationId || "");
+    if (!senderId || !targetConversationId) return;
+
+    // Already inside My Documents conversation.
+    if (
+      currentConversationId &&
+      String(currentConversationId) === targetConversationId
+    ) {
+      setOpenMenuFileId(null);
+      return;
+    }
+
+    const fileName = getFileName(key);
+    const contentSize = Number((message as any)?.size || 0);
+
+    try {
+      await MessageService.sendMessage(
+        targetConversationId,
+        senderId,
+        key,
+        "file",
+        contentSize,
+        fileName,
+      );
+      setOpenMenuFileId(null);
+      window.dispatchEvent(
+        new CustomEvent("chat:my-documents-saved", {
+          detail: {
+            sourceConversationId: currentConversationId,
+            targetConversationId,
+          },
+        }),
+      );
+    } catch (error) {
+      console.error("Save to My Documents failed:", error);
+    }
+  };
+
+  const jumpToMessage = (message: Message) => {
+    const conversationId = String((message as any).conversation_id || "");
+    const messageId = String(
+      (message as any).msg_id || (message as any)._id || "",
+    );
+    if (!conversationId || !messageId) return;
+
+    window.dispatchEvent(
+      new CustomEvent("chat:jump", {
+        detail: {
+          conversationId,
+          messageId,
+          highlight: true,
+        },
+      }),
+    );
+  };
+
+  const handleDeleteForMe = async (message: Message) => {
+    const conversationId = String((message as any).conversation_id || "");
+    const messageId = String((message as any).msg_id || "");
+    if (!currentUserId || !conversationId || !messageId) return;
+
+    try {
+      await MessageService.deleteMessage(
+        conversationId,
+        messageId,
+        currentUserId,
+      );
+      setOpenMenuFileId(null);
+      onDataChanged?.();
+    } catch (error) {
+      console.error("Delete file message for me failed:", error);
+    }
+  };
+
   return (
     <div ref={menuRef}>
       <div className="space-y-2 mb-3">
@@ -91,9 +185,12 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
           const { Icon, bg, color } = getFileTypeData(ext);
           const typeLabel = getFileTypeLabel(ext);
           const fileUrl = `${URL_S3}${key}`;
-          const fileDate = message.created_at || message.createdAt
-            ? new Date(message.created_at || message.createdAt || "").toLocaleDateString("vi-VN")
-            : "Không rõ ngày";
+          const fileDate =
+            message.created_at || message.createdAt
+              ? new Date(
+                  message.created_at || message.createdAt || "",
+                ).toLocaleDateString("vi-VN")
+              : "Không rõ ngày";
           const isMenuOpen = openMenuFileId === id;
 
           return (
@@ -109,14 +206,18 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                   window.open(fileUrl, "_blank", "noopener,noreferrer");
                 }}
               >
-                <div className={`flex h-8 w-8 items-center justify-center rounded ${bg}`}>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded ${bg}`}
+                >
                   <Icon size={14} className={color} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-gray-900">
                     {fileName}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">{typeLabel} • {formatFileSize(size)}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {typeLabel} • {formatFileSize(size)}
+                  </p>
                 </div>
               </button>
 
@@ -127,14 +228,18 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
 
               <div
                 className={`absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-white pl-1 shadow-sm ring-1 ring-gray-200 transition-opacity ${
-                  isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  isMenuOpen
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100"
                 }`}
               >
                 <button
                   type="button"
                   className="flex cursor-pointer h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100"
                   title="Tải xuống"
-                  onClick={() => window.open(fileUrl, "_blank", "noopener,noreferrer")}
+                  onClick={() =>
+                    window.open(fileUrl, "_blank", "noopener,noreferrer")
+                  }
                 >
                   <Download size={15} />
                 </button>
@@ -173,10 +278,9 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          window.open(fileUrl, "_blank", "noopener,noreferrer");
-                          setOpenMenuFileId(null);
-                        }}
+                        onClick={() =>
+                          void handleSaveToMyDocuments(message, key)
+                        }
                         className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
                       >
                         Lưu vào My Documents
@@ -184,7 +288,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          window.open(fileUrl, "_blank", "noopener,noreferrer");
+                          jumpToMessage(message);
                           setOpenMenuFileId(null);
                         }}
                         className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-gray-700 hover:bg-gray-50"
@@ -194,7 +298,7 @@ const FilesList: React.FC<FilesListProps> = ({ messages, onViewAll }) => {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         type="button"
-                        onClick={() => setOpenMenuFileId(null)}
+                        onClick={() => void handleDeleteForMe(message)}
                         className="w-full cursor-pointer px-4 py-2 text-left text-[14px] text-red-500 hover:bg-red-50"
                       >
                         Xóa chỉ ở phía tôi

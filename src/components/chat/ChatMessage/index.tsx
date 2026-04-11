@@ -49,6 +49,7 @@ export const ChatMessage = memo(
           isFirstInSequence={isFirstInSequence}
           isLastInSequence={isLastInSequence}
           isTopBoundary={isTopBoundary}
+          onDelete={onDelete}
         />
       );
     }

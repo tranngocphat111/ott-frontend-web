@@ -12,7 +12,18 @@ export interface Message {
   _id: string;
   msg_id?: string;
   content: MessageContent[];
-  type: "text" | "link" | "image" | "file" | "video" | "audio" | "system_add";
+  type:
+    | "text"
+    | "link"
+    | "image"
+    | "file"
+    | "video"
+    | "audio"
+    | "system_add"
+    | "system_block"
+    | "system_leave"
+    | "system_pin"
+    | "system_unpin";
   created_at: string;
   createdAt?: string; // For backwards compatibility
   sender_id: String;
@@ -40,7 +51,18 @@ export interface MessageReplyPreview {
   msg_id?: string;
   sender_id: string;
   sender_name?: string;
-  type: "text" | "link" | "image" | "video" | "file" | "audio" | "system_add";
+  type:
+    | "text"
+    | "link"
+    | "image"
+    | "video"
+    | "file"
+    | "audio"
+    | "system_add"
+    | "system_block"
+    | "system_leave"
+    | "system_pin"
+    | "system_unpin";
   content: string;
   raw_content?: string;
   file_name?: string;
@@ -67,7 +89,7 @@ export interface ChatNotificationProps {
 export interface ChatInputProps {
   conversationId: string;
   senderId: string;
-  onSendSuccess: () => void | Promise<void>;
+  onSendSuccess: (sentMessage?: Message | null) => void | Promise<void>;
   replyToMessage?: Message | null;
   onCancelReply?: () => void;
 }

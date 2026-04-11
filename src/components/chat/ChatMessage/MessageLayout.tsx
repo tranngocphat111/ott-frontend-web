@@ -361,9 +361,7 @@ export const MessageLayout = ({
       <div
         className={`group flex flex-col max-w-[75%] sm:max-w-[70%] ${
           isMe ? "items-end" : "items-start"
-        } relative ${
-          showActionMenu || showReactionPicker ? "z-20" : ""
-        }`}
+        } relative ${showActionMenu || showReactionPicker ? "z-20" : ""}`}
       >
         {!isMe && (isFirst || isTopBoundary) && (
           <span className="text-[12px] font-medium text-slate-500 mb-1 ml-1 select-none">

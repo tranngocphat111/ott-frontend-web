@@ -207,6 +207,40 @@ export const ChatInput = ({
     };
   }, []);
 
+  useEffect(() => {
+    setShowEmojiPicker(false);
+    const raf = window.requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!replyToMessage) return;
+
+    const raf = window.requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, [replyToMessage]);
+
+  useEffect(() => {
+    const handler = () => {
+      textInputRef.current?.focus();
+    };
+
+    window.addEventListener("chat:focus-input", handler as EventListener);
+    return () => {
+      window.removeEventListener("chat:focus-input", handler as EventListener);
+    };
+  }, []);
+
   const handleAddMore = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
@@ -448,7 +482,7 @@ export const ChatInput = ({
         }),
       );
       setUploadProgress(80);
-      await MessageService.sendMessage(
+      const sentMessage = await MessageService.sendMessage(
         conversationId,
         senderId,
         keys,
@@ -458,7 +492,7 @@ export const ChatInput = ({
         replyToMsgId,
       );
       setUploadProgress(100);
-      await onSendSuccess();
+      await onSendSuccess(sentMessage);
       if (replyToMsgId) onCancelReply?.();
     } catch (err) {
       console.error(err);
@@ -486,7 +520,7 @@ export const ChatInput = ({
       setUploadProgress(40);
       await MessageService.uploadFileToS3(uploadUrl, file, mimeType);
       setUploadProgress(70);
-      await MessageService.sendMessage(
+      const sentMessage = await MessageService.sendMessage(
         conversationId,
         senderId,
         key,
@@ -496,7 +530,7 @@ export const ChatInput = ({
         replyToMsgId,
       );
       setUploadProgress(100);
-      await onSendSuccess();
+      await onSendSuccess(sentMessage);
       if (replyToMsgId) onCancelReply?.();
     } catch (err) {
       console.error(err);
@@ -532,7 +566,7 @@ export const ChatInput = ({
         const messageType = isStandaloneLink(text) ? "link" : "text";
         const messageContent = convertEmojiImageMarkupToText(text);
 
-        await MessageService.sendMessage(
+        const sentMessage = await MessageService.sendMessage(
           conversationId,
           senderId,
           messageContent,
@@ -542,7 +576,7 @@ export const ChatInput = ({
           replyToMsgId,
         );
         setText("");
-        await onSendSuccess();
+        await onSendSuccess(sentMessage);
         if (replyToMsgId) onCancelReply?.();
       } catch {
         alert("Gửi tin nhắn thất bại");
