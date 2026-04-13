@@ -16,7 +16,7 @@ export class UserService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      
+
       // Mapping dữ liệu từ Backend về Frontend
       return data.map((user: any) => ({
         _id: user.user_id || user._id,
@@ -31,7 +31,7 @@ export class UserService {
       }));
     } catch (error) {
       console.error("Error fetching users:", error);
-      throw error;
+      return [];
     }
   }
 

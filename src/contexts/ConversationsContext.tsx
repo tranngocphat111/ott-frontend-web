@@ -14,6 +14,7 @@ import type {
   Participant,
 } from "../types";
 import { ConversationService, socketService } from "../services";
+import { useAuth } from "./AuthContext";
 
 interface ConversationsContextType {
   // State
@@ -65,15 +66,16 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
 
   // Update specific conversation
   const updateConversation = useCallback(
     (conversationId: string, updates: Partial<Conversation>) => {
       setConversations((prev) =>
         prev.map((item) =>
-          item.conversation._id === conversationId
-            ? { ...item, conversation: { ...item.conversation, ...updates } }
-            : item,
+          item.conversation._id === conversationId ?
+            { ...item, conversation: { ...item.conversation, ...updates } }
+          : item,
         ),
       );
     },
@@ -99,9 +101,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
             // Nếu tin nhắn cuối cùng mới hơn tin nhắn vừa đọc -> giữ badge hoặc set về 1, ngược lại về 0
             mergedParticipant.unread_count =
-              lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadId)
-                ? mergedParticipant.unread_count || 1
-                : 0;
+              lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadId) ?
+                mergedParticipant.unread_count || 1
+              : 0;
           }
 
           return { ...item, participant: mergedParticipant };
@@ -148,8 +150,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       );
       if (targetIndex === -1) return prev;
 
-      const rawContent: string = Array.isArray(message.content)
-        ? message.content[0] || ""
+      const rawContent: string =
+        Array.isArray(message.content) ?
+          message.content[0] || ""
         : message.content || "";
 
       let displayContent = "";
@@ -168,17 +171,18 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
           break;
         default:
           displayContent =
-            rawContent.length > 50
-              ? rawContent.substring(0, 50) + "..."
-              : rawContent;
+            rawContent.length > 50 ?
+              rawContent.substring(0, 50) + "..."
+            : rawContent;
       }
 
       const existing = prev[targetIndex];
       const isIncomingFromOther =
         String(message.sender_id || "") !==
         String(existing.participant.user_id || "");
-      const nextUnread = isIncomingFromOther
-        ? (Number(existing.participant.unread_count) || 0) + 1
+      const nextUnread =
+        isIncomingFromOther ?
+          (Number(existing.participant.unread_count) || 0) + 1
         : Number(existing.participant.unread_count) || 0;
 
       const updated: ConversationWithParticipant = {
@@ -210,8 +214,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     if (!convId) return;
 
     const revokedMsgId = String(payload.msg_id || "");
-    const revokedContent = Array.isArray(payload.content)
-      ? String(payload.content[0] || "Tin nhắn đã được thu hồi")
+    const revokedContent =
+      Array.isArray(payload.content) ?
+        String(payload.content[0] || "Tin nhắn đã được thu hồi")
       : String(payload.content || "Tin nhắn đã được thu hồi");
 
     setConversations((prev) =>
@@ -243,6 +248,11 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      socketService.disconnect();
+      return;
+    }
+
     socketService.connect();
     socketService.onNewMessage(handleIncomingMessage);
 
@@ -273,7 +283,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
       socketService.offGroupDissolved(handleGroupDissolved);
     };
-  }, [handleIncomingMessage, handleRevokedMessage]);
+  }, [handleIncomingMessage, handleRevokedMessage, isAuthenticated]);
 
   // Category Actions
   const addCategory = useCallback((category: Category) => {
@@ -295,15 +305,15 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     setCategories((prev) => prev.filter((cat) => cat._id !== categoryId));
     setConversations((prev) =>
       prev.map((item) =>
-        item.participant.settings.category_id === categoryId
-          ? {
-              ...item,
-              participant: {
-                ...item.participant,
-                settings: { ...item.participant.settings, category_id: null },
-              },
-            }
-          : item,
+        item.participant.settings.category_id === categoryId ?
+          {
+            ...item,
+            participant: {
+              ...item.participant,
+              settings: { ...item.participant.settings, category_id: null },
+            },
+          }
+        : item,
       ),
     );
   }, []);
@@ -329,8 +339,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
             "0",
           );
 
-          return BigInt(bestId) > BigInt(dbId)
-            ? {
+          return BigInt(bestId) > BigInt(dbId) ?
+              {
                 ...newItem,
                 participant: {
                   ...newItem.participant,

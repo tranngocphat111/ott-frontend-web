@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Gift, Users } from "lucide-react";
 import avatar from "../../assets/avatar.png";
 import {
@@ -9,6 +9,10 @@ import {
   type FriendOption,
   type FriendRequestOption,
 } from "../../services/social.service";
+import {
+  relationshipSocketService,
+  type RelationshipRealtimePayload,
+} from "../../services/relationshipSocket.service";
 
 interface Props {
   currentUserId: string;
@@ -21,6 +25,71 @@ const SocialRightSidebar: React.FC<Props> = ({ currentUserId }) => {
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
 
+  const loadRequests = useCallback(async () => {
+    if (!currentUserId) return;
+    setRequestsLoading(true);
+    const data = await fetchPendingRequests(currentUserId);
+    setRequests(data);
+    setRequestsLoading(false);
+  }, [currentUserId]);
+
+  const loadFriends = useCallback(async () => {
+    if (!currentUserId) return;
+    setFriendsLoading(true);
+    const data = await fetchFriends(currentUserId);
+    setFriends(data);
+    setFriendsLoading(false);
+  }, [currentUserId]);
+
+  const getOtherUserId = useCallback(
+    (payload: RelationshipRealtimePayload) => {
+      if (payload.requesterId === currentUserId) return payload.receiverId;
+      if (payload.receiverId === currentUserId) return payload.requesterId;
+      return null;
+    },
+    [currentUserId],
+  );
+
+  const updateFromPayload = useCallback(
+    (payload: RelationshipRealtimePayload) => {
+      if (!payload) return;
+
+      switch (payload.type) {
+        case "REQUEST_SENT": {
+          if (payload.receiverId === currentUserId) {
+            loadRequests();
+          }
+          break;
+        }
+        case "REQUEST_ACCEPTED": {
+          setRequests((prev) =>
+            prev.filter((req) => req.id !== payload.relationshipId),
+          );
+          loadFriends();
+          break;
+        }
+        case "REQUEST_REJECTED":
+        case "REQUEST_CANCELED": {
+          setRequests((prev) =>
+            prev.filter((req) => req.id !== payload.relationshipId),
+          );
+          break;
+        }
+        case "UNFRIENDED":
+        case "BLOCKED": {
+          const otherUserId = getOtherUserId(payload);
+          if (otherUserId) {
+            setFriends((prev) => prev.filter((f) => f.id !== otherUserId));
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [currentUserId, getOtherUserId, loadFriends, loadRequests],
+  );
+
   useEffect(() => {
     if (!currentUserId) {
       setRequests([]);
@@ -28,23 +97,43 @@ const SocialRightSidebar: React.FC<Props> = ({ currentUserId }) => {
       return;
     }
 
-    const loadRequests = async () => {
-      setRequestsLoading(true);
-      const data = await fetchPendingRequests(currentUserId);
-      setRequests(data);
-      setRequestsLoading(false);
-    };
-
-    const loadFriends = async () => {
-      setFriendsLoading(true);
-      const data = await fetchFriends(currentUserId);
-      setFriends(data);
-      setFriendsLoading(false);
-    };
-
     loadRequests();
     loadFriends();
-  }, [currentUserId]);
+  }, [currentUserId, updateFromPayload]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
+      if (!payload) return;
+
+      const targetIds = payload.targetUserIds || [];
+      const isTarget =
+        targetIds.includes(currentUserId) ||
+        payload.requesterId === currentUserId ||
+        payload.receiverId === currentUserId;
+
+      if (!isTarget) return;
+
+      updateFromPayload(payload);
+    };
+
+    relationshipSocketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () =>
+      relationshipSocketService.offRelationshipUpdate(handleRelationshipUpdate);
+  }, [currentUserId, loadRequests, loadFriends, updateFromPayload]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const handleConnect = () => {
+      loadRequests();
+      loadFriends();
+    };
+
+    relationshipSocketService.onConnect(handleConnect);
+    return () => relationshipSocketService.offConnect(handleConnect);
+  }, [currentUserId, loadRequests, loadFriends]);
 
   const handleAccept = async (relationshipId: string) => {
     setBusyRequestId(relationshipId);

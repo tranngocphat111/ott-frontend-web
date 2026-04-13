@@ -3,6 +3,7 @@ import { SOCKET_CHAT_SERVER_URL } from "../config/api.config";
 
 type CallType = "voice" | "video";
 
+
 class SocketService {
   private socket: Socket | null = null;
 
@@ -124,6 +125,7 @@ class SocketService {
       this.socket?.removeAllListeners("giai_tan_nhom");
     }
   }
+
 
   getSocket(): Socket | null {
     return this.socket;

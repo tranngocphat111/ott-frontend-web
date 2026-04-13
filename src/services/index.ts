@@ -4,6 +4,7 @@ export { MessageService } from "./message.service";
 export { CategoryService } from "./category.service";
 export { ParticipantService } from "./participant.service";
 export { socketService } from "./socket.service";
+export { relationshipSocketService } from "./relationshipSocket.service";
 
 // Social / media services
 export { fetchPosts, fetchPostsByUser, fetchPostById, createPost, deletePost } from "./post.service";

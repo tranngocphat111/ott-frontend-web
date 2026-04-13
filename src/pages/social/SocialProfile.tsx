@@ -2,9 +2,6 @@ import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import type { TabKey } from "../../components/social/ProfileTabs";
 import ProfileHeader from "../../components/social/ProfileHeader";
-import ProfileActions from "../../components/social/ProfileActions";
-import ProfileQuickInfo from "../../components/social/ProfileQuickInfo";
-import ProfileTabs from "../../components/social/ProfileTabs";
 import PostsTab from "../../components/social/PostsTab";
 import AboutTab from "../../components/social/AboutTab";
 import PhotosTab from "../../components/social/PhotosTab";
@@ -133,37 +130,14 @@ const SocialProfile: React.FC = () => {
           isOwner={isOwner}
           onEditCover={openCoverModal}
           onEditAvatar={openAvatarModal}
+          currentUser={currentUser}
+          userId={userId}
+          setActiveTab={setActiveTab}
+          startEditAbout={startEditAbout}
+          profile={profile}
+          tabs={tabs}
+          activeTab={activeTab}
         />
-
-        {/* Profile Info Card */}
-        <div className="bg-white rounded-2xl mx-4 -mt-16 relative shadow-lg">
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row items-center md:items-end gap-4">
-              <div className="flex-1" />
-              <ProfileActions
-                isOwner={isOwner}
-                currentUserId={currentUser.id}
-                profileUserId={userId}
-                onEditProfile={() => {
-                  setActiveTab("about");
-                  startEditAbout();
-                }}
-              />
-            </div>
-
-            <ProfileQuickInfo
-              work={profile.work}
-              location={profile.location}
-              relationship={profile.relationship}
-            />
-          </div>
-
-          <ProfileTabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-        </div>
 
         {/* ── Tab content ────────────────────────────── */}
         <div className="px-4 mt-4 space-y-4">

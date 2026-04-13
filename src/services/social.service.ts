@@ -196,6 +196,35 @@ export async function acceptFriendRequest(
     }
 }
 
+export async function blockRelationship(
+    relationshipId: string,
+    blockerId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/block?blockerId=${blockerId}`,
+            { method: "PATCH", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function unfriendRelationship(
+    relationshipId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/unfriend`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 export async function rejectFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {

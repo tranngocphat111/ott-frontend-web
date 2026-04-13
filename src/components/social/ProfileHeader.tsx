@@ -1,6 +1,10 @@
 import React from "react";
 import { Camera } from "lucide-react";
 import avatar from "../../assets/avatar.png";
+import ProfileActions from "./ProfileActions";
+import type { PostUser } from "./types";
+import ProfileQuickInfo from "./ProfileQuickInfo";
+import ProfileTabs, { type TabKey } from "./ProfileTabs";
 
 interface ProfileHeaderProps {
   coverUrl?: string;
@@ -12,6 +16,17 @@ interface ProfileHeaderProps {
   isOwner: boolean;
   onEditCover: () => void;
   onEditAvatar: () => void;
+  currentUser: PostUser;
+  userId?: string;
+  profile: {
+    work?: string;
+    location?: string;
+    relationship?: string;
+  };
+  tabs: Array<{ key: TabKey; label: string }>;
+  activeTab: TabKey;
+  setActiveTab: (tab: TabKey) => void;
+  startEditAbout: () => void;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -24,6 +39,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   isOwner,
   onEditCover,
   onEditAvatar,
+  currentUser,
+  userId,
+  profile,
+  tabs,
+  activeTab,
+  setActiveTab,
+  startEditAbout,
 }) => {
   return (
     <>
@@ -91,6 +113,28 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 <span className="font-medium">{postCount}</span> bài viết
               </p>
             </div>
+            <ProfileActions
+              isOwner={isOwner}
+              currentUserId={currentUser.id}
+              profileUserId={userId}
+              onEditProfile={() => {
+                setActiveTab("about");
+                startEditAbout();
+              }}
+            />
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <ProfileQuickInfo
+              work={profile.work}
+              location={profile.location}
+              relationship={profile.relationship}
+            />
+            <ProfileTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
           </div>
         </div>
       </div>
