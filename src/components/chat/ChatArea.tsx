@@ -524,6 +524,87 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     });
   }, [renderedMessages]);
 
+  const timelineItems = useMemo(() => {
+    const items: Array<
+      | {
+          kind: "system-group";
+          key: string;
+          messages: Message[];
+          showTime: boolean;
+          time: string;
+        }
+      | {
+          kind: "message";
+          key: string;
+          message: Message;
+          showTime: boolean;
+          time: string;
+          index: number;
+        }
+    > = [];
+
+    for (let index = 0; index < hydratedMessages.length; index += 1) {
+      const currentMsg = hydratedMessages[index];
+      const prevMsg = hydratedMessages[index - 1];
+      const isSystemMsg = currentMsg.type?.startsWith("system_");
+
+      if (!isSystemMsg) {
+        items.push({
+          kind: "message",
+          key: `message-${String(currentMsg.msg_id || currentMsg._id || index)}-${index}`,
+          message: currentMsg,
+          showTime: shouldShowTimestamp(
+            currentMsg.createdAt || "",
+            prevMsg?.createdAt,
+          ),
+          time: formatChatTimestamp(currentMsg.createdAt || ""),
+          index,
+        });
+        continue;
+      }
+
+      const showTime = shouldShowTimestamp(
+        currentMsg.createdAt || "",
+        prevMsg?.createdAt,
+      );
+
+      let endIndex = index;
+      while (endIndex + 1 < hydratedMessages.length) {
+        const nextMsg = hydratedMessages[endIndex + 1];
+        if (!nextMsg.type?.startsWith("system_")) {
+          break;
+        }
+
+        if (
+          shouldShowTimestamp(
+            nextMsg.createdAt || "",
+            hydratedMessages[endIndex].createdAt,
+          )
+        ) {
+          break;
+        }
+
+        endIndex += 1;
+      }
+
+      const systemMessages = hydratedMessages.slice(index, endIndex + 1);
+      const firstMessage = systemMessages[0];
+      const lastMessage = systemMessages[systemMessages.length - 1];
+
+      items.push({
+        kind: "system-group",
+        key: `system-group-${String(firstMessage.msg_id || firstMessage._id || index)}-${String(lastMessage.msg_id || lastMessage._id || endIndex)}`,
+        messages: systemMessages,
+        showTime,
+        time: formatChatTimestamp(firstMessage.createdAt || ""),
+      });
+
+      index = endIndex;
+    }
+
+    return items;
+  }, [hydratedMessages]);
+
   const renderPinnedTypeVisual = useCallback(
     (msg: Message, size: "sm" | "md" = "sm") => {
       const type = String(msg.type || "").toLowerCase();
@@ -1465,9 +1546,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    // If there are still messages below current context, jump back to latest 20.
+    // If there are still messages below current context, reload the latest 20 messages.
     if (hasMoreAfter && !loading) {
-      await handleSendSuccess();
+      forceScrollToBottomRef.current = true;
+      await loadMessages();
       return;
     }
 
@@ -1476,7 +1558,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     container.scrollTop = container.scrollHeight;
     wasNearBottomRef.current = true;
     setShowScrollButton(false);
-  }, [handleSendSuccess, hasMoreAfter, loading, waitForNextFrame]);
+  }, [hasMoreAfter, loadMessages, loading, waitForNextFrame]);
 
   /**
    * Restore scroll position after loading older messages
@@ -1891,115 +1973,71 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           ) : hydratedMessages.length === 0 ? (
             <ChatEmpty />
           ) : (
-            hydratedMessages.map((msg, index) => {
-              const isSystemMsg = msg.type?.startsWith("system_");
-              const prevMsg = hydratedMessages[index - 1];
-              const nextMsg = hydratedMessages[index + 1];
-              const prevIsSystem = prevMsg?.type?.startsWith("system_");
-
-              if (isSystemMsg && prevIsSystem) {
-                return null;
-              }
-
-              if (isSystemMsg) {
-                let endIndex = index;
-                while (
-                  endIndex + 1 < renderedMessages.length &&
-                  renderedMessages[endIndex + 1]?.type?.startsWith("system_")
-                ) {
-                  endIndex += 1;
-                }
-
-                const systemGroup = renderedMessages.slice(index, endIndex + 1);
-                const firstId = String(
-                  systemGroup[0]?.msg_id || systemGroup[0]?._id || index,
-                );
-                const lastId = String(
-                  systemGroup[systemGroup.length - 1]?.msg_id ||
-                    systemGroup[systemGroup.length - 1]?._id ||
-                    endIndex,
-                );
-                const groupKey = `${firstId}-${lastId}`;
-                const isExpanded = !!expandedSystemGroups[groupKey];
-                const shouldCollapseGroup = systemGroup.length >= 2;
+            timelineItems.map((item) => {
+              if (item.kind === "system-group") {
+                const isExpanded = !!expandedSystemGroups[item.key];
+                const shouldCollapseGroup = item.messages.length >= 2;
                 const visibleSystemMessages =
-                  shouldCollapseGroup && !isExpanded ? [] : systemGroup;
-
-                const firstVisibleMsg = visibleSystemMessages[0];
-                const showGroupTime =
-                  !!firstVisibleMsg &&
-                  shouldShowTimestamp(
-                    firstVisibleMsg.createdAt || "",
-                    prevMsg?.createdAt,
-                  );
+                  shouldCollapseGroup && !isExpanded ? [] : item.messages;
 
                 return (
-                  <React.Fragment key={`system-group-${groupKey}`}>
-                    {showGroupTime && (
-                      <ChatTimeSeparator
-                        time={formatChatTimestamp(
-                          firstVisibleMsg.createdAt || "",
-                        )}
-                      />
-                    )}
+                  <React.Fragment key={item.key}>
+                    {item.showTime && <ChatTimeSeparator time={item.time} />}
 
-                    {visibleSystemMessages.map((systemMsg, systemIdx) => {
+                    {visibleSystemMessages.map((systemMsg) => {
                       const notificationContent = Array.isArray(
                         systemMsg.content,
                       )
                         ? String(systemMsg.content[0] || "")
                         : String(systemMsg.content || "");
 
-                      const prevInVisible =
-                        visibleSystemMessages[systemIdx - 1];
-                      const showInnerTime =
-                        systemIdx > 0 &&
-                        shouldShowTimestamp(
-                          systemMsg.createdAt || "",
-                          prevInVisible?.createdAt,
-                        );
-
                       return (
-                        <React.Fragment
-                          key={`system-${String(systemMsg.msg_id || systemMsg._id || systemIdx)}`}
-                        >
-                          {showInnerTime && (
-                            <ChatTimeSeparator
-                              time={formatChatTimestamp(
-                                systemMsg.createdAt || "",
-                              )}
-                            />
+                        <div
+                          key={`system-${String(systemMsg.msg_id || systemMsg._id)}`}
+                          id={`chat-msg-${systemMsg.msg_id || systemMsg._id}`}
+                          data-message-id={String(
+                            systemMsg.msg_id || systemMsg._id,
                           )}
-                          <div
-                            id={`chat-msg-${systemMsg.msg_id || systemMsg._id}`}
-                            data-message-id={String(
-                              systemMsg.msg_id || systemMsg._id,
-                            )}
-                          >
-                            <ChatNotification
-                              type={systemMsg.type}
-                              content={notificationContent}
-                            />
-                          </div>
-                        </React.Fragment>
+                        >
+                          <ChatNotification
+                            type={systemMsg.type}
+                            content={notificationContent}
+                          />
+                        </div>
                       );
                     })}
 
-                    {shouldCollapseGroup && (
+                    {shouldCollapseGroup &&
+                      visibleSystemMessages.length === 0 && (
+                        <div className="flex justify-center mb-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedSystemGroups((prev) => ({
+                                ...prev,
+                                [item.key]: !isExpanded,
+                              }))
+                            }
+                            className="text-[12px] px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                          >
+                            Xem {item.messages.length} thông báo
+                          </button>
+                        </div>
+                      )}
+
+                    {shouldCollapseGroup && isExpanded && (
                       <div className="flex justify-center mb-2">
                         <button
                           type="button"
                           onClick={() =>
                             setExpandedSystemGroups((prev) => ({
                               ...prev,
-                              [groupKey]: !isExpanded,
+                              [item.key]: false,
                             }))
                           }
                           className="text-[12px] px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
                         >
-                          {isExpanded
-                            ? "Thu gọn thông báo"
-                            : `Xem ${systemGroup.length} thông báo`}
+                          Thu gọn thông báo
                         </button>
                       </div>
                     )}
@@ -2007,26 +2045,26 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 );
               }
 
-              const isMe = msg.sender_id === normalizedUserId;
+              const msg = item.message;
+              const index = item.index;
+              const prevMsg = hydratedMessages[index - 1];
+              const nextMsg = hydratedMessages[index + 1];
+              const prevIsSystem = prevMsg?.type?.startsWith("system_");
               const nextIsSystem = nextMsg?.type?.startsWith("system_");
-              const firstUserMessageIndex = hydratedMessages.findIndex(
-                (item) => !item.type?.startsWith("system_"),
-              );
-              const isTopBoundary = index === firstUserMessageIndex;
-
-              const showTime = shouldShowTimestamp(
-                msg.createdAt || "",
-                prevMsg?.createdAt,
-              );
               const nextShowTime = nextMsg
                 ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
                 : false;
+              const firstUserMessageIndex = hydratedMessages.findIndex(
+                (message) => !message.type?.startsWith("system_"),
+              );
+              const isTopBoundary = index === firstUserMessageIndex;
+              const isMe = msg.sender_id === normalizedUserId;
 
               const isFirstInSequence =
                 !prevMsg ||
                 prevIsSystem ||
                 prevMsg.sender_id !== msg.sender_id ||
-                showTime;
+                item.showTime;
               const isLastInSequence =
                 !nextMsg ||
                 nextIsSystem ||
@@ -2034,14 +2072,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 nextShowTime;
 
               return (
-                <React.Fragment
-                  key={`message-${String(msg.msg_id || msg._id || index)}-${index}`}
-                >
-                  {showTime && (
-                    <ChatTimeSeparator
-                      time={formatChatTimestamp(msg.createdAt || "")}
-                    />
-                  )}
+                <React.Fragment key={item.key}>
+                  {item.showTime && <ChatTimeSeparator time={item.time} />}
 
                   <div
                     id={`chat-msg-${msg.msg_id || msg._id}`}

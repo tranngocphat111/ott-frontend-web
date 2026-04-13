@@ -41,6 +41,84 @@ type MessageLayoutProps = {
   children: (borderRadius: string) => React.ReactNode;
 };
 
+type ReactionEntry = {
+  type: string;
+  userId: string;
+  userName: string;
+  userNickname: string;
+  userAvatar: string;
+};
+
+type ReactionDetailRowProps = {
+  entry: ReactionEntry;
+  index: number;
+  currentUserId?: string;
+};
+
+const ReactionDetailRow = ({
+  entry,
+  index,
+  currentUserId,
+}: ReactionDetailRowProps) => {
+  const isCurrentUser =
+    !!currentUserId &&
+    !!entry.userId &&
+    String(entry.userId) === String(currentUserId);
+
+  const sender = useMessageSender(
+    entry.userId,
+    isCurrentUser,
+    {
+      user_id: entry.userId,
+      name: entry.userName,
+      avatar: entry.userAvatar,
+    },
+    !!entry.userId,
+  );
+
+  const normalizedUserName = String(entry.userName || "").trim();
+  const explicitName =
+    normalizedUserName && normalizedUserName !== String(entry.userId || "")
+      ? normalizedUserName
+      : "";
+  const displayName =
+    String(entry.userNickname || "").trim() ||
+    explicitName ||
+    String(sender?.name || "").trim() ||
+    (entry.userId ? `User ${entry.userId}` : "Người dùng");
+  const avatarUrl = String(entry.userAvatar || sender?.avatar || "").trim();
+
+  return (
+    <div
+      key={`${entry.type}-${entry.userId}-${index}`}
+      className="flex items-center justify-between border-b border-slate-100 px-1 py-2.5 last:border-b-0"
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="h-9 w-9 overflow-hidden rounded-full bg-slate-200">
+          {avatarUrl ? (
+            <img
+              src={getFullUrl(avatarUrl)}
+              alt={displayName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-600">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <span className="truncate text-sm font-medium text-slate-800">
+          {displayName}
+        </span>
+      </div>
+
+      <span className="ml-3 shrink-0">
+        <EmojiGlyph emoji={entry.type} size={18} />
+      </span>
+    </div>
+  );
+};
+
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 const normalizeReactionType = (value: string) => {
@@ -95,7 +173,6 @@ export const MessageLayout = ({
     }),
     [msg.sender_id, msg.sender_name, msg.sender_avatar, msg.sender_avatar_url],
   );
-  
 
   const sender = useMessageSender(msg.sender_id, isMe, preloadedSender);
 
@@ -169,11 +246,21 @@ export const MessageLayout = ({
   const reactionEntries = useMemo(() => {
     const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
 
-    return reactions
+    const parsedReactions = reactions
       .map((reaction: any) => {
-        const reactionType = normalizeReactionType(String(reaction?.type || ""));
+        const reactionType = normalizeReactionType(
+          String(reaction?.type || ""),
+        );
         if (!reactionType) return null;
 
+        const rawNickname =
+          reaction?.nickname ||
+          reaction?.user_nickname ||
+          reaction?.nick_name ||
+          reaction?.participant?.nickname ||
+          reaction?.user?.nickname ||
+          reaction?.account?.nickname ||
+          "";
         const rawName =
           reaction?.user_name ||
           reaction?.name ||
@@ -191,7 +278,8 @@ export const MessageLayout = ({
             reaction?.account?.id ||
             "",
         );
-        const userName = String(rawName || userId || "Người dùng");
+        const userNickname = String(rawNickname || "").trim();
+        const userName = String(rawName || userId || "Người dùng").trim();
         const rawAvatar =
           reaction?.user_avatar ||
           reaction?.avatar ||
@@ -204,8 +292,9 @@ export const MessageLayout = ({
 
         return {
           type: reactionType,
-          userId,
+          userId: String(userId || ""),
           userName,
+          userNickname,
           userAvatar: String(rawAvatar || ""),
         };
       })
@@ -213,8 +302,24 @@ export const MessageLayout = ({
       type: string;
       userId: string;
       userName: string;
+      userNickname: string;
       userAvatar: string;
     }>;
+
+    const dedupedByUser = new Map<string, (typeof parsedReactions)[number]>();
+    const anonymousReactions: typeof parsedReactions = [];
+
+    parsedReactions.forEach((entry) => {
+      if (!entry.userId) {
+        anonymousReactions.push(entry);
+        return;
+      }
+
+      // Keep the latest seen reaction for each user to avoid stale multi-react states.
+      dedupedByUser.set(entry.userId, entry);
+    });
+
+    return [...dedupedByUser.values(), ...anonymousReactions];
   }, [msg.reactions]);
 
   const reactionGroups = useMemo(() => {
@@ -246,7 +351,10 @@ export const MessageLayout = ({
     });
   }, [reactionEntries, currentUserId]);
 
-  const topReactionGroups = useMemo(() => reactionGroups.slice(0, 3), [reactionGroups]);
+  const topReactionGroups = useMemo(
+    () => reactionGroups.slice(0, 3),
+    [reactionGroups],
+  );
 
   const totalReactionCount = useMemo(
     () => reactionGroups.reduce((sum, item) => sum + item.count, 0),
@@ -267,7 +375,9 @@ export const MessageLayout = ({
 
   const filteredReactionEntries = useMemo(() => {
     if (activeReactionFilter === "all") return reactionEntries;
-    return reactionEntries.filter((entry) => entry.type === activeReactionFilter);
+    return reactionEntries.filter(
+      (entry) => entry.type === activeReactionFilter,
+    );
   }, [reactionEntries, activeReactionFilter]);
 
   const myReactionTypes = useMemo(() => {
@@ -302,6 +412,17 @@ export const MessageLayout = ({
     }, 120);
   };
 
+  const handleSelectReaction = async (reaction: string) => {
+    if (!onReact) return;
+
+    const selectedType = normalizeReactionType(reaction);
+    if (!selectedType) return;
+
+    await Promise.resolve(onReact(msg, selectedType));
+
+    setShowReactionPicker(false);
+  };
+
   useEffect(() => {
     return () => clearReactionHoverTimeout();
   }, []);
@@ -310,7 +431,9 @@ export const MessageLayout = ({
     if (!showReactionDetails) return;
     if (activeReactionFilter === "all") return;
 
-    const hasFilter = reactionGroups.some((group) => group.type === activeReactionFilter);
+    const hasFilter = reactionGroups.some(
+      (group) => group.type === activeReactionFilter,
+    );
     if (!hasFilter) {
       setActiveReactionFilter("all");
     }
@@ -768,85 +891,79 @@ export const MessageLayout = ({
                 </button>
               )}
 
-              {/* GỘP TRIGGER VÀ PICKER VÀO CÙNG MỘT KHỐI (Tương tự ảnh Zalo/Discord) */}
-            </div>
-          )}
-
-
-
-          {onReact && !msg.is_deleted && !msg.is_revoked && (
-            <div
-              className={`absolute -bottom-3 ${isMe ? "left-1.5" : "right-1.5"} z-20 ${
-                showReactionPicker
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100"
-              } transition-opacity duration-150`}
-              onMouseEnter={openReactionPickerOnHover}
-              onMouseLeave={closeReactionPickerOnLeave}
-            >
-              <button
-                ref={reactionTriggerRef}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowReactionPicker((prev) => !prev);
-                }}
-                className={`inline-flex items-center justify-center w-7 h-7 rounded-full border border-slate-200/90 shadow-sm transition-colors ${
-                  showReactionPicker
-                    ? "text-slate-600 bg-white"
-                    : "text-slate-400 bg-white/90 hover:text-slate-600 hover:bg-white"
-                }`}
-                title="Thả reaction"
-              >
-                <SmilePlus size={14} strokeWidth={2} />
-              </button>
-
-              {showReactionPicker && (
+              {onReact && !msg.is_deleted && !msg.is_revoked && (
                 <div
-                  ref={reactionDropdownRef}
-                  className={`absolute ${
-                    showReactionPickerUpward
-                      ? "bottom-[calc(100%+6px)] slide-in-from-bottom-2"
-                      : "top-[calc(100%+6px)] slide-in-from-top-2"
-                  } rounded-md bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-0.5 animate-in fade-in zoom-in-95 duration-200 ${
-                    showReactionPickerLeftward
-                      ? `right-0 ${showReactionPickerUpward ? "origin-bottom-right" : "origin-top-right"}`
-                      : `left-0 ${showReactionPickerUpward ? "origin-bottom-left" : "origin-top-left"}`
-                  }`}
+                  className="relative"
+                  onMouseEnter={openReactionPickerOnHover}
+                  onMouseLeave={closeReactionPickerOnLeave}
                 >
-                  {QUICK_REACTIONS.map((reaction) => (
-                    <button
-                      key={reaction}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onReact(msg, normalizeReactionType(reaction));
-                        setShowReactionPicker(false);
-                      }}
-                      className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-slate-100/80 hover:scale-110 transition-all duration-150"
-                    >
-                      <EmojiGlyph emoji={normalizeReactionType(reaction)} size={18} />
-                    </button>
-                  ))}
+                  <button
+                    ref={reactionTriggerRef}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setShowReactionPicker((prev) => !prev);
+                    }}
+                    className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                      showReactionPicker
+                        ? "text-slate-600 bg-slate-100"
+                        : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title="Thả reaction"
+                  >
+                    <SmilePlus size={16} strokeWidth={2} />
+                  </button>
 
-                  {myReactionTypes.length > 0 && (
-                    <>
-                      <div className="mx-1 h-5 w-px bg-slate-200" />
-                      <button
-                        type="button"
-                        onClick={async (event) => {
-                          event.stopPropagation();
-                          for (const type of myReactionTypes) {
-                            await Promise.resolve(onReact(msg, type));
-                          }
-                          setShowReactionPicker(false);
-                        }}
-                        className="w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 transition-all duration-150"
-                        title="Gỡ tất cả reaction của bạn"
-                      >
-                        <X size={16} />
-                      </button>
-                    </>
+                  {showReactionPicker && (
+                    <div
+                      ref={reactionDropdownRef}
+                      className={`absolute ${
+                        showReactionPickerUpward
+                          ? "bottom-[calc(100%+6px)] slide-in-from-bottom-2"
+                          : "top-[calc(100%+6px)] slide-in-from-top-2"
+                      } rounded-md bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-0.5 animate-in fade-in zoom-in-95 duration-200 ${
+                        showReactionPickerLeftward
+                          ? `right-0 ${showReactionPickerUpward ? "origin-bottom-right" : "origin-top-right"}`
+                          : `left-0 ${showReactionPickerUpward ? "origin-bottom-left" : "origin-top-left"}`
+                      }`}
+                    >
+                      {QUICK_REACTIONS.map((reaction) => (
+                        <button
+                          key={reaction}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleSelectReaction(reaction);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-slate-100/80 hover:scale-110 transition-all duration-150"
+                        >
+                          <EmojiGlyph
+                            emoji={normalizeReactionType(reaction)}
+                            size={18}
+                          />
+                        </button>
+                      ))}
+
+                      {myReactionTypes.length > 0 && (
+                        <>
+                          <div className="mx-1 h-5 w-px bg-slate-200" />
+                          <button
+                            type="button"
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              for (const type of myReactionTypes) {
+                                await Promise.resolve(onReact(msg, type));
+                              }
+                              setShowReactionPicker(false);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 transition-all duration-150"
+                            title="Gỡ reaction"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -876,9 +993,11 @@ export const MessageLayout = ({
                     <EmojiGlyph emoji={reaction.type} size={12} />
                   </span>
                 ))}
-                <span className="ml-0.5 text-[10px] font-semibold leading-none text-slate-600 tabular-nums">
-                  {totalReactionCount}
-                </span>
+                {totalReactionCount > 1 && (
+                  <span className="ml-0.5 text-[10px] font-semibold leading-none text-slate-600 tabular-nums">
+                    {totalReactionCount}
+                  </span>
+                )}
               </button>
             </div>
           )}
@@ -940,33 +1059,12 @@ export const MessageLayout = ({
                   </div>
                 ) : (
                   filteredReactionEntries.map((entry, index) => (
-                    <div
+                    <ReactionDetailRow
                       key={`${entry.type}-${entry.userId}-${index}`}
-                      className="flex items-center justify-between border-b border-slate-100 px-1 py-2.5 last:border-b-0"
-                    >
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <div className="h-9 w-9 overflow-hidden rounded-full bg-slate-200">
-                          {entry.userAvatar ? (
-                            <img
-                              src={getFullUrl(entry.userAvatar)}
-                              alt={entry.userName}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-600">
-                              {(entry.userName || "U").charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                        <span className="truncate text-sm font-medium text-slate-800">
-                          {entry.userName}
-                        </span>
-                      </div>
-
-                      <span className="ml-3 shrink-0">
-                        <EmojiGlyph emoji={entry.type} size={18} />
-                      </span>
-                    </div>
+                      entry={entry}
+                      index={index}
+                      currentUserId={currentUserId}
+                    />
                   ))
                 )}
               </div>
