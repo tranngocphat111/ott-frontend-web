@@ -7,6 +7,7 @@ export const RevokedMessage = ({
   isFirstInSequence,
   isLastInSequence,
   isTopBoundary,
+  onDelete,
 }: {
   msg: any;
   isMe: boolean;
@@ -14,6 +15,7 @@ export const RevokedMessage = ({
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
   isTopBoundary?: boolean;
+  onDelete?: (msg: any) => void;
 }) => {
   const placeholder = isMe
     ? "Bạn đã thu hồi một tin nhắn"
@@ -37,6 +39,7 @@ export const RevokedMessage = ({
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
       isTopBoundary={isTopBoundary}
+      onDelete={onDelete}
     >
       {(borderRadius) => (
         <div

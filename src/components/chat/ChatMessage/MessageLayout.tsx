@@ -3,6 +3,7 @@ import {
   MoreVertical,
   SmilePlus,
   Reply,
+  Share2,
   RotateCcw,
   Trash2,
   Pin,
@@ -10,6 +11,7 @@ import {
   Video as VideoIcon,
   FileText,
   Music,
+  X,
 } from "lucide-react";
 
 import { useMessageSender } from "../../../hooks/useMessageSender";
@@ -20,6 +22,8 @@ import {
   getFullUrl,
   getFileNameFromUrl,
 } from "../../../utils";
+import { convertDisplayShortcodeToEmoji } from "../../../constants/emoji.constants";
+import { EmojiGlyph } from "../EmojiGlyph";
 
 type MessageLayoutProps = {
   msg: any;
@@ -33,10 +37,99 @@ type MessageLayoutProps = {
   onRevoke?: (msg: any) => void;
   onDelete?: (msg: any) => void;
   onPin?: (msg: any) => void;
+  onForward?: (msg: any) => void;
   children: (borderRadius: string) => React.ReactNode;
 };
 
+type ReactionEntry = {
+  type: string;
+  userId: string;
+  userName: string;
+  userNickname: string;
+  userAvatar: string;
+};
+
+type ReactionDetailRowProps = {
+  entry: ReactionEntry;
+  index: number;
+  currentUserId?: string;
+};
+
+const ReactionDetailRow = ({
+  entry,
+  index,
+  currentUserId,
+}: ReactionDetailRowProps) => {
+  const isCurrentUser =
+    !!currentUserId &&
+    !!entry.userId &&
+    String(entry.userId) === String(currentUserId);
+
+  const sender = useMessageSender(
+    entry.userId,
+    isCurrentUser,
+    {
+      user_id: entry.userId,
+      name: entry.userName,
+      avatar: entry.userAvatar,
+    },
+    !!entry.userId,
+  );
+
+  const normalizedUserName = String(entry.userName || "").trim();
+  const explicitName =
+    normalizedUserName && normalizedUserName !== String(entry.userId || "")
+      ? normalizedUserName
+      : "";
+  const displayName =
+    String(entry.userNickname || "").trim() ||
+    explicitName ||
+    String(sender?.name || "").trim() ||
+    (entry.userId ? `User ${entry.userId}` : "Người dùng");
+  const avatarUrl = String(entry.userAvatar || sender?.avatar || "").trim();
+
+  return (
+    <div
+      key={`${entry.type}-${entry.userId}-${index}`}
+      className="flex items-center justify-between border-b border-slate-100 px-1 py-2.5 last:border-b-0"
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="h-9 w-9 overflow-hidden rounded-full bg-slate-200">
+          {avatarUrl ? (
+            <img
+              src={getFullUrl(avatarUrl)}
+              alt={displayName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-600">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <span className="truncate text-sm font-medium text-slate-800">
+          {displayName}
+        </span>
+      </div>
+
+      <span className="ml-3 shrink-0">
+        <EmojiGlyph emoji={entry.type} size={18} />
+      </span>
+    </div>
+  );
+};
+
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+const normalizeReactionType = (value: string) => {
+  const normalized = convertDisplayShortcodeToEmoji(String(value || "").trim());
+  const emojiMatch = normalized.match(
+    /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/u,
+  );
+
+  if (emojiMatch?.[0]) return emojiMatch[0];
+  return normalized.split(/\s+/)[0] || "";
+};
 
 export const MessageLayout = ({
   msg,
@@ -50,6 +143,7 @@ export const MessageLayout = ({
   onRevoke,
   onDelete,
   onPin,
+  onForward,
   children,
 }: MessageLayoutProps) => {
   // --- STATE & REF CHO ACTION MENU (MoreVertical) ---
@@ -63,8 +157,13 @@ export const MessageLayout = ({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showReactionPickerUpward, setShowReactionPickerUpward] =
     useState(true);
+  const [showReactionPickerLeftward, setShowReactionPickerLeftward] =
+    useState(true);
+  const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [activeReactionFilter, setActiveReactionFilter] = useState("all");
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
   const reactionDropdownRef = useRef<HTMLDivElement>(null);
+  const reactionHoverTimeoutRef = useRef<number | null>(null);
 
   const preloadedSender = useMemo(
     () => ({
@@ -144,37 +243,205 @@ export const MessageLayout = ({
     );
   };
 
+  const reactionEntries = useMemo(() => {
+    const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
+
+    const parsedReactions = reactions
+      .map((reaction: any) => {
+        const reactionType = normalizeReactionType(
+          String(reaction?.type || ""),
+        );
+        if (!reactionType) return null;
+
+        const rawNickname =
+          reaction?.nickname ||
+          reaction?.user_nickname ||
+          reaction?.nick_name ||
+          reaction?.participant?.nickname ||
+          reaction?.user?.nickname ||
+          reaction?.account?.nickname ||
+          "";
+        const rawName =
+          reaction?.user_name ||
+          reaction?.name ||
+          reaction?.full_name ||
+          reaction?.display_name ||
+          reaction?.user?.name ||
+          reaction?.user?.full_name ||
+          reaction?.account?.name ||
+          reaction?.account?.full_name;
+        const userId = String(
+          reaction?.user_id ||
+            reaction?.account_id ||
+            reaction?.user?.user_id ||
+            reaction?.user?.id ||
+            reaction?.account?.id ||
+            "",
+        );
+        const userNickname = String(rawNickname || "").trim();
+        const userName = String(rawName || userId || "Người dùng").trim();
+        const rawAvatar =
+          reaction?.user_avatar ||
+          reaction?.avatar ||
+          reaction?.avatar_url ||
+          reaction?.user?.avatar ||
+          reaction?.user?.avatar_url ||
+          reaction?.account?.avatar ||
+          reaction?.account?.avatar_url ||
+          "";
+
+        return {
+          type: reactionType,
+          userId: String(userId || ""),
+          userName,
+          userNickname,
+          userAvatar: String(rawAvatar || ""),
+        };
+      })
+      .filter(Boolean) as Array<{
+      type: string;
+      userId: string;
+      userName: string;
+      userNickname: string;
+      userAvatar: string;
+    }>;
+
+    const dedupedByUser = new Map<string, (typeof parsedReactions)[number]>();
+    const anonymousReactions: typeof parsedReactions = [];
+
+    parsedReactions.forEach((entry) => {
+      if (!entry.userId) {
+        anonymousReactions.push(entry);
+        return;
+      }
+
+      // Keep the latest seen reaction for each user to avoid stale multi-react states.
+      dedupedByUser.set(entry.userId, entry);
+    });
+
+    return [...dedupedByUser.values(), ...anonymousReactions];
+  }, [msg.reactions]);
+
   const reactionGroups = useMemo(() => {
     const reactionMap = new Map<
       string,
       { type: string; count: number; reactedByMe: boolean }
     >();
-    const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
 
-    reactions.forEach((reaction: { user_id?: string; type?: string }) => {
-      const reactionType = String(reaction.type || "").trim();
-      if (!reactionType) return;
-
-      const existing = reactionMap.get(reactionType);
+    reactionEntries.forEach((reaction) => {
+      const existing = reactionMap.get(reaction.type);
       if (!existing) {
-        reactionMap.set(reactionType, {
-          type: reactionType,
+        reactionMap.set(reaction.type, {
+          type: reaction.type,
           count: 1,
-          reactedByMe: !!currentUserId && reaction.user_id === currentUserId,
+          reactedByMe: !!currentUserId && reaction.userId === currentUserId,
         });
         return;
       }
 
       existing.count += 1;
-      if (currentUserId && reaction.user_id === currentUserId) {
+      if (currentUserId && reaction.userId === currentUserId) {
         existing.reactedByMe = true;
       }
     });
 
-    return Array.from(reactionMap.values());
-  }, [msg.reactions, currentUserId]);
+    return Array.from(reactionMap.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.type.localeCompare(b.type);
+    });
+  }, [reactionEntries, currentUserId]);
+
+  const topReactionGroups = useMemo(
+    () => reactionGroups.slice(0, 3),
+    [reactionGroups],
+  );
+
+  const totalReactionCount = useMemo(
+    () => reactionGroups.reduce((sum, item) => sum + item.count, 0),
+    [reactionGroups],
+  );
+
+  const detailTabs = useMemo(
+    () => [
+      { key: "all", label: "Tất cả", count: reactionEntries.length },
+      ...reactionGroups.map((group) => ({
+        key: group.type,
+        label: group.type,
+        count: group.count,
+      })),
+    ],
+    [reactionEntries.length, reactionGroups],
+  );
+
+  const filteredReactionEntries = useMemo(() => {
+    if (activeReactionFilter === "all") return reactionEntries;
+    return reactionEntries.filter(
+      (entry) => entry.type === activeReactionFilter,
+    );
+  }, [reactionEntries, activeReactionFilter]);
+
+  const myReactionTypes = useMemo(() => {
+    if (!currentUserId) return [] as string[];
+
+    const types = new Set<string>();
+    reactionEntries.forEach((entry) => {
+      if (String(entry.userId) === String(currentUserId) && entry.type) {
+        types.add(entry.type);
+      }
+    });
+    return Array.from(types);
+  }, [reactionEntries, currentUserId]);
+
+  const clearReactionHoverTimeout = () => {
+    if (reactionHoverTimeoutRef.current) {
+      window.clearTimeout(reactionHoverTimeoutRef.current);
+      reactionHoverTimeoutRef.current = null;
+    }
+  };
+
+  const openReactionPickerOnHover = () => {
+    clearReactionHoverTimeout();
+    setShowReactionPicker(true);
+  };
+
+  const closeReactionPickerOnLeave = () => {
+    clearReactionHoverTimeout();
+    reactionHoverTimeoutRef.current = window.setTimeout(() => {
+      setShowReactionPicker(false);
+      reactionHoverTimeoutRef.current = null;
+    }, 120);
+  };
+
+  const handleSelectReaction = async (reaction: string) => {
+    if (!onReact) return;
+
+    const selectedType = normalizeReactionType(reaction);
+    if (!selectedType) return;
+
+    await Promise.resolve(onReact(msg, selectedType));
+
+    setShowReactionPicker(false);
+  };
+
+  useEffect(() => {
+    return () => clearReactionHoverTimeout();
+  }, []);
+
+  useEffect(() => {
+    if (!showReactionDetails) return;
+    if (activeReactionFilter === "all") return;
+
+    const hasFilter = reactionGroups.some(
+      (group) => group.type === activeReactionFilter,
+    );
+    if (!hasFilter) {
+      setActiveReactionFilter("all");
+    }
+  }, [showReactionDetails, activeReactionFilter, reactionGroups]);
 
   const hasReactions = reactionGroups.length > 0;
+  const isUploadInFlight =
+    msg.local_status === "uploading" || msg.local_status === "error";
   const containerMargin = isLast
     ? hasReactions
       ? "mb-3"
@@ -183,10 +450,21 @@ export const MessageLayout = ({
       ? "mb-4"
       : "mb-1";
 
-  const canDeleteForMe = !!onDelete;
+  const canDeleteForMe = !!onDelete && !isUploadInFlight;
   const canRevokeForAll =
-    isMe && !msg.is_deleted && !msg.is_revoked && !!onRevoke;
-  const canPinMessage = !msg.is_deleted && !msg.is_revoked && !!onPin;
+    isMe &&
+    !msg.is_deleted &&
+    !msg.is_revoked &&
+    !isUploadInFlight &&
+    !!onRevoke;
+  const canPinMessage =
+    !msg.is_deleted && !msg.is_revoked && !isUploadInFlight && !!onPin;
+  const canForwardMessage =
+    !msg.is_deleted &&
+    !msg.is_revoked &&
+    !String(msg.type || "").startsWith("system_") &&
+    !isUploadInFlight &&
+    !!onForward;
 
   // ==========================================
   // EFFECT 1: CLICK OUTSIDE CHO ACTION MENU
@@ -294,20 +572,26 @@ export const MessageLayout = ({
     const measurePlacement = () => {
       const trigger = reactionTriggerRef.current;
       const dropdown = reactionDropdownRef.current;
-      if (!trigger || !dropdown) return;
-
+      if (!trigger) return;
       const triggerRect = trigger.getBoundingClientRect();
-      const dropdownHeight = dropdown.offsetHeight || 50;
-      const spaceBelow = window.innerHeight - triggerRect.bottom;
-      const spaceAbove = triggerRect.top;
+      const isUpperHalf = triggerRect.top < window.innerHeight / 2;
+      const dropdownWidth = dropdown?.offsetWidth || 290;
+      const gutter = 12;
 
-      if (spaceAbove >= dropdownHeight + 20) {
-        setShowReactionPickerUpward(true);
-      } else if (spaceBelow >= dropdownHeight + 20) {
-        setShowReactionPickerUpward(false);
+      const spaceToLeft = triggerRect.right;
+      const spaceToRight = window.innerWidth - triggerRect.left;
+      const preferredLeftward = triggerRect.left > window.innerWidth / 2;
+
+      if (preferredLeftward && spaceToLeft >= dropdownWidth + gutter) {
+        setShowReactionPickerLeftward(true);
+      } else if (!preferredLeftward && spaceToRight >= dropdownWidth + gutter) {
+        setShowReactionPickerLeftward(false);
       } else {
-        setShowReactionPickerUpward(true);
+        setShowReactionPickerLeftward(spaceToLeft >= spaceToRight);
       }
+
+      // Upper half => open downward, lower half => open upward.
+      setShowReactionPickerUpward(!isUpperHalf);
     };
 
     const rafId = window.requestAnimationFrame(() => {
@@ -361,9 +645,7 @@ export const MessageLayout = ({
       <div
         className={`group flex flex-col max-w-[75%] sm:max-w-[70%] ${
           isMe ? "items-end" : "items-start"
-        } relative ${
-          showActionMenu || showReactionPicker ? "z-20" : ""
-        }`}
+        } relative ${showActionMenu || showReactionPicker ? "z-20" : ""}`}
       >
         {!isMe && (isFirst || isTopBoundary) && (
           <span className="text-[12px] font-medium text-slate-500 mb-1 ml-1 select-none">
@@ -502,7 +784,8 @@ export const MessageLayout = ({
             onReact ||
             canDeleteForMe ||
             canRevokeForAll ||
-            canPinMessage) && (
+            canPinMessage ||
+            canForwardMessage) && (
             <div
               className={`absolute top-1/2 -translate-y-1/2  flex items-center gap-0.5 ${
                 isMe ? "right-full mr-2" : "left-full ml-2"
@@ -512,7 +795,10 @@ export const MessageLayout = ({
                   : "opacity-0 group-hover:opacity-100"
               } transition-all duration-200`}
             >
-              {(canDeleteForMe || canRevokeForAll || canPinMessage) && (
+              {(canDeleteForMe ||
+                canRevokeForAll ||
+                canPinMessage ||
+                canForwardMessage) && (
                 <div className="relative" ref={actionMenuRef}>
                   <button
                     ref={actionButtonRef}
@@ -554,6 +840,20 @@ export const MessageLayout = ({
                           {msg.is_pinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
                         </button>
                       )}
+                      {canForwardMessage && onForward && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setShowActionMenu(false);
+                            onForward(msg);
+                          }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors"
+                        >
+                          <Share2 size={14} />
+                          Chuyển tiếp
+                        </button>
+                      )}
                       {canRevokeForAll && onRevoke && (
                         <button
                           type="button"
@@ -568,6 +868,7 @@ export const MessageLayout = ({
                           Thu hồi tin nhắn
                         </button>
                       )}
+
                       {canDeleteForMe && onDelete && (
                         <button
                           type="button"
@@ -587,112 +888,203 @@ export const MessageLayout = ({
                 </div>
               )}
 
-              {onReply && !msg.is_deleted && !msg.is_revoked && (
-                <button
-                  type="button"
-                  onClick={() => onReply(msg)}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                  title="Trả lời"
-                >
-                  <Reply size={16} strokeWidth={2} />
-                </button>
-              )}
-
-              {/* GỘP TRIGGER VÀ PICKER VÀO CÙNG MỘT KHỐI (Tương tự ảnh Zalo/Discord) */}
-              {onReact && !msg.is_deleted && !msg.is_revoked && (
-                <div className="relative flex items-center justify-center">
+              {onReply &&
+                !msg.is_deleted &&
+                !msg.is_revoked &&
+                !isUploadInFlight && (
                   <button
-                    ref={reactionTriggerRef}
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setShowReactionPicker((prev) => !prev);
-                    }}
-                    className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                      showReactionPicker
-                        ? "text-slate-600 bg-slate-100"
-                        : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                    }`}
-                    title="Thả reaction"
+                    onClick={() => onReply(msg)}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    title="Trả lời"
                   >
-                    <SmilePlus size={16} strokeWidth={2} />
+                    <Reply size={16} strokeWidth={2} />
                   </button>
+                )}
 
-                  {showReactionPicker && (
-                    <div
-                      ref={reactionDropdownRef}
-                      className={`absolute ${
-                        showReactionPickerUpward
-                          ? "bottom-[calc(100%+6px)] slide-in-from-bottom-2"
-                          : "top-[calc(100%+6px)] slide-in-from-top-2"
-                      } rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-200 ${
-                        // Tin nhắn của mình (thanh công cụ ở bên TRÁI tin nhắn) -> Bảng đổ về bên PHẢI (left-[-8px])
-                        // Tin nhắn người khác (thanh công cụ ở bên PHẢI tin nhắn) -> Bảng đổ về bên TRÁI (right-[-8px])
-                        isMe
-                          ? `right-0 ${showReactionPickerUpward ? "origin-bottom-left" : "origin-top-left"}`
-                          : `left-0 ${showReactionPickerUpward ? "origin-bottom-right" : "origin-top-right"}`
+              {onReact &&
+                !msg.is_deleted &&
+                !msg.is_revoked &&
+                !isUploadInFlight && (
+                  <div
+                    className="relative"
+                    onMouseEnter={openReactionPickerOnHover}
+                    onMouseLeave={closeReactionPickerOnLeave}
+                  >
+                    <button
+                      ref={reactionTriggerRef}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowReactionPicker((prev) => !prev);
+                      }}
+                      className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                        showReactionPicker
+                          ? "text-slate-600 bg-slate-100"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                       }`}
+                      title="Thả reaction"
                     >
-                      {QUICK_REACTIONS.map((reaction) => (
-                        <button
-                          key={reaction}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onReact(msg, reaction);
-                            setShowReactionPicker(false);
-                          }}
-                          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100/80 hover:scale-125 hover:-translate-y-1 transition-all duration-200 group/emoji"
-                          title={`Thả ${reaction}`}
-                        >
-                          <span className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors">
-                            {reaction}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                      <SmilePlus size={16} strokeWidth={2} />
+                    </button>
+
+                    {showReactionPicker && (
+                      <div
+                        ref={reactionDropdownRef}
+                        className={`absolute ${
+                          showReactionPickerUpward
+                            ? "bottom-[calc(100%+6px)] slide-in-from-bottom-2"
+                            : "top-[calc(100%+6px)] slide-in-from-top-2"
+                        } rounded-md bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-0.5 animate-in fade-in zoom-in-95 duration-200 ${
+                          showReactionPickerLeftward
+                            ? `right-0 ${showReactionPickerUpward ? "origin-bottom-right" : "origin-top-right"}`
+                            : `left-0 ${showReactionPickerUpward ? "origin-bottom-left" : "origin-top-left"}`
+                        }`}
+                      >
+                        {QUICK_REACTIONS.map((reaction) => (
+                          <button
+                            key={reaction}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleSelectReaction(reaction);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-slate-100/80 hover:scale-110 transition-all duration-150"
+                          >
+                            <EmojiGlyph
+                              emoji={normalizeReactionType(reaction)}
+                              size={18}
+                            />
+                          </button>
+                        ))}
+
+                        {myReactionTypes.length > 0 && (
+                          <>
+                            <div className="mx-1 h-5 w-px bg-slate-200" />
+                            <button
+                              type="button"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                for (const type of myReactionTypes) {
+                                  await Promise.resolve(onReact(msg, type));
+                                }
+                                setShowReactionPicker(false);
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 transition-all duration-150"
+                              title="Gỡ reaction"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
           )}
 
           {/* HIỂN THỊ REACTION ĐÃ THẢ */}
           {hasReactions && (
             <div
-              className={`absolute -bottom-3.5 ${
-                isMe ? "right-1" : "left-1"
-              } flex flex-row items-center gap-1 z-20`}
+              className={`absolute ${
+                msg.type === "video" || msg.type === "image"
+                  ? "-bottom-0.5"
+                  : "-bottom-2.5"
+              } ${isMe ? "right-0" : "left-0"} z-20 flex items-center gap-0.5 rounded-full bg-white py-px shadow-sm ring-1 ring-slate-100/50 select-none`}
             >
-              {reactionGroups.map((reaction) => (
-                <button
-                  key={reaction.type}
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onReact?.(msg, reaction.type);
-                  }}
-                  className={`inline-flex items-center justify-center rounded-full bg-white shadow-sm border px-1.5 py-0.5 transition-transform hover:scale-105 ${
-                    reaction.reactedByMe
-                      ? "border-blue-300 text-blue-600"
-                      : "border-slate-200 text-slate-600"
-                  }`}
-                  title="Đổi reaction"
-                >
-                  <span className="text-[13px] leading-none">
-                    {reaction.type}
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveReactionFilter("all");
+                  setShowReactionDetails(true);
+                }}
+                className="flex items-center gap-0.5 rounded-full px-1 py-0.5 transition-colors hover:bg-slate-50"
+                title="Xem chi tiết biểu cảm"
+              >
+                {topReactionGroups.map((reaction) => (
+                  <EmojiGlyph emoji={reaction.type} size={12} />
+                ))}
+                {totalReactionCount > 1 && (
+                  <span className="ml-0.5 text-[10px] font-semibold leading-none text-slate-600 tabular-nums">
+                    {totalReactionCount}
                   </span>
-                  {reaction.count > 1 && (
-                    <span className="ml-1 text-[11px] font-bold leading-none">
-                      {reaction.count}
-                    </span>
-                  )}
-                </button>
-              ))}
+                )}
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      {showReactionDetails && (
+        <div
+          className="fixed inset-0 z-120 flex items-center justify-center bg-black/35 px-4"
+          onClick={() => setShowReactionDetails(false)}
+        >
+          <div
+            className="w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+              <h3 className="text-4xl font-semibold">Biểu cảm</h3>
+              <button
+                type="button"
+                onClick={() => setShowReactionDetails(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                title="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid max-h-[70vh] grid-cols-[150px_1fr]">
+              <div className="border-r border-slate-200 bg-slate-50 px-2 py-2">
+                {detailTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveReactionFilter(tab.key)}
+                    className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                      activeReactionFilter === tab.key
+                        ? "bg-slate-200 text-slate-900"
+                        : "text-slate-600 hover:bg-slate-200/80"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {tab.key === "all" ? (
+                        <span>{tab.label}</span>
+                      ) : (
+                        <EmojiGlyph emoji={tab.label} size={16} />
+                      )}
+                    </span>
+                    <span className="text-xs tabular-nums text-slate-500">
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="min-h-70 overflow-y-auto bg-white px-4 py-2">
+                {filteredReactionEntries.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                    Chưa có biểu cảm nào
+                  </div>
+                ) : (
+                  filteredReactionEntries.map((entry, index) => (
+                    <ReactionDetailRow
+                      key={`${entry.type}-${entry.userId}-${index}`}
+                      entry={entry}
+                      index={index}
+                      currentUserId={currentUserId}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

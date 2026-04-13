@@ -17,6 +17,7 @@
     "lucide-react": "^0.562.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
+    "react-contenteditable": "^3.3.7",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
     "react-native-qrcode-svg": "^6.3.21",

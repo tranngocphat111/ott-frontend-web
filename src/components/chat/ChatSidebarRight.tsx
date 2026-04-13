@@ -145,7 +145,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     try {
       const results = await Promise.allSettled([
         ParticipantService.getMembers(conversation._id),
-        MessageService.getPinnedMessages(conversation._id),
+        MessageService.getPinnedMessages(conversation._id, currentUser?._id),
         MessageService.getMediaMessages(conversation._id),
         MessageService.getFileMessages(conversation._id),
         MessageService.getLinkMessages(conversation._id),
@@ -217,7 +217,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [conversation?._id]);
+  }, [conversation?._id, currentUser?._id]);
 
   // Load data
   useEffect(() => {
@@ -465,6 +465,9 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     (item) => item.conversation._id === conversation._id,
   )?.participant;
   const isManager = Boolean(isOwner || currentParticipant?.roles === "admin");
+  const selfConversationId =
+    conversations.find((item) => item.conversation.is_self_conversation)
+      ?.conversation._id || "";
 
   // Safety checks
   if (!isOpen || !conversation) return null;
@@ -531,7 +534,8 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     usagePercent - imagePercent - videoPercent - filePercent,
   );
 
-  const selfTitle = (conversation.name || "My Documents").trim() || "My Documents";
+  const selfTitle =
+    (conversation.name || "My Documents").trim() || "My Documents";
 
   return (
     <>
@@ -659,15 +663,15 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               </div>
             ) : (
               conversation._id && (
-              <GroupInfoHeader
-                conversation={conversation}
-                memberCount={members.length}
-                onUpdate={(updates) =>
-                  updateConversation?.(conversation._id, updates)
-                }
-                isAdmin={isManager}
-                currentUserId={currentUser?._id || currentUser?.user_id}
-              />
+                <GroupInfoHeader
+                  conversation={conversation}
+                  memberCount={members.length}
+                  onUpdate={(updates) =>
+                    updateConversation?.(conversation._id, updates)
+                  }
+                  isAdmin={isManager}
+                  currentUserId={currentUser?._id || currentUser?.user_id}
+                />
               )
             )}
 
@@ -703,17 +707,19 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             {/* Nickname section for both group and private */}
             {!isSelfConversation &&
               (conversation.type === "group" ||
-              conversation.type === "private") && (
-              <CollapsibleSection
-                title="Biệt danh"
-                icon={<UserRoundPen size={20} />}
-                onClick={() => setShowNicknameModal(true)}
-                showIndicator={false}
-              />
-            )}
+                conversation.type === "private") && (
+                <CollapsibleSection
+                  title="Biệt danh"
+                  icon={<UserRoundPen size={20} />}
+                  onClick={() => setShowNicknameModal(true)}
+                  showIndicator={false}
+                />
+              )}
 
             <CollapsibleSection
-              title={isSelfConversation ? "Danh sách nhắc hẹn" : "Bảng tin nhóm"}
+              title={
+                isSelfConversation ? "Danh sách nhắc hẹn" : "Bảng tin nhóm"
+              }
               icon={<Pin size={20} />}
               badge={pinnedMessages.length}
               defaultOpen={true}
@@ -748,6 +754,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               <FilesList
                 messages={fileMessagesPreview}
                 onViewAll={handleViewAllFiles}
+                currentUserId={currentUser?._id || currentUser?.user_id}
+                currentConversationId={conversation._id}
+                selfConversationId={selfConversationId}
+                onDataChanged={() => {
+                  void loadSidebarData();
+                }}
               />
             </CollapsibleSection>
 

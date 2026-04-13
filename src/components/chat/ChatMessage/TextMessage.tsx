@@ -1,5 +1,5 @@
 import type { Message } from "../../../types";
-import { convertShortcodeToEmoji } from "../../../utils";
+import { EmojiText } from "../EmojiText";
 import { MessageLayout } from "./MessageLayout";
 
 export const TextMessage = ({
@@ -14,6 +14,7 @@ export const TextMessage = ({
   onRevoke,
   onDelete,
   onPin,
+  onForward,
 }: {
   msg: Message;
   isMe: boolean;
@@ -26,6 +27,7 @@ export const TextMessage = ({
   onRevoke?: (msg: Message) => void;
   onDelete?: (msg: Message) => void;
   onPin?: (msg: Message) => void;
+  onForward?: (msg: Message) => void;
 }) => {
   const text = Array.isArray(msg.content)
     ? msg.content.join("")
@@ -44,10 +46,11 @@ export const TextMessage = ({
       onRevoke={onRevoke}
       onDelete={onDelete}
       onPin={onPin}
+      onForward={onForward}
     >
       {(borderRadius) => (
         <div
-          className={`h-10 px-3 text-[15px] leading-relaxed shadow-sm wrap-break-word whitespace-nowrap overflow-hidden flex items-center transition-all border
+          className={`px-3 py-2 text-[15px] leading-relaxed shadow-sm wrap-break-word whitespace-pre-wrap transition-all border
           ${
             isMe
               ? "bg-chat-me text-chat-me-text border-chat-me"
@@ -56,7 +59,11 @@ export const TextMessage = ({
           ${borderRadius} 
           `}
         >
-          {convertShortcodeToEmoji(text)}
+          <EmojiText
+            text={text}
+            emojiSize={18}
+            emojiClassName="inline-block align-[-0.2em] me-1"
+          />
         </div>
       )}
     </MessageLayout>

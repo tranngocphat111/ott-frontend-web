@@ -11,7 +11,11 @@ import type { Category } from "../../types";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { PiTagSimpleFill } from "react-icons/pi";
 import { FaBellSlash } from "react-icons/fa6";
-import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils";
+import {
+  getConversationDisplayAvatar,
+  getConversationDisplayName,
+} from "../../utils";
+import { EmojiText } from "../chat/EmojiText";
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   item,
@@ -20,7 +24,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations, updateParticipant } = useConversations();
+  const { categories, refreshConversations, updateParticipant } =
+    useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -44,12 +49,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   }, [participant.settings.category_id, categories]);
 
   // Check if conversation is muted
-  const isMuted = !!(participant.settings.notification_status === 'mute' && 
-                    participant.settings.mute_until && 
-                    new Date(participant.settings.mute_until) > new Date());
+  const isMuted = !!(
+    participant.settings.notification_status === "mute" &&
+    participant.settings.mute_until &&
+    new Date(participant.settings.mute_until) > new Date()
+  );
 
   const getConversationName = (): string => {
-    return getConversationDisplayName(conversation, currentUserId) || "Conversation";
+    return (
+      getConversationDisplayName(conversation, currentUserId) || "Conversation"
+    );
   };
 
   const getConversationAvatar = (): string | undefined => {
@@ -63,10 +72,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
     if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
 
-    const senderParticipant = (conversation.participants || []).find((participant) => {
-      const participantId = String(participant.user_id || participant._id || "");
-      return participantId === String(lastMsg.sender_id || "");
-    });
+    const senderParticipant = (conversation.participants || []).find(
+      (participant) => {
+        const participantId = String(
+          participant.user_id || participant._id || "",
+        );
+        return participantId === String(lastMsg.sender_id || "");
+      },
+    );
 
     const preferredSenderName =
       (senderParticipant?.nickname || "").trim() ||
@@ -82,8 +95,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const getTimeDisplay = (): string => {
     // Ưu tiên thời gian từ last_message
-    const time =
-      conversation.last_message?.createdAt || conversation.createdAt;
+    const time = conversation.last_message?.createdAt || conversation.createdAt;
     return formatTimeAgo(time);
   };
 
@@ -138,21 +150,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (!currentUserId) return;
 
     let muteUntil: Date | null = null;
-    let status: 'on' | 'mute' = 'mute';
+    let status: "on" | "mute" = "mute";
 
     // Handle unmute
-    if (duration === 'unmute') {
-      status = 'on';
+    if (duration === "unmute") {
+      status = "on";
       muteUntil = null;
-    } else if (duration === '1h') {
+    } else if (duration === "1h") {
       muteUntil = new Date(Date.now() + 60 * 60 * 1000);
-    } else if (duration === '4h') {
+    } else if (duration === "4h") {
       muteUntil = new Date(Date.now() + 4 * 60 * 60 * 1000);
-    } else if (duration === '8h') {
+    } else if (duration === "8h") {
       muteUntil = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    } else if (duration === 'forever') {
+    } else if (duration === "forever") {
       // Set a far future date for "forever"
-      muteUntil = new Date('2099-12-31');
+      muteUntil = new Date("2099-12-31");
     }
 
     try {
@@ -162,7 +174,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         status,
         muteUntil,
       );
-      
+
       // Refresh from API to get updated data from database
       await refreshConversations(currentUserId);
     } catch (error) {
@@ -184,10 +196,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         currentUserId,
       );
       // Cập nhật deleted_msg_id trong state — Sidebar filter sẽ tự động ẩn conversation
-      updateParticipant(conversation._id, { deleted_msg_id: updatedParticipant.deleted_msg_id });
+      updateParticipant(conversation._id, {
+        deleted_msg_id: updatedParticipant.deleted_msg_id,
+      });
       setIsDeleteModalOpen(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
+      const message =
+        error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
       window.alert(message);
       console.error("Error deleting conversation:", error);
     } finally {
@@ -242,7 +257,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <MessageCircle className="w-3 h-3 text-primary-500" />
               )}
             </div>
-
           </div>
 
           {/* Content */}
@@ -264,10 +278,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </div>
 
               <div className="flex items-center space-x-1 ml-2 ">
-                {isMuted && (
-                  <FaBellSlash  className="w-4 h-4 text-gray-400" />
-                )}
-                <span className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}>
+                {isMuted && <FaBellSlash className="w-4 h-4 text-gray-400" />}
+                <span
+                  className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}
+                >
                   {getTimeDisplay()}
                 </span>
               </div>
@@ -282,8 +296,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 />
               )}
 
-              <p className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}>
-                {getLatestMessagePreview()}
+              <p
+                className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}
+              >
+                <EmojiText
+                  text={getLatestMessagePreview()}
+                  emojiSize={15}
+                  emojiClassName="inline-block align-[-0.2em] me-1"
+                />
               </p>
 
               {/* Unread badge */}

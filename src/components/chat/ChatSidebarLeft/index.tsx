@@ -9,7 +9,11 @@ import { ConversationService } from "../../../services/conversation.service";
 import { CategoryService, socketService } from "../../../services";
 import { useConversations } from "../../../contexts/ConversationsContext";
 import { useUser } from "../../../contexts/UserContext";
-import type { ConversationWithParticipant, FilterMode, User } from "../../../types";
+import type {
+  ConversationWithParticipant,
+  FilterMode,
+  User,
+} from "../../../types";
 import type { SidebarProps } from "../../../interfaces";
 import { SearchResultsPanel, SidebarHeader } from "./components";
 import useChatSearch from "../../../hooks/useChatSearch";
@@ -293,7 +297,9 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
               selectedSenderName={selectedSenderName}
               senderSearchText={senderSearchText}
               filteredSenderOptions={filteredSenderOptions}
-              onToggleSenderDropdown={() => setIsSenderDropdownOpen((prev) => !prev)}
+              onToggleSenderDropdown={() =>
+                setIsSenderDropdownOpen((prev) => !prev)
+              }
               onSenderSearchTextChange={setSenderSearchText}
               onSelectAllSender={() => {
                 setMessageSenderFilter("");

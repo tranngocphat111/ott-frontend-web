@@ -26,6 +26,86 @@ export const useChat = (conversationId: string, userId?: string) => {
     }
   }, []);
 
+  const getMessageStableId = useCallback((message: any) => {
+    return String(message?.msg_id || message?._id || "").trim();
+  }, []);
+
+  const normalizeMessageOrder = useCallback(
+    (list: any[]): Message[] => {
+      if (!Array.isArray(list) || list.length === 0) return [];
+
+      const byId = new Map<string, any>();
+      const withoutId: any[] = [];
+
+      list.forEach((item) => {
+        const stableId = getMessageStableId(item);
+        if (!stableId) {
+          withoutId.push(item);
+          return;
+        }
+        byId.set(stableId, item);
+      });
+
+      const withId = Array.from(byId.values()).sort((a, b) => {
+        const leftId = getMessageStableId(a);
+        const rightId = getMessageStableId(b);
+        return compareMessageIds(leftId, rightId);
+      });
+
+      return [...withId, ...withoutId] as Message[];
+    },
+    [compareMessageIds, getMessageStableId],
+  );
+
+  const normalizeIncomingMessage = useCallback((payload: any) => {
+    if (!payload) return null;
+
+    if (typeof payload === "object") {
+      if (payload.result && typeof payload.result === "object") {
+        return payload.result;
+      }
+
+      if (payload.message && typeof payload.message === "object") {
+        return payload.message;
+      }
+    }
+
+    return payload;
+  }, []);
+
+  const appendMessage = useCallback(
+    (payload: any) => {
+      const normalized = normalizeIncomingMessage(payload) as
+        | (Message & { _id?: string; msg_id?: string; conversationId?: string })
+        | null;
+      if (!normalized) return;
+
+      const msgConvId = String(
+        normalized.conversation_id || normalized.conversationId || "",
+      );
+      if (msgConvId && msgConvId !== String(conversationId || "")) return;
+
+      setMessages((prev) => {
+        const incomingMsgId = String(normalized.msg_id || normalized._id || "");
+        if (
+          incomingMsgId &&
+          prev.some(
+            (item: Message & { _id?: string; msg_id?: string }) =>
+              String(item.msg_id || item._id || "") === incomingMsgId,
+          )
+        ) {
+          return prev;
+        }
+
+        const nextMessages = [...prev, normalized as Message];
+
+        messagesRef.current = nextMessages;
+        return nextMessages;
+      });
+    },
+    [conversationId, normalizeIncomingMessage],
+  );
+
   // Reset messages khi đổi conversation, tránh dùng tin nhắn cũ
   useEffect(() => {
     setMessages([]);
@@ -62,7 +142,7 @@ export const useChat = (conversationId: string, userId?: string) => {
         console.log(
           `✓ Loaded ${data.messageCount} messages (source: ${data.source})`,
         );
-        const nextMessages = data.messages || [];
+        const nextMessages = normalizeMessageOrder(data.messages || []);
         messagesRef.current = nextMessages;
         setMessages(nextMessages);
         // Do not hard-stop by visible count (it may be <20 due to deleted_for filtering).
@@ -77,8 +157,9 @@ export const useChat = (conversationId: string, userId?: string) => {
       // Fallback to old method if new API fails
       try {
         const data = await MessageService.getMessages(conversationId, userId);
-        messagesRef.current = data;
-        setMessages(data);
+        const nextMessages = normalizeMessageOrder(data || []);
+        messagesRef.current = nextMessages;
+        setMessages(nextMessages);
         setHasMoreAfter(false);
       } catch (fallbackError) {
         console.error("Fallback method also failed:", fallbackError);
@@ -127,7 +208,10 @@ export const useChat = (conversationId: string, userId?: string) => {
           console.log(`✓ Loaded ${data.messageCount} older messages`);
           // Prepend older messages
           setMessages((prev) => {
-            const nextMessages = [...(data.messages || []), ...prev];
+            const nextMessages = normalizeMessageOrder([
+              ...(data.messages || []),
+              ...prev,
+            ]);
             messagesRef.current = nextMessages;
             return nextMessages;
           });
@@ -162,7 +246,7 @@ export const useChat = (conversationId: string, userId?: string) => {
 
         if (!data?.success) return false;
 
-        const nextMessages = data.messages || [];
+        const nextMessages = normalizeMessageOrder(data.messages || []);
         messagesRef.current = nextMessages;
         setMessages(nextMessages);
         setHasMore(Boolean(data.hasMoreBefore ?? nextMessages.length > 0));
@@ -243,7 +327,7 @@ export const useChat = (conversationId: string, userId?: string) => {
           appendedCount = appendable.length;
           if (appendable.length === 0) return prev;
 
-          const nextMessages = [...prev, ...appendable];
+          const nextMessages = normalizeMessageOrder([...prev, ...appendable]);
           messagesRef.current = nextMessages;
           return nextMessages;
         });
@@ -262,24 +346,16 @@ export const useChat = (conversationId: string, userId?: string) => {
         hasMoreAfter: false,
       };
     }
-  }, [compareMessageIds, conversationId, userId]);
+  }, [compareMessageIds, conversationId, normalizeMessageOrder, userId]);
 
   /**
    * Handle new message from Socket.IO
    */
   const handleNewMessage = useCallback(
     (msg: any) => {
-      const msgConvId = msg.conversation_id?.toString() || msg.conversationId;
-      if (msgConvId !== conversationId) return;
-
-      setMessages((prev) => {
-        // Avoid duplicates
-        if (prev.some((m: any) => m._id === msg._id || m.msg_id === msg.msg_id))
-          return prev;
-        return [...prev, msg];
-      });
+      appendMessage(msg);
     },
-    [conversationId],
+    [appendMessage],
   );
 
   /**
@@ -469,6 +545,7 @@ export const useChat = (conversationId: string, userId?: string) => {
 
   return {
     messages,
+    appendMessage,
     loadMessages,
     loadOlderMessages,
     loadMessageContext,

@@ -22,6 +22,11 @@ import { useChat } from "../../hooks/useChat";
 import { primeMessageSenderCache } from "../../hooks/useMessageSender";
 import { MessageService, ParticipantService } from "../../services";
 import type { ChatAreaProps } from "../../interfaces";
+import type {
+  ImageSendError,
+  ImageSendSuccess,
+  Message as ChatMessageType,
+} from "../../types/message.type";
 
 // Components
 import { ChatHeader } from "./ChatHeader";
@@ -33,6 +38,7 @@ import { ChatTimeSeparator } from "./ChatTimeSeparator";
 import ChatSidebarRight from "./ChatSidebarRight";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import { ReplacePinnedModal } from "../modal/ReplacePinnedModal";
+import { ForwardMessageModal } from "../modal/ForwardMessageModal";
 
 // Utils
 import {
@@ -70,6 +76,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const {
     messages,
+    appendMessage,
     loadMessages,
     loadOlderMessages,
     loadMessageContext,
@@ -106,6 +113,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const initialScrollRafRef = useRef<number | null>(null);
   const prevMessageCountRef = useRef(0);
   const prevLastMessageIdRef = useRef<string | null>(null);
+  const autoFillOlderRef = useRef(false);
 
   // State quản lý Media Viewer & Tin nhắn
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -115,11 +123,37 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [showPinnedMenu, setShowPinnedMenu] = useState(false);
+  const [expandedSystemGroups, setExpandedSystemGroups] = useState<
+    Record<string, boolean>
+  >({});
   const [replacePinModalOpen, setReplacePinModalOpen] = useState(false);
   const [pendingPinMessage, setPendingPinMessage] = useState<Message | null>(
     null,
   );
+  const [forwardModalOpen, setForwardModalOpen] = useState(false);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(
+    null,
+  );
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [locallyRemovedPinnedMap, setLocallyRemovedPinnedMap] = useState<
+    Record<string, Message>
+  >({});
+  const [removedPinnedNoticeOpen, setRemovedPinnedNoticeOpen] = useState(false);
+  const [optimisticImageMessages, setOptimisticImageMessages] = useState<
+    Array<ChatMessageType>
+  >([]);
+  const imageUploadRemovalTimersRef = useRef<Map<string, number>>(new Map());
   const pinnedMenuRef = useRef<HTMLDivElement>(null);
+
+  const getStableMessageId = useCallback((msg?: Message | null) => {
+    return String(msg?.msg_id || msg?._id || "").trim();
+  }, []);
+
+  const getPinnedScopeKey = useCallback(
+    (conversationId: string, messageId: string) =>
+      `${conversationId}:${String(messageId || "").trim()}`,
+    [],
+  );
 
   const applyJumpHighlight = useCallback((container: HTMLElement | null) => {
     // 1. Guard clause: Tránh lỗi crash app nếu container chưa tồn tại
@@ -172,29 +206,250 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     return getConversationDisplayName(activeConversation, normalizedUserId);
   };
 
-  const loadPinnedMessages = useCallback(async () => {
+  const revokePreviewUrls = useCallback((urls?: string[]) => {
+    (urls || []).forEach((url) => {
+      if (typeof url === "string" && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    imageUploadRemovalTimersRef.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    imageUploadRemovalTimersRef.current.clear();
+
+    setOptimisticImageMessages((prev) => {
+      prev.forEach((item) => revokePreviewUrls(item.local_preview_urls));
+      return [];
+    });
+  }, [activeConversation?._id, revokePreviewUrls]);
+
+  const clearImageRemovalTimer = useCallback((clientMessageId: string) => {
+    const timerId = imageUploadRemovalTimersRef.current.get(clientMessageId);
+    if (timerId) {
+      window.clearTimeout(timerId);
+      imageUploadRemovalTimersRef.current.delete(clientMessageId);
+    }
+  }, []);
+
+  const upsertOptimisticImageMessage = useCallback(
+    (draft: ChatMessageType) => {
+      const clientMessageId = String(
+        draft.local_client_id || draft.msg_id || draft._id || "",
+      );
+      if (!clientMessageId) return;
+
+      clearImageRemovalTimer(clientMessageId);
+
+      setOptimisticImageMessages((prev) => {
+        const existing = prev.find(
+          (item) =>
+            String(item.local_client_id || item.msg_id || item._id || "") ===
+            clientMessageId,
+        );
+
+        if (
+          existing?.local_preview_urls?.length &&
+          draft.local_preview_urls?.length
+        ) {
+          if (
+            existing.local_preview_urls.join("|") !==
+            draft.local_preview_urls.join("|")
+          ) {
+            revokePreviewUrls(existing.local_preview_urls);
+          }
+        }
+
+        const optimisticMessage: ChatMessageType = {
+          ...draft,
+          _id: draft._id || clientMessageId,
+          msg_id: draft.msg_id || clientMessageId,
+          created_at: draft.created_at || new Date().toISOString(),
+          createdAt: draft.createdAt || new Date().toISOString(),
+          sender_name:
+            draft.sender_name ||
+            currentUser?.name ||
+            currentUser?.display_name ||
+            "Bạn",
+          reactions: Array.isArray(draft.reactions) ? draft.reactions : [],
+          local_status: draft.local_status || "uploading",
+          local_error: draft.local_error,
+          local_upload_progress: draft.local_upload_progress ?? 0,
+          local_preview_urls: draft.local_preview_urls || [],
+          local_retry: draft.local_retry,
+        };
+
+        if (existing) {
+          return prev.map((item) =>
+            String(item.local_client_id || item.msg_id || item._id || "") ===
+            clientMessageId
+              ? optimisticMessage
+              : item,
+          );
+        }
+
+        return [...prev, optimisticMessage];
+      });
+    },
+    [clearImageRemovalTimer, currentUser, revokePreviewUrls],
+  );
+
+  const updateOptimisticImageMessage = useCallback(
+    (
+      clientMessageId: string,
+      updater: (message: ChatMessageType) => ChatMessageType,
+    ) => {
+      setOptimisticImageMessages((prev) =>
+        prev.map((item) =>
+          item.local_client_id === clientMessageId ? updater(item) : item,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeOptimisticImageMessage = useCallback(
+    (clientMessageId: string) => {
+      clearImageRemovalTimer(clientMessageId);
+
+      setOptimisticImageMessages((prev) => {
+        const item = prev.find(
+          (entry) => entry.local_client_id === clientMessageId,
+        );
+        if (item?.local_preview_urls?.length) {
+          revokePreviewUrls(item.local_preview_urls);
+        }
+
+        return prev.filter(
+          (entry) => entry.local_client_id !== clientMessageId,
+        );
+      });
+    },
+    [clearImageRemovalTimer, revokePreviewUrls],
+  );
+
+  const handleImageSendStart = useCallback(
+    (draft: ChatMessageType) => {
+      upsertOptimisticImageMessage(draft);
+    },
+    [upsertOptimisticImageMessage],
+  );
+
+  const handleImageSendProgress = useCallback(
+    (clientMessageId: string, progress: number) => {
+      updateOptimisticImageMessage(clientMessageId, (message) => ({
+        ...message,
+        local_status: "uploading",
+        local_upload_progress: progress,
+      }));
+    },
+    [updateOptimisticImageMessage],
+  );
+
+  const handleImageSendError = useCallback(
+    ({ clientMessageId, error }: ImageSendError) => {
+      clearImageRemovalTimer(clientMessageId);
+      updateOptimisticImageMessage(clientMessageId, (message) => ({
+        ...message,
+        local_status: "error",
+        local_error: error,
+        local_upload_progress: 0,
+      }));
+    },
+    [clearImageRemovalTimer, updateOptimisticImageMessage],
+  );
+
+  const handleImageSendSuccess = useCallback(
+    ({ clientMessageId, sentMessage }: ImageSendSuccess) => {
+      clearImageRemovalTimer(clientMessageId);
+
+      const nextMessage: ChatMessageType = {
+        ...(sentMessage as ChatMessageType),
+        local_client_id: clientMessageId,
+        local_status: "success",
+        local_error: undefined,
+        local_upload_progress: 100,
+      };
+
+      updateOptimisticImageMessage(clientMessageId, (message) => ({
+        ...message,
+        ...nextMessage,
+      }));
+
+      appendMessage(sentMessage);
+
+      const timerId = window.setTimeout(() => {
+        removeOptimisticImageMessage(clientMessageId);
+        forceScrollToBottomRef.current = true;
+        const container = messagesContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 650);
+
+      imageUploadRemovalTimersRef.current.set(clientMessageId, timerId);
+    },
+    [
+      appendMessage,
+      clearImageRemovalTimer,
+      removeOptimisticImageMessage,
+      updateOptimisticImageMessage,
+    ],
+  );
+
+  const loadPinnedMessages = useCallback(async (): Promise<Message[]> => {
     if (!activeConversation?._id) {
       setPinnedMessages([]);
-      return;
+      return [];
     }
 
     try {
       const list = await MessageService.getPinnedMessages(
         activeConversation._id,
+        normalizedUserId,
       );
-      const normalized = (Array.isArray(list) ? list : [])
+      const normalizedList = (Array.isArray(list) ? list : [])
         .filter((msg) => msg?.is_pinned)
+        .map((msg) => ({ ...msg, is_pinned: true }));
+
+      const mergedById = new Map<string, Message>();
+
+      normalizedList.forEach((item) => {
+        const itemId = getStableMessageId(item);
+        if (!itemId) return;
+        mergedById.set(itemId, item);
+      });
+
+      const currentScopePrefix = `${activeConversation._id}:`;
+      Object.entries(locallyRemovedPinnedMap).forEach(([scopeKey, item]) => {
+        if (!scopeKey.startsWith(currentScopePrefix)) return;
+        const itemId = scopeKey.slice(currentScopePrefix.length);
+        if (!itemId || mergedById.has(itemId)) return;
+        mergedById.set(itemId, { ...item, is_pinned: true });
+      });
+
+      const normalized = Array.from(mergedById.values())
         .sort(
           (a, b) =>
             new Date(b.pinned_at || b.createdAt || 0).getTime() -
             new Date(a.pinned_at || a.createdAt || 0).getTime(),
         )
         .slice(0, 3);
+
       setPinnedMessages(normalized);
+      return normalized;
     } catch {
       setPinnedMessages([]);
+      return [];
     }
-  }, [activeConversation?._id]);
+  }, [
+    activeConversation?._id,
+    getStableMessageId,
+    locallyRemovedPinnedMap,
+    normalizedUserId,
+  ]);
 
   const getPinnedPreviewText = useCallback((msg: Message) => {
     const messageType = String(msg.type || "").toLowerCase();
@@ -311,15 +566,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }
 
       if (msg.sender_name) {
-        const participant = (activeConversation?.participants || []).find(
-          (item) => String(item.user_id || item._id || "") === senderId,
-        );
-
-        const preferredName =
-          (participant?.nickname || "").trim() ||
-          (msg.sender_name || "").trim();
-
-        if (preferredName) return preferredName;
+        return msg.sender_name;
       }
 
       const participant = (activeConversation?.participants || []).find(
@@ -327,8 +574,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       );
 
       return (
-        participant?.nickname ||
         participant?.display_name ||
+        participant?.nickname ||
         participant?.name ||
         "Thành viên"
       );
@@ -337,24 +584,234 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   );
 
   const jumpToPinnedMessage = useCallback(
-    (msg: Message) => {
-      if (!msg?.msg_id || !activeConversation?._id) return;
+    async (msg: Message) => {
+      if (!activeConversation?._id) return;
+
+      const pinnedMessageId = getStableMessageId(msg);
+      if (!pinnedMessageId) return;
+
+      const scopedKey = getPinnedScopeKey(
+        activeConversation._id,
+        pinnedMessageId,
+      );
+
       setShowPinnedMenu(false);
+
+      if (locallyRemovedPinnedMap[scopedKey]) {
+        setRemovedPinnedNoticeOpen(true);
+        return;
+      }
+
       window.dispatchEvent(
         new CustomEvent("chat:jump", {
           detail: {
             conversationId: activeConversation._id,
-            messageId: msg.msg_id,
+            messageId: pinnedMessageId,
             highlight: true,
+            fromPinned: true,
           },
         }),
       );
     },
-    [activeConversation?._id],
+    [
+      activeConversation?._id,
+      getPinnedScopeKey,
+      getStableMessageId,
+      locallyRemovedPinnedMap,
+    ],
   );
 
   const primaryPinnedMessage = pinnedMessages[0] || null;
   const morePinnedCount = Math.max(0, pinnedMessages.length - 1);
+  const pinnedMessageIdSet = useMemo(() => {
+    return new Set(
+      pinnedMessages.map((item) => String(item.msg_id || item._id || "")),
+    );
+  }, [pinnedMessages]);
+
+  const renderedMessages = useMemo(() => {
+    const mergedByKey = new Map<string, Message>();
+
+    [...messages, ...optimisticImageMessages].forEach((item) => {
+      const stableId = String(item?.msg_id || item?._id || "").trim();
+
+      if (!stableId) {
+        const fallbackKey = `no-id:${mergedByKey.size}`;
+        mergedByKey.set(fallbackKey, item);
+        return;
+      }
+
+      const scopedKey = `${stableId}:${String(item?.conversation_id || activeConversation?._id || "")}`;
+      mergedByKey.set(scopedKey, item);
+    });
+
+    return Array.from(mergedByKey.values());
+  }, [messages, optimisticImageMessages, activeConversation?._id]);
+
+  const hydratedMessages = useMemo(() => {
+    const messageById = new Map<string, Message>();
+
+    renderedMessages.forEach((item) => {
+      const stableId = String(item.msg_id || item._id || "").trim();
+      if (!stableId) return;
+      messageById.set(stableId, item);
+    });
+
+    return renderedMessages.map((item) => {
+      if (item.reply_to || !item.reply_to_msg_id) {
+        return item;
+      }
+
+      const replyTargetId = String(item.reply_to_msg_id || "").trim();
+      if (!replyTargetId) return item;
+
+      const replyTarget = messageById.get(replyTargetId);
+      if (!replyTarget) return item;
+
+      const replyType = String(replyTarget.type || "text") as
+        | "text"
+        | "link"
+        | "image"
+        | "video"
+        | "file"
+        | "audio"
+        | "system_add"
+        | "system_block"
+        | "system_leave"
+        | "system_pin"
+        | "system_unpin";
+      const rawReplyContent = Array.isArray(replyTarget.content)
+        ? String(replyTarget.content[0] || "")
+        : String(replyTarget.content || "");
+
+      const replyTo: Message["reply_to"] & {
+        media_urls?: string[];
+        media_count?: number;
+      } = {
+        msg_id: String(replyTarget.msg_id || replyTarget._id || ""),
+        sender_id: String(replyTarget.sender_id || ""),
+        sender_name: String(replyTarget.sender_name || ""),
+        type: replyType,
+        content: rawReplyContent,
+        raw_content: rawReplyContent,
+        url: rawReplyContent,
+        is_deleted: Boolean(replyTarget.is_deleted),
+        is_revoked: Boolean(replyTarget.is_revoked),
+      };
+
+      if (replyType === "image") {
+        const mediaUrls = (
+          Array.isArray(replyTarget.content)
+            ? replyTarget.content
+            : [replyTarget.content]
+        )
+          .filter(Boolean)
+          .map((value) => String(value));
+
+        replyTo.media_urls = mediaUrls;
+        replyTo.media_count = mediaUrls.length;
+      }
+
+      if (
+        replyType === "file" ||
+        replyType === "video" ||
+        replyType === "audio"
+      ) {
+        replyTo.file_name = getFileNameFromUrl(getFullUrl(rawReplyContent));
+      }
+
+      return {
+        ...item,
+        reply_to: replyTo,
+      };
+    });
+  }, [renderedMessages]);
+
+  const timelineItems = useMemo(() => {
+    const items: Array<
+      | {
+          kind: "system-group";
+          key: string;
+          messages: Message[];
+          showTime: boolean;
+          time: string;
+        }
+      | {
+          kind: "message";
+          key: string;
+          message: Message;
+          showTime: boolean;
+          time: string;
+          index: number;
+        }
+    > = [];
+
+    for (let index = 0; index < hydratedMessages.length; index += 1) {
+      const currentMsg = hydratedMessages[index];
+      const prevMsg = hydratedMessages[index - 1];
+      const isSystemMsg = currentMsg.type?.startsWith("system_");
+
+      if (!isSystemMsg) {
+        items.push({
+          kind: "message",
+          key: `message-${String(
+            currentMsg.local_client_id ||
+              currentMsg.msg_id ||
+              currentMsg._id ||
+              index,
+          )}-${index}`,
+          message: currentMsg,
+          showTime: shouldShowTimestamp(
+            currentMsg.createdAt || "",
+            prevMsg?.createdAt,
+          ),
+          time: formatChatTimestamp(currentMsg.createdAt || ""),
+          index,
+        });
+        continue;
+      }
+
+      const showTime = shouldShowTimestamp(
+        currentMsg.createdAt || "",
+        prevMsg?.createdAt,
+      );
+
+      let endIndex = index;
+      while (endIndex + 1 < hydratedMessages.length) {
+        const nextMsg = hydratedMessages[endIndex + 1];
+        if (!nextMsg.type?.startsWith("system_")) {
+          break;
+        }
+
+        if (
+          shouldShowTimestamp(
+            nextMsg.createdAt || "",
+            hydratedMessages[endIndex].createdAt,
+          )
+        ) {
+          break;
+        }
+
+        endIndex += 1;
+      }
+
+      const systemMessages = hydratedMessages.slice(index, endIndex + 1);
+      const firstMessage = systemMessages[0];
+      const lastMessage = systemMessages[systemMessages.length - 1];
+
+      items.push({
+        kind: "system-group",
+        key: `system-group-${String(firstMessage.msg_id || firstMessage._id || index)}-${String(lastMessage.msg_id || lastMessage._id || endIndex)}`,
+        messages: systemMessages,
+        showTime,
+        time: formatChatTimestamp(firstMessage.createdAt || ""),
+      });
+
+      index = endIndex;
+    }
+
+    return items;
+  }, [hydratedMessages]);
 
   const renderPinnedTypeVisual = useCallback(
     (msg: Message, size: "sm" | "md" = "sm") => {
@@ -517,18 +974,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const handleReplyMessage = (msg: Message) => {
     setReplyToMessage(msg);
-
-    if (!msg.msg_id || !activeConversation?._id) return;
-
-    window.dispatchEvent(
-      new CustomEvent("chat:jump", {
-        detail: {
-          conversationId: activeConversation._id,
-          messageId: msg.msg_id,
-          highlight: false,
-        },
-      }),
-    );
+    window.dispatchEvent(new CustomEvent("chat:focus-input"));
   };
 
   const waitForNextFrame = useCallback(
@@ -683,8 +1129,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const jumpToMessage = useCallback(
     async (conversationId: string, messageId: string, highlight = true) => {
-      if (!conversationId || !messageId) return;
-      if (conversationId !== activeConversation?._id) return;
+      if (!conversationId || !messageId) return false;
+      if (conversationId !== activeConversation?._id) return false;
 
       const findTarget = () =>
         document.getElementById(`chat-msg-${messageId}`) ||
@@ -705,7 +1151,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         }
       }
 
-      if (!targetElement) return;
+      if (!targetElement) return false;
 
       centerTargetInContainer(targetElement);
       await waitForNextFrame();
@@ -713,12 +1159,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         centerTargetInContainer(targetElement);
       }
 
-      if (!highlight) return;
+      if (!highlight) return true;
 
       await waitForTargetVisible(targetElement);
-      if (!targetElement.isConnected) return;
+      if (!targetElement.isConnected) return false;
 
       applyJumpHighlight(targetElement);
+      return true;
     },
     [
       activeConversation?._id,
@@ -730,24 +1177,32 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     ],
   );
 
-  const handleSendSuccess = useCallback(async () => {
-    forceScrollToBottomRef.current = true;
-    await loadMessages();
+  const handleSendSuccess = useCallback(
+    async (sentMessage?: Message | null) => {
+      if (sentMessage) {
+        appendMessage(sentMessage);
+      } else {
+        await loadMessageContextAfterLast();
+      }
 
-    const pinToBottom = () => {
-      const container = messagesContainerRef.current;
-      if (!container) return;
+      forceScrollToBottomRef.current = true;
 
-      container.scrollTop = container.scrollHeight;
-      wasNearBottomRef.current = true;
-      setShowScrollButton(false);
-    };
+      const pinToBottom = () => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
 
-    // Ensure the viewport lands at latest message even if DOM updates in multiple ticks.
-    pinToBottom();
-    window.requestAnimationFrame(pinToBottom);
-    window.setTimeout(pinToBottom, 120);
-  }, [loadMessages]);
+        container.scrollTop = container.scrollHeight;
+        wasNearBottomRef.current = true;
+        setShowScrollButton(false);
+      };
+
+      // Ensure the viewport lands at latest message even if DOM updates in multiple ticks.
+      pinToBottom();
+      window.requestAnimationFrame(pinToBottom);
+      window.setTimeout(pinToBottom, 120);
+    },
+    [appendMessage, loadMessageContextAfterLast],
+  );
 
   const handleReactMessage = async (msg: Message, reactionType: string) => {
     if (!activeConversation?._id || !normalizedUserId || !msg.msg_id) return;
@@ -783,24 +1238,156 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     });
   };
 
+  const handleForwardMessage = (msg: Message) => {
+    setForwardingMessage(msg);
+    setForwardModalOpen(true);
+  };
+
+  const handleConfirmForwardMessage = async (conversationIds: string[]) => {
+    if (!forwardingMessage || !normalizedUserId) return;
+
+    const payloadContent = (
+      Array.isArray(forwardingMessage.content)
+        ? forwardingMessage.content
+        : [forwardingMessage.content]
+    )
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (typeof item === "object" && item) {
+          return String(item.url || item.text || item.name || "");
+        }
+        return "";
+      })
+      .filter(Boolean);
+
+    if (payloadContent.length === 0) {
+      alert("Không có nội dung hợp lệ để chuyển tiếp");
+      return;
+    }
+    const payloadType = String(forwardingMessage.type || "text") as
+      | "text"
+      | "link"
+      | "image"
+      | "video"
+      | "file"
+      | "audio";
+
+    if (
+      !["text", "link", "image", "video", "file", "audio"].includes(payloadType)
+    ) {
+      alert("Loại tin nhắn này chưa hỗ trợ chuyển tiếp");
+      return;
+    }
+
+    const firstValue = String(payloadContent[0] || "");
+    const fileName =
+      payloadType === "file" ||
+      payloadType === "video" ||
+      payloadType === "audio"
+        ? getFileNameFromUrl(getFullUrl(firstValue))
+        : undefined;
+
+    setIsForwarding(true);
+    try {
+      const settled = await Promise.allSettled(
+        conversationIds.map((conversationId) =>
+          MessageService.sendMessage(
+            conversationId,
+            normalizedUserId,
+            payloadContent,
+            payloadType,
+            Number(forwardingMessage.size || 0),
+            fileName,
+          ),
+        ),
+      );
+
+      const successCount = settled.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
+
+      if (successCount === 0) {
+        alert("Chuyển tiếp thất bại");
+        return;
+      }
+
+      if (successCount < conversationIds.length) {
+        alert(
+          `Đã chuyển tiếp ${successCount}/${conversationIds.length} hội thoại`,
+        );
+      }
+
+      if (conversationIds.includes(String(activeConversation?._id || ""))) {
+        await loadMessageContextAfterLast();
+      }
+
+      setForwardModalOpen(false);
+      setForwardingMessage(null);
+    } finally {
+      setIsForwarding(false);
+    }
+  };
+
   const handlePinMessage = async (msg: Message) => {
     if (!activeConversation?._id || !normalizedUserId || !msg.msg_id) return;
 
     const isPinAction = !Boolean(msg.is_pinned);
 
-    if (isPinAction && pinnedMessages.length >= 3) {
+    let latestPinned = pinnedMessages;
+    if (isPinAction) {
+      latestPinned = await loadPinnedMessages();
+    }
+
+    if (isPinAction && latestPinned.length >= 3) {
       setPendingPinMessage(msg);
       setReplacePinModalOpen(true);
       return;
     }
 
     try {
-      await MessageService.pinMessage(
+      const pinResult = await MessageService.pinMessage(
         activeConversation._id,
         msg.msg_id,
         normalizedUserId,
         isPinAction,
       );
+
+      const targetPinnedId = getStableMessageId(msg);
+      if (!isPinAction && targetPinnedId) {
+        const scopedKey = getPinnedScopeKey(
+          activeConversation._id,
+          targetPinnedId,
+        );
+        setLocallyRemovedPinnedMap((prev) => {
+          if (!prev[scopedKey]) return prev;
+          const next = { ...prev };
+          delete next[scopedKey];
+          return next;
+        });
+      }
+
+      const systemMessage = pinResult?.systemMessage;
+      if (systemMessage) {
+        const rawSystemContent = Array.isArray(systemMessage.content)
+          ? String(systemMessage.content[0] || "")
+          : String(systemMessage.content || "");
+
+        updateConversation(activeConversation._id, {
+          last_message: {
+            msg_id: String(systemMessage.msg_id || ""),
+            sender_id: String(systemMessage.sender_id || ""),
+            sender_name: String(systemMessage.sender_name || ""),
+            content:
+              rawSystemContent.length > 50
+                ? `${rawSystemContent.substring(0, 50)}...`
+                : rawSystemContent,
+            type: "text",
+            createdAt: systemMessage.createdAt || new Date().toISOString(),
+          },
+        });
+      }
+
+      await loadMessages();
       await loadPinnedMessages();
       window.dispatchEvent(
         new CustomEvent("chat:pinned-updated", {
@@ -813,8 +1400,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       const errorMessage =
         error instanceof Error ? error.message : "Ghim/Bỏ ghim thất bại";
 
-      // Fallback: pinnedMessages might be stale/not loaded yet.
-      // If backend says limit reached, force-open replace modal.
       if (
         isPinAction &&
         /toi da 3|tối đa 3|gioi han 3|giới hạn 3/i.test(errorMessage)
@@ -847,13 +1432,49 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         false,
       );
 
-      await MessageService.pinMessage(
+      const replacedPinnedId = getStableMessageId(messageToUnpin);
+      if (replacedPinnedId) {
+        const scopedKey = getPinnedScopeKey(
+          activeConversation._id,
+          replacedPinnedId,
+        );
+        setLocallyRemovedPinnedMap((prev) => {
+          if (!prev[scopedKey]) return prev;
+          const next = { ...prev };
+          delete next[scopedKey];
+          return next;
+        });
+      }
+
+      const pinResult = await MessageService.pinMessage(
         activeConversation._id,
         pendingPinMessage.msg_id,
         normalizedUserId,
         true,
       );
 
+      const systemMessage = pinResult?.systemMessage;
+      if (systemMessage) {
+        const rawSystemContent = Array.isArray(systemMessage.content)
+          ? String(systemMessage.content[0] || "")
+          : String(systemMessage.content || "");
+
+        updateConversation(activeConversation._id, {
+          last_message: {
+            msg_id: String(systemMessage.msg_id || ""),
+            sender_id: String(systemMessage.sender_id || ""),
+            sender_name: String(systemMessage.sender_name || ""),
+            content:
+              rawSystemContent.length > 50
+                ? `${rawSystemContent.substring(0, 50)}...`
+                : rawSystemContent,
+            type: "text",
+            createdAt: systemMessage.createdAt || new Date().toISOString(),
+          },
+        });
+      }
+
+      await loadMessages();
       await loadPinnedMessages();
       window.dispatchEvent(
         new CustomEvent("chat:pinned-updated", {
@@ -884,10 +1505,33 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
     try {
       if (action === "revoke") {
-        await MessageService.revokeMessage(
+        const revokedResult = await MessageService.revokeMessage(
           activeConversation._id,
           message.msg_id,
           normalizedUserId,
+        );
+
+        if (revokedResult?.last_message) {
+          updateConversation(activeConversation._id, {
+            last_message: {
+              msg_id: String(revokedResult.last_message.msg_id || ""),
+              sender_id: String(revokedResult.last_message.sender_id || ""),
+              sender_name: String(revokedResult.last_message.sender_name || ""),
+              content: String(revokedResult.last_message.content || ""),
+              type: "text",
+              createdAt:
+                revokedResult.last_message.createdAt ||
+                new Date().toISOString(),
+            },
+          });
+        }
+
+        await loadMessages();
+        await loadPinnedMessages();
+        window.dispatchEvent(
+          new CustomEvent("chat:pinned-updated", {
+            detail: { conversationId: activeConversation._id },
+          }),
         );
       } else if (action === "delete") {
         const wasCurrentLastMessage =
@@ -899,6 +1543,26 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           message.msg_id,
           normalizedUserId,
         );
+
+        const deletedMessageId = getStableMessageId(message);
+        const shouldKeepPinnedOnBar =
+          Boolean(deletedMessageId) &&
+          (Boolean(message.is_pinned) ||
+            pinnedMessageIdSet.has(deletedMessageId));
+
+        if (shouldKeepPinnedOnBar) {
+          const scopedKey = getPinnedScopeKey(
+            activeConversation._id,
+            deletedMessageId,
+          );
+          setLocallyRemovedPinnedMap((prev) => ({
+            ...prev,
+            [scopedKey]: {
+              ...message,
+              is_pinned: true,
+            },
+          }));
+        }
 
         if (wasCurrentLastMessage) {
           const previousMessage = [...messages]
@@ -933,16 +1597,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 sender_id: String(previousMessage.sender_id || ""),
                 sender_name: previousMessage.sender_name || "",
                 content: displayContent,
-                type:
-                  previousMessage.type === "system_add"
-                    ? "text"
-                    : (previousMessage.type as
-                        | "text"
-                        | "link"
-                        | "image"
-                        | "video"
-                        | "file"
-                        | "audio"),
+                type: previousMessage.type?.startsWith("system_")
+                  ? "text"
+                  : (previousMessage.type as
+                      | "text"
+                      | "link"
+                      | "image"
+                      | "video"
+                      | "file"
+                      | "audio"),
                 createdAt:
                   previousMessage.createdAt ||
                   (previousMessage as Message & { created_at?: string })
@@ -952,6 +1615,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             });
           }
         }
+
+        await loadMessages();
+        await loadPinnedMessages();
+        window.dispatchEvent(
+          new CustomEvent("chat:pinned-updated", {
+            detail: { conversationId: activeConversation._id },
+          }),
+        );
       }
     } catch (error) {
       console.error(
@@ -966,6 +1637,60 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       });
     }
   };
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || loading || !hasMore || messages.length === 0) {
+      return;
+    }
+
+    const shouldAutoFill =
+      container.scrollHeight <= container.clientHeight + 16;
+    if (!shouldAutoFill || autoFillOlderRef.current) {
+      return;
+    }
+
+    autoFillOlderRef.current = true;
+
+    const runAutoFill = async () => {
+      try {
+        let keepLoading = true;
+        let attempts = 0;
+
+        while (keepLoading && attempts < 5) {
+          attempts += 1;
+          const loaded = await loadOlderMessages(true);
+          const latestContainer = messagesContainerRef.current;
+
+          if (!loaded || !latestContainer) {
+            keepLoading = false;
+            break;
+          }
+
+          const stillNotScrollable =
+            latestContainer.scrollHeight <= latestContainer.clientHeight + 16;
+          keepLoading = stillNotScrollable;
+        }
+
+        // Auto-fill runs right after initial open for short histories.
+        // Keep viewport anchored to newest message instead of jumping to top.
+        const latestContainer = messagesContainerRef.current;
+        if (latestContainer && wasNearBottomRef.current) {
+          latestContainer.scrollTop = latestContainer.scrollHeight;
+          window.requestAnimationFrame(() => {
+            const finalContainer = messagesContainerRef.current;
+            if (!finalContainer) return;
+            finalContainer.scrollTop = finalContainer.scrollHeight;
+          });
+          setShowScrollButton(false);
+        }
+      } finally {
+        autoFillOlderRef.current = false;
+      }
+    };
+
+    void runAutoFill();
+  }, [messages.length, hasMore, loading, loadOlderMessages]);
 
   /**
    * Handle scroll to load older messages (infinite scroll)
@@ -1029,9 +1754,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    // If there are still messages below current context, jump back to latest 20.
+    // If there are still messages below current context, reload the latest 20 messages.
     if (hasMoreAfter && !loading) {
-      await handleSendSuccess();
+      forceScrollToBottomRef.current = true;
+      await loadMessages();
       return;
     }
 
@@ -1040,7 +1766,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     container.scrollTop = container.scrollHeight;
     wasNearBottomRef.current = true;
     setShowScrollButton(false);
-  }, [handleSendSuccess, hasMoreAfter, loading, waitForNextFrame]);
+  }, [hasMoreAfter, loadMessages, loading, waitForNextFrame]);
 
   /**
    * Restore scroll position after loading older messages
@@ -1193,19 +1919,27 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         messageId: string;
         highlight?: boolean;
         openMedia?: boolean;
+        fromPinned?: boolean;
       }>;
 
-      jumpToMessage(
-        custom.detail?.conversationId,
-        custom.detail?.messageId,
-        custom.detail?.highlight ?? true,
-      );
+      void (async () => {
+        const found = await jumpToMessage(
+          custom.detail?.conversationId,
+          custom.detail?.messageId,
+          custom.detail?.highlight ?? true,
+        );
 
-      // Open media viewer if requested (e.g., from pinned messages)
-      if (custom.detail?.openMedia) {
-        const msgId = custom.detail.messageId;
-        handleOpenMedia(msgId, 0);
-      }
+        if (custom.detail?.fromPinned && !found) {
+          setRemovedPinnedNoticeOpen(true);
+          return;
+        }
+
+        // Open media viewer if requested (e.g., from pinned messages)
+        if (custom.detail?.openMedia) {
+          const msgId = custom.detail.messageId;
+          handleOpenMedia(msgId, 0);
+        }
+      })();
     };
 
     window.addEventListener("chat:jump", handler as EventListener);
@@ -1245,6 +1979,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   useEffect(() => {
     void loadPinnedMessages();
     setShowPinnedMenu(false);
+    setExpandedSystemGroups({});
   }, [loadPinnedMessages]);
 
   useEffect(() => {
@@ -1311,9 +2046,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         >
           {primaryPinnedMessage && (
             <div
-              className="shrink-0 full sticky top-0 -mx-4 px-2 w-[calc(100%+2.5rem)] z-40 "
+              className="shrink-0 full sticky top-0 -mx-4 px-2 w-[calc(100%+2.5rem)] z-50 "
               style={{
-                transform: "translate3d(0, 0, 0)", 
+                transform: "translate3d(0, 0, 0)",
                 willChange: "transform", // Báo trước cho trình duyệt để tối ưu
               }}
             >
@@ -1375,13 +2110,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 </div>
 
                 {showPinnedMenu && pinnedMessages.length > 1 && (
-                  <div className="absolute right-2 top-[calc(100%+8px)] z-40 w-[320px] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+                  <div className="absolute right-2 top-[calc(100%+8px)] z-50 w-[320px] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
                     {pinnedMessages.slice(1).map((item) => (
                       <div
                         key={item._id || item.msg_id}
                         className="w-full rounded-md px-2.5 py-2 text-left text-slate-800 hover:bg-slate-50"
                       >
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={(event) => {
@@ -1393,7 +2128,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                             <div className="text-[12px] text-slate-500">
                               Tin nhắn ghim
                             </div>
-                            <div className="text-[13px] text-slate-800 pr-2 flex items-center gap-2 min-w-0">
+                            <div className="text-[13px] text-slate-800 pr-2 flex items-center gap-2 w-60">
                               {renderPinnedTypeVisual(item, "sm")}
                               <span className="truncate">
                                 {getPinnedSenderName(item)}:{" "}
@@ -1443,78 +2178,141 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             <div className="flex items-center justify-center h-full">
               <Loader2 size={20} className="animate-spin text-gray-100" />
             </div>
-          ) : messages.length === 0 ? (
+          ) : hydratedMessages.length === 0 ? (
             <ChatEmpty />
           ) : (
-            messages.map((msg, index) => {
-              const isSystemMsg = msg.type?.startsWith("system_");
-              const isMe = msg.sender_id === normalizedUserId;
-              const prevMsg = messages[index - 1];
-              const nextMsg = messages[index + 1];
+            timelineItems.map((item) => {
+              if (item.kind === "system-group") {
+                const isExpanded = !!expandedSystemGroups[item.key];
+                const shouldCollapseGroup = item.messages.length >= 2;
+                const visibleSystemMessages =
+                  shouldCollapseGroup && !isExpanded ? [] : item.messages;
+
+                return (
+                  <React.Fragment key={item.key}>
+                    {item.showTime && <ChatTimeSeparator time={item.time} />}
+
+                    {visibleSystemMessages.map((systemMsg) => {
+                      const notificationContent = Array.isArray(
+                        systemMsg.content,
+                      )
+                        ? String(systemMsg.content[0] || "")
+                        : String(systemMsg.content || "");
+
+                      return (
+                        <div
+                          key={`system-${String(systemMsg.msg_id || systemMsg._id)}`}
+                          id={`chat-msg-${systemMsg.msg_id || systemMsg._id}`}
+                          data-message-id={String(
+                            systemMsg.msg_id || systemMsg._id,
+                          )}
+                        >
+                          <ChatNotification
+                            type={systemMsg.type}
+                            content={notificationContent}
+                          />
+                        </div>
+                      );
+                    })}
+
+                    {shouldCollapseGroup &&
+                      visibleSystemMessages.length === 0 && (
+                        <div className="flex justify-center mb-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedSystemGroups((prev) => ({
+                                ...prev,
+                                [item.key]: !isExpanded,
+                              }))
+                            }
+                            className="text-[12px] px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                          >
+                            Xem {item.messages.length} thông báo
+                          </button>
+                        </div>
+                      )}
+
+                    {shouldCollapseGroup && isExpanded && (
+                      <div className="flex justify-center mb-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedSystemGroups((prev) => ({
+                              ...prev,
+                              [item.key]: false,
+                            }))
+                          }
+                          className="text-[12px] px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Thu gọn thông báo
+                        </button>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              }
+
+              const msg = item.message;
+              const index = item.index;
+              const prevMsg = hydratedMessages[index - 1];
+              const nextMsg = hydratedMessages[index + 1];
               const prevIsSystem = prevMsg?.type?.startsWith("system_");
               const nextIsSystem = nextMsg?.type?.startsWith("system_");
-              const firstUserMessageIndex = messages.findIndex(
-                (item) => !item.type?.startsWith("system_"),
-              );
-              const isTopBoundary = index === firstUserMessageIndex;
-
-              const showTime = shouldShowTimestamp(
-                msg.createdAt || "",
-                prevMsg?.createdAt,
-              );
               const nextShowTime = nextMsg
                 ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
                 : false;
+              const firstUserMessageIndex = hydratedMessages.findIndex(
+                (message) => !message.type?.startsWith("system_"),
+              );
+              const isTopBoundary = index === firstUserMessageIndex;
+              const isMe = msg.sender_id === normalizedUserId;
 
               const isFirstInSequence =
                 !prevMsg ||
                 prevIsSystem ||
                 prevMsg.sender_id !== msg.sender_id ||
-                showTime;
+                item.showTime;
               const isLastInSequence =
                 !nextMsg ||
                 nextIsSystem ||
                 nextMsg.sender_id !== msg.sender_id ||
                 nextShowTime;
 
-              // Nội dung hiển thị cho thông báo hệ thống
-              const notificationContent = msg.content?.[0] + "";
-
               return (
-                <React.Fragment key={msg._id || index}>
-                  {showTime && (
-                    <ChatTimeSeparator
-                      time={formatChatTimestamp(msg.createdAt || "")}
-                    />
-                  )}
+                <React.Fragment key={item.key}>
+                  {item.showTime && <ChatTimeSeparator time={item.time} />}
 
                   <div
-                    id={`chat-msg-${msg.msg_id || msg._id}`}
-                    data-message-id={String(msg.msg_id || msg._id)}
-                  >
-                    {isSystemMsg ? (
-                      <ChatNotification
-                        type={msg.type}
-                        content={notificationContent}
-                      />
-                    ) : (
-                      <ChatMessage
-                        msg={msg}
-                        isMe={isMe}
-                        currentUserId={normalizedUserId}
-                        isFirstInSequence={isFirstInSequence}
-                        isLastInSequence={isLastInSequence}
-                        isTopBoundary={isTopBoundary}
-                        onMediaClick={(imageIndex) =>
-                          handleOpenMedia(msg._id, imageIndex)
-                        }
-                        onReply={handleReplyMessage}
-                        onReact={handleReactMessage}
-                        onRevoke={handleRevokeMessage}
-                        onDelete={handleDeleteMessage}
-                        onPin={handlePinMessage}
-                      />
+                    id={`chat-msg-${msg.msg_id || msg._id || msg.local_client_id}`}
+                    data-message-id={String(
+                      msg.msg_id || msg._id || msg.local_client_id || "",
                     )}
+                  >
+                    <ChatMessage
+                      msg={{
+                        ...msg,
+                        is_pinned:
+                          Boolean(msg.is_pinned) ||
+                          pinnedMessageIdSet.has(
+                            String(msg.msg_id || msg._id || ""),
+                          ),
+                      }}
+                      isMe={isMe}
+                      currentUserId={normalizedUserId}
+                      isFirstInSequence={isFirstInSequence}
+                      isLastInSequence={isLastInSequence}
+                      isTopBoundary={isTopBoundary}
+                      onMediaClick={(imageIndex) =>
+                        handleOpenMedia(msg._id, imageIndex)
+                      }
+                      onReply={handleReplyMessage}
+                      onReact={handleReactMessage}
+                      onRevoke={handleRevokeMessage}
+                      onDelete={handleDeleteMessage}
+                      onPin={handlePinMessage}
+                      onForward={handleForwardMessage}
+                    />
                   </div>
                 </React.Fragment>
               );
@@ -1535,9 +2333,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         </div>
 
         <ChatInput
+          key={activeConversation._id}
           conversationId={activeConversation._id}
           senderId={normalizedUserId || ""}
           onSendSuccess={handleSendSuccess}
+          onUploadStart={handleImageSendStart}
+          onUploadProgress={handleImageSendProgress}
+          onUploadSuccess={handleImageSendSuccess}
+          onUploadError={handleImageSendError}
           replyToMessage={replyToMessage}
           onCancelReply={() => setReplyToMessage(null)}
         />
@@ -1588,6 +2391,16 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         }
       />
 
+      <ConfirmModal
+        isOpen={removedPinnedNoticeOpen}
+        title="Không thể mở tin nhắn ghim"
+        message="Tin nhắn gốc đã bị gỡ ở phía bạn."
+        confirmText="Đóng"
+        hideCancelButton
+        onConfirm={() => setRemovedPinnedNoticeOpen(false)}
+        onCancel={() => setRemovedPinnedNoticeOpen(false)}
+      />
+
       <ReplacePinnedModal
         isOpen={replacePinModalOpen}
         pinnedMessages={pinnedMessages}
@@ -1600,6 +2413,20 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           setPendingPinMessage(null);
         }}
         onConfirm={handleConfirmReplacePinned}
+      />
+
+      <ForwardMessageModal
+        isOpen={forwardModalOpen}
+        message={forwardingMessage}
+        conversations={conversations}
+        currentConversationId={activeConversation?._id}
+        currentUserId={normalizedUserId}
+        isSubmitting={isForwarding}
+        onClose={() => {
+          setForwardModalOpen(false);
+          setForwardingMessage(null);
+        }}
+        onConfirm={handleConfirmForwardMessage}
       />
     </div>
   );

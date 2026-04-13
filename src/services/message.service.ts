@@ -2,12 +2,17 @@ import { API_CHAT_SERVER_URL } from "../config/api.config";
 import type { SearchEverythingResponse } from "../types";
 
 export class MessageService {
-  static async getPresignedUrl(fileName: string, fileType: string) {
+  static async getPresignedUrl(
+    fileName: string,
+    fileType: string,
+    signal?: AbortSignal,
+  ) {
     try {
       const response = await fetch(
         `${API_CHAT_SERVER_URL}/messages/presigned-url`,
         {
           method: "POST",
+          signal,
           headers: {
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
@@ -33,10 +38,12 @@ export class MessageService {
     uploadUrl: string,
     file: File,
     contentType?: string,
+    signal?: AbortSignal,
   ) {
     try {
       const response = await fetch(uploadUrl, {
         method: "PUT", // Bắt buộc là PUT cho S3 Presigned URL
+        signal,
         body: file,
         headers: {
           "Content-Type":
@@ -60,10 +67,12 @@ export class MessageService {
     size: number = 0,
     fileName?: string,
     replyToMsgId?: string,
+    signal?: AbortSignal,
   ) {
     try {
       const response = await fetch(`${API_CHAT_SERVER_URL}/messages`, {
         method: "POST",
+        signal,
         headers: {
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
@@ -341,10 +350,16 @@ export class MessageService {
   }
 
   // Get pinned messages
-  static async getPinnedMessages(conversationId: string) {
+  static async getPinnedMessages(conversationId: string, userId?: string) {
     try {
+      const params = new URLSearchParams();
+      if (userId) {
+        params.set("userId", userId);
+      }
+
+      const query = params.toString();
       const response = await fetch(
-        `${API_CHAT_SERVER_URL}/messages/${conversationId}/pinned`,
+        `${API_CHAT_SERVER_URL}/messages/${conversationId}/pinned${query ? `?${query}` : ""}`,
         {
           method: "GET",
           headers: {
