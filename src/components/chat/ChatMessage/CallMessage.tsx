@@ -116,7 +116,9 @@ export const CallMessage = ({
                   ? `Đã bỏ lỡ cuộc gọi ${isVideoCall ? "video" : "thoại"}`
                   : `Cuộc gọi ${isVideoCall ? "video" : "thoại"}`}
               </div>
-
+              <div className="mt-0.5 text-[12px] opacity-80 truncate font-body">
+                {rawText || label}
+              </div>
               {callTimeLabel && (
                 <div className="text-[12px] opacity-60 ">{callTimeLabel}</div>
               )}
