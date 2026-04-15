@@ -1,6 +1,62 @@
+import { useEffect, useMemo, useState } from "react";
 import type { Message } from "../../../types";
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
 import { MessageLayout } from "./MessageLayout";
+
+const imagePreviewCache = new Map<string, string>();
+const PREVIEW_MAX_EDGE = 640;
+const PREVIEW_QUALITY = 0.72;
+
+const createImagePreview = async (url: string): Promise<string> => {
+  if (!url) return url;
+
+  const cached = imagePreviewCache.get(url);
+  if (cached) return cached;
+
+  const response = await fetch(url, { cache: "force-cache" });
+  if (!response.ok) return url;
+
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) return url;
+
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(
+    1,
+    PREVIEW_MAX_EDGE / bitmap.width,
+    PREVIEW_MAX_EDGE / bitmap.height,
+  );
+
+  if (scale >= 0.98) {
+    bitmap.close();
+    return url;
+  }
+
+  const targetWidth = Math.max(1, Math.round(bitmap.width * scale));
+  const targetHeight = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    return url;
+  }
+
+  context.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const previewBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", PREVIEW_QUALITY);
+  });
+
+  if (!previewBlob) return url;
+
+  const objectUrl = URL.createObjectURL(previewBlob);
+  imagePreviewCache.set(url, objectUrl);
+  return objectUrl;
+};
 
 export const ImageMessage = ({
   msg,
@@ -33,16 +89,72 @@ export const ImageMessage = ({
   onPin?: (msg: Message) => void;
   onForward?: (msg: Message) => void;
 }) => {
+  const GRID_WIDTH = 260;
+  const GRID_LARGE_HEIGHT = 130;
+  const GRID_SMALL_HEIGHT = 88;
   const count = urls.length;
   const isUploading = msg.local_status === "uploading";
   const isUploadSuccess = msg.local_status === "success";
   const isUploadError = msg.local_status === "error";
   const hasUploadState = isUploading || isUploadSuccess || isUploadError;
   const canPreviewClick = !isUploading && !isUploadError;
+  const [previewMap, setPreviewMap] = useState<Record<string, string>>({});
+  const preprocessUrls = useMemo(() => {
+    if (!Array.isArray(urls) || urls.length === 0) return [] as string[];
+    return urls.slice(0, 6);
+  }, [urls]);
 
   const handleImageClick = (imageIndex: number) => {
     if (!canPreviewClick) return;
     onClick?.(imageIndex);
+  };
+
+  const getDisplaySrc = (url: string) => {
+    if (!url) return "";
+    return previewMap[url] || imagePreviewCache.get(url) || url;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildPreviews = async () => {
+      for (const url of preprocessUrls) {
+        if (!url) continue;
+
+        try {
+          const previewUrl = await createImagePreview(url);
+          if (cancelled || !previewUrl || previewUrl === url) continue;
+
+          setPreviewMap((previous) => {
+            if (previous[url] === previewUrl) return previous;
+            return { ...previous, [url]: previewUrl };
+          });
+        } catch {
+          continue;
+        }
+      }
+    };
+
+    void buildPreviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preprocessUrls]);
+
+  const getImagePriority = (index: number) => {
+    // Prioritize the first visible tiles so message clusters appear faster.
+    if (index <= 2) {
+      return {
+        loading: "eager" as const,
+        fetchPriority: "high" as const,
+      };
+    }
+
+    return {
+      loading: "lazy" as const,
+      fetchPriority: "auto" as const,
+    };
   };
 
   const renderUploadOverlay = () => {
@@ -129,10 +241,13 @@ export const ImageMessage = ({
           onClick={canPreviewClick ? () => handleImageClick(0) : undefined}
         >
           <img
-            src={urls[0]}
+            src={getDisplaySrc(urls[0])}
             alt="Attachment"
-            className="block max-w-full h-auto object-cover max-h-100 min-w-25"
+            className="block h-auto w-auto object-cover"
             loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            style={{ maxWidth: `${GRID_WIDTH}px`, maxHeight: "280px" }}
           />
         </div>
       );
@@ -142,7 +257,7 @@ export const ImageMessage = ({
       return (
         <div
           className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
-          style={{ width: "300px" }}
+          style={{ width: `${GRID_WIDTH}px` }}
         >
           {urls.map((url, index) => (
             <div
@@ -152,17 +267,24 @@ export const ImageMessage = ({
                   ? "cursor-pointer hover:brightness-90"
                   : "cursor-default"
               }`}
-              style={{ height: "150px" }}
+              style={{ height: `${GRID_LARGE_HEIGHT}px` }}
               onClick={
                 canPreviewClick ? () => handleImageClick(index) : undefined
               }
             >
-              <img
-                src={url}
-                alt="Attachment"
-                className="w-full h-full object-cover"
-                loading="eager"
-              />
+              {(() => {
+                const priority = getImagePriority(index);
+                return (
+                  <img
+                    src={getDisplaySrc(url)}
+                    alt="Attachment"
+                    className="w-full h-full object-cover"
+                    loading={priority.loading}
+                    fetchPriority={priority.fetchPriority}
+                    decoding="async"
+                  />
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -173,7 +295,10 @@ export const ImageMessage = ({
       return (
         <div
           className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
-          style={{ width: "300px", gridTemplateRows: "repeat(2, 150px)" }}
+          style={{
+            width: `${GRID_WIDTH}px`,
+            gridTemplateRows: `repeat(2, ${GRID_LARGE_HEIGHT}px)`,
+          }}
         >
           <div
             className={`row-span-2 overflow-hidden transition-all ${
@@ -183,12 +308,19 @@ export const ImageMessage = ({
             }`}
             onClick={canPreviewClick ? () => handleImageClick(0) : undefined}
           >
-            <img
-              src={urls[0]}
-              alt="Attachment"
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
+            {(() => {
+              const priority = getImagePriority(0);
+              return (
+                <img
+                  src={getDisplaySrc(urls[0])}
+                  alt="Attachment"
+                  className="w-full h-full object-cover"
+                  loading={priority.loading}
+                  fetchPriority={priority.fetchPriority}
+                  decoding="async"
+                />
+              );
+            })()}
           </div>
           {urls.slice(1, 3).map((url, index) => (
             <div
@@ -198,17 +330,24 @@ export const ImageMessage = ({
                   ? "cursor-pointer hover:brightness-90"
                   : "cursor-default"
               }`}
-              style={{ height: "150px" }}
+              style={{ height: `${GRID_LARGE_HEIGHT}px` }}
               onClick={
                 canPreviewClick ? () => handleImageClick(index + 1) : undefined
               }
             >
-              <img
-                src={url}
-                alt="Attachment"
-                className="w-full h-full object-cover"
-                loading="eager"
-              />
+              {(() => {
+                const priority = getImagePriority(index + 1);
+                return (
+                  <img
+                    src={getDisplaySrc(url)}
+                    alt="Attachment"
+                    className="w-full h-full object-cover"
+                    loading={priority.loading}
+                    fetchPriority={priority.fetchPriority}
+                    decoding="async"
+                  />
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -219,7 +358,7 @@ export const ImageMessage = ({
       return (
         <div
           className={`grid grid-cols-2 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
-          style={{ width: "300px" }}
+          style={{ width: `${GRID_WIDTH}px` }}
         >
           {urls.map((url, index) => (
             <div
@@ -229,17 +368,118 @@ export const ImageMessage = ({
                   ? "cursor-pointer hover:brightness-90"
                   : "cursor-default"
               }`}
-              style={{ height: "150px" }}
+              style={{ height: `${GRID_LARGE_HEIGHT}px` }}
               onClick={
                 canPreviewClick ? () => handleImageClick(index) : undefined
               }
             >
-              <img
-                src={url}
-                alt="Attachment"
-                className="w-full h-full object-cover"
-                loading="eager"
-              />
+              {(() => {
+                const priority = getImagePriority(index);
+                return (
+                  <img
+                    src={getDisplaySrc(url)}
+                    alt="Attachment"
+                    className="w-full h-full object-cover"
+                    loading={priority.loading}
+                    fetchPriority={priority.fetchPriority}
+                    decoding="async"
+                  />
+                );
+              })()}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (count === 5) {
+      return (
+        <div
+          className={`grid gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
+          style={{
+            width: `${GRID_WIDTH}px`,
+            gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+            gridTemplateRows: `repeat(2, ${GRID_SMALL_HEIGHT}px)`,
+          }}
+        >
+          <div
+            className={`col-span-3 row-span-2 overflow-hidden transition-all ${
+              canPreviewClick
+                ? "cursor-pointer hover:brightness-90"
+                : "cursor-default"
+            }`}
+            onClick={canPreviewClick ? () => handleImageClick(0) : undefined}
+          >
+            {(() => {
+              const priority = getImagePriority(0);
+              return (
+                <img
+                  src={getDisplaySrc(urls[0])}
+                  alt="Attachment"
+                  className="h-full w-full object-cover"
+                  loading={priority.loading}
+                  fetchPriority={priority.fetchPriority}
+                  decoding="async"
+                />
+              );
+            })()}
+          </div>
+
+          {urls.slice(1, 3).map((url, index) => (
+            <div
+              key={index + 1}
+              className={`col-span-3 overflow-hidden transition-all ${
+                canPreviewClick
+                  ? "cursor-pointer hover:brightness-90"
+                  : "cursor-default"
+              }`}
+              style={{ height: `${GRID_SMALL_HEIGHT}px` }}
+              onClick={
+                canPreviewClick ? () => handleImageClick(index + 1) : undefined
+              }
+            >
+              {(() => {
+                const priority = getImagePriority(index + 1);
+                return (
+                  <img
+                    src={getDisplaySrc(url)}
+                    alt="Attachment"
+                    className="h-full w-full object-cover"
+                    loading={priority.loading}
+                    fetchPriority={priority.fetchPriority}
+                    decoding="async"
+                  />
+                );
+              })()}
+            </div>
+          ))}
+
+          {urls.slice(3, 5).map((url, index) => (
+            <div
+              key={index + 3}
+              className={`col-span-3 overflow-hidden transition-all ${
+                canPreviewClick
+                  ? "cursor-pointer hover:brightness-90"
+                  : "cursor-default"
+              }`}
+              style={{ height: `${GRID_SMALL_HEIGHT}px` }}
+              onClick={
+                canPreviewClick ? () => handleImageClick(index + 3) : undefined
+              }
+            >
+              {(() => {
+                const priority = getImagePriority(index + 3);
+                return (
+                  <img
+                    src={getDisplaySrc(url)}
+                    alt="Attachment"
+                    className="h-full w-full object-cover"
+                    loading={priority.loading}
+                    fetchPriority={priority.fetchPriority}
+                    decoding="async"
+                  />
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -252,7 +492,10 @@ export const ImageMessage = ({
     return (
       <div
         className={`grid grid-cols-3 gap-0.5 overflow-hidden border border-gray-200 shadow-sm ${borderRadius}`}
-        style={{ width: "300px" }}
+        style={{
+          width: `${GRID_WIDTH}px`,
+          gridAutoRows: `${GRID_SMALL_HEIGHT}px`,
+        }}
       >
         {visibleUrls.map((url, index) => (
           <div
@@ -262,17 +505,23 @@ export const ImageMessage = ({
                 ? "cursor-pointer hover:brightness-90"
                 : "cursor-default"
             }`}
-            style={{ height: "100px" }}
             onClick={
               canPreviewClick ? () => handleImageClick(index) : undefined
             }
           >
-            <img
-              src={url}
-              alt="Attachment"
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
+            {(() => {
+              const priority = getImagePriority(index);
+              return (
+                <img
+                  src={getDisplaySrc(url)}
+                  alt="Attachment"
+                  className="w-full h-full object-cover"
+                  loading={priority.loading}
+                  fetchPriority={priority.fetchPriority}
+                  decoding="async"
+                />
+              );
+            })()}
             {index === 5 && remaining > 0 && (
               <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-xl font-bold pointer-events-none">
                 +{remaining}

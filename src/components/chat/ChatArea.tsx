@@ -21,6 +21,7 @@ import { useConversations } from "../../contexts/ConversationsContext";
 import { useChat } from "../../hooks/useChat";
 import { primeMessageSenderCache } from "../../hooks/useMessageSender";
 import { MessageService, ParticipantService } from "../../services";
+import { socketService } from "../../services";
 import type { ChatAreaProps } from "../../interfaces";
 import type {
   ImageSendError,
@@ -48,6 +49,10 @@ import {
   getFullUrl,
   getFileNameFromUrl,
 } from "../../utils";
+import {
+  convertDisplayShortcodeToEmoji,
+  convertEmojiImageMarkupToText,
+} from "../../constants/emoji.constants";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
 import type { Message } from "../../types";
 
@@ -135,10 +140,21 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     null,
   );
   const [isForwarding, setIsForwarding] = useState(false);
+  const [typingUserIds, setTypingUserIds] = useState<Record<string, number>>(
+    {},
+  );
   const [locallyRemovedPinnedMap, setLocallyRemovedPinnedMap] = useState<
     Record<string, Message>
   >({});
-  const [removedPinnedNoticeOpen, setRemovedPinnedNoticeOpen] = useState(false);
+  const [removedMessageNotice, setRemovedMessageNotice] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
   const [optimisticImageMessages, setOptimisticImageMessages] = useState<
     Array<ChatMessageType>
   >([]);
@@ -532,7 +548,22 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }
     }
 
-    return rawContent || "Tin nhắn";
+    const normalizedText = convertDisplayShortcodeToEmoji(
+      convertEmojiImageMarkupToText(rawContent || "Tin nhắn"),
+    );
+
+    return normalizedText || "Tin nhắn";
+  }, []);
+
+  const extractContentValue = useCallback((value: unknown): string => {
+    if (typeof value === "string") return value;
+
+    if (typeof value === "object" && value) {
+      const candidate = value as { text?: string; url?: string; name?: string };
+      return String(candidate.text || candidate.url || candidate.name || "");
+    }
+
+    return String(value || "");
   }, []);
 
   const getPinnedMediaValue = useCallback((msg: Message) => {
@@ -583,6 +614,41 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     [activeConversation?.participants, normalizedUserId],
   );
 
+  const typingUsers = useMemo(() => {
+    const typingIds = Object.keys(typingUserIds).filter(
+      (userId) => userId && String(userId) !== String(normalizedUserId || ""),
+    );
+
+    return typingIds
+      .map((userId) => {
+        const participant = (activeConversation?.participants || []).find(
+          (item) => String(item.user_id || item._id || "") === String(userId),
+        );
+        const participantAny = participant as
+          | {
+              avatar?: string;
+              avatar_url?: string;
+              profile_picture?: string;
+            }
+          | undefined;
+
+        return {
+          id: String(userId),
+          name:
+            participant?.display_name ||
+            participant?.nickname ||
+            participant?.name ||
+            "Ai đó",
+          avatar:
+            participantAny?.avatar ||
+            participantAny?.avatar_url ||
+            participantAny?.profile_picture ||
+            "",
+        };
+      })
+      .filter(Boolean);
+  }, [activeConversation?.participants, normalizedUserId, typingUserIds]);
+
   const jumpToPinnedMessage = useCallback(
     async (msg: Message) => {
       if (!activeConversation?._id) return;
@@ -598,7 +664,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       setShowPinnedMenu(false);
 
       if (locallyRemovedPinnedMap[scopedKey]) {
-        setRemovedPinnedNoticeOpen(true);
+        setRemovedMessageNotice({
+          isOpen: true,
+          title: "Không thể mở tin nhắn ghim",
+          message: "Tin nhắn gốc đã bị gỡ ở phía bạn.",
+        });
         return;
       }
 
@@ -681,8 +751,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         | "system_pin"
         | "system_unpin";
       const rawReplyContent = Array.isArray(replyTarget.content)
-        ? String(replyTarget.content[0] || "")
-        : String(replyTarget.content || "");
+        ? extractContentValue(replyTarget.content[0])
+        : extractContentValue(replyTarget.content);
 
       const replyTo: Message["reply_to"] & {
         media_urls?: string[];
@@ -705,8 +775,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             ? replyTarget.content
             : [replyTarget.content]
         )
-          .filter(Boolean)
-          .map((value) => String(value));
+          .map((value) => extractContentValue(value))
+          .filter(Boolean);
 
         replyTo.media_urls = mediaUrls;
         replyTo.media_count = mediaUrls.length;
@@ -725,7 +795,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         reply_to: replyTo,
       };
     });
-  }, [renderedMessages]);
+  }, [extractContentValue, renderedMessages]);
 
   const timelineItems = useMemo(() => {
     const items: Array<
@@ -831,6 +901,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               src={getFullUrl(mediaValue)}
               alt="preview"
               className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
             {imageCount > 1 && (
               <span className="absolute inset-0 bg-black/45 text-[10px] font-semibold text-white flex items-center justify-center">
@@ -1768,6 +1840,25 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     setShowScrollButton(false);
   }, [hasMoreAfter, loadMessages, loading, waitForNextFrame]);
 
+  useEffect(() => {
+    if (typingUsers.length === 0) return;
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const distanceToBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottomNow = distanceToBottom < 140;
+
+    if (!isNearBottomNow && !wasNearBottomRef.current) return;
+
+    requestAnimationFrame(() => {
+      const activeContainer = messagesContainerRef.current;
+      if (!activeContainer) return;
+      activeContainer.scrollTop = activeContainer.scrollHeight;
+    });
+  }, [typingUsers.length]);
+
   /**
    * Restore scroll position after loading older messages
    * Auto-scroll to bottom on first load for new conversation (BEFORE render visible)
@@ -1930,7 +2021,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         );
 
         if (custom.detail?.fromPinned && !found) {
-          setRemovedPinnedNoticeOpen(true);
+          setRemovedMessageNotice({
+            isOpen: true,
+            title: "Không thể mở tin nhắn ghim",
+            message: "Tin nhắn gốc đã bị gỡ ở phía bạn.",
+          });
           return;
         }
 
@@ -2000,6 +2095,86 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       );
     };
   }, [activeConversation?._id, loadPinnedMessages]);
+
+  useEffect(() => {
+    const markTyping = (userId: string) => {
+      if (!userId) return;
+
+      setTypingUserIds((prev) => ({
+        ...prev,
+        [userId]: Date.now(),
+      }));
+    };
+
+    const unmarkTyping = (userId: string) => {
+      if (!userId) return;
+      setTypingUserIds((prev) => {
+        if (!prev[userId]) return prev;
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    };
+
+    const handleTypingStart = (payload: {
+      conversationId?: string;
+      userId?: string;
+    }) => {
+      if (payload.conversationId !== activeConversation?._id) return;
+      if (
+        !payload.userId ||
+        String(payload.userId) === String(normalizedUserId || "")
+      ) {
+        return;
+      }
+
+      markTyping(payload.userId);
+    };
+
+    const handleTypingStop = (payload: {
+      conversationId?: string;
+      userId?: string;
+    }) => {
+      if (payload.conversationId !== activeConversation?._id) return;
+      if (!payload.userId) return;
+      unmarkTyping(payload.userId);
+    };
+
+    socketService.onTyping(handleTypingStart);
+    socketService.onTypingStopped(handleTypingStop);
+
+    return () => {
+      socketService.offTyping(handleTypingStart);
+      socketService.offTypingStopped(handleTypingStop);
+    };
+  }, [activeConversation?._id, normalizedUserId]);
+
+  useEffect(() => {
+    const handleRemovedReferenceNotice = (event: Event) => {
+      const custom = event as CustomEvent<{
+        title?: string;
+        message?: string;
+      }>;
+
+      setRemovedMessageNotice({
+        isOpen: true,
+        title: custom.detail?.title || "Không thể mở tin nhắn",
+        message: custom.detail?.message || "Tin nhắn gốc đã bị gỡ ở phía bạn.",
+      });
+    };
+
+    window.addEventListener(
+      "chat:open-removed-reference-notice",
+      handleRemovedReferenceNotice as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "chat:open-removed-reference-notice",
+        handleRemovedReferenceNotice as EventListener,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -2318,6 +2493,49 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               );
             })
           )}
+
+          {typingUsers.length > 0 && (
+            <div className="flex items-center  gap-2 mt-1 mb-1 pl-0.5">
+              {/* Phần Avatar giữ nguyên */}
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-white/80 shadow-sm bg-slate-300 shrink-0">
+                {typingUsers[0].avatar ? (
+                  <img
+                    src={typingUsers[0].avatar}
+                    alt={typingUsers[0].name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-white bg-slate-500">
+                    {typingUsers[0].name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              {/* Phần bong bóng chat "..." đã được sửa lại giao diện sáng */}
+              <div className="h-6 px-4 rounded-2xl bg-white flex items-center pt-1 gap-1 shadow-sm">
+                <span
+                  className="w-1 h-1 rounded-full bg-slate-400 animate-bounce-high"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <span
+                  className="w-1 h-1 rounded-full bg-slate-400  animate-bounce-high"
+                  style={{ animationDelay: "140ms" }}
+                />
+                <span
+                  className="w-1 h-1 rounded-full bg-slate-400  animate-bounce-high"
+                  style={{ animationDelay: "280ms" }}
+                />
+                {typingUsers.length > 1 && (
+                  <span className="ml-1 text-[11px] font-medium text-slate-500">
+                    +{typingUsers.length - 1}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
 
           {/* Scroll to bottom button */}
@@ -2392,13 +2610,23 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       />
 
       <ConfirmModal
-        isOpen={removedPinnedNoticeOpen}
-        title="Không thể mở tin nhắn ghim"
-        message="Tin nhắn gốc đã bị gỡ ở phía bạn."
+        isOpen={removedMessageNotice.isOpen}
+        title={removedMessageNotice.title}
+        message={removedMessageNotice.message}
         confirmText="Đóng"
         hideCancelButton
-        onConfirm={() => setRemovedPinnedNoticeOpen(false)}
-        onCancel={() => setRemovedPinnedNoticeOpen(false)}
+        onConfirm={() =>
+          setRemovedMessageNotice((prev) => ({
+            ...prev,
+            isOpen: false,
+          }))
+        }
+        onCancel={() =>
+          setRemovedMessageNotice((prev) => ({
+            ...prev,
+            isOpen: false,
+          }))
+        }
       />
 
       <ReplacePinnedModal

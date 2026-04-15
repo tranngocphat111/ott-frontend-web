@@ -393,11 +393,30 @@ export const useChat = (conversationId: string, userId?: string) => {
       if (payloadConvId !== conversationId) return;
 
       setMessages((prev) =>
-        prev.filter(
-          (message: any) =>
-            message._id !== payload.messageId &&
-            message.msg_id !== payload.msg_id,
-        ),
+        prev
+          .filter(
+            (message: any) =>
+              message._id !== payload.messageId &&
+              message.msg_id !== payload.msg_id,
+          )
+          .map((message: any) => {
+            const replyTargetId =
+              message.reply_to_msg_id || message.reply_to?.msg_id;
+
+            if (replyTargetId !== payload.msg_id) {
+              return message;
+            }
+
+            return {
+              ...message,
+              reply_to: {
+                ...(message.reply_to || {}),
+                msg_id: payload.msg_id,
+                is_deleted: true,
+                is_revoked: false,
+              },
+            };
+          }),
       );
     },
     [conversationId],

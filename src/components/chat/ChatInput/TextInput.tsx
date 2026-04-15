@@ -19,6 +19,7 @@ interface TextInputProps {
   value: string;
   onChange: (value: string) => void;
   onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  onBlur?: () => void;
   placeholder: string;
   disabled?: boolean;
 }
@@ -31,7 +32,10 @@ export interface TextInputHandle {
 const EMOJI_SIZE = 18;
 
 export const TextInput = forwardRef<TextInputHandle, TextInputProps>(
-  ({ value, onChange, onKeyDown, placeholder, disabled = false }, ref) => {
+  (
+    { value, onChange, onKeyDown, onBlur, placeholder, disabled = false },
+    ref,
+  ) => {
     const editorRef = useRef<HTMLElement | null>(null);
     const htmlRef = useRef(convertEmojiTextToImageMarkup(value, EMOJI_SIZE));
     const caretOffsetRef = useRef<number | null>(null);
@@ -195,7 +199,7 @@ export const TextInput = forwardRef<TextInputHandle, TextInputProps>(
     };
 
     return (
-      <div className="relative flex-1 w-full">
+      <div className="relative flex-1 w-full resize-none overflow-hidden">
         {/* Placeholder */}
         {!value && (
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center text-sm text-gray-400 select-none">
@@ -210,6 +214,7 @@ export const TextInput = forwardRef<TextInputHandle, TextInputProps>(
           onChange={handleChange}
           onPaste={handlePaste}
           onKeyDown={onKeyDown}
+          onBlur={onBlur}
           onKeyUp={saveCaretPosition}
           onMouseUp={saveCaretPosition}
           className="w-full bg-transparent outline-none text-sm leading-5 py-1.5 px-0 max-h-35 overflow-y-auto whitespace-pre-wrap wrap-break-word

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -14,6 +14,10 @@ import type { Message } from "../../../types";
 import { API_CHAT_SERVER_URL } from "../../../config/api.config";
 import { MessageLayout } from "./MessageLayout";
 import { formatFileSize, getFileNameFromUrl, getFullUrl } from "../../../utils";
+import {
+  registerAudioPlaybackHandler,
+  resetOtherAudioPlaybacks,
+} from "../../../utils/audioPlaybackManagerUtils";
 
 export const AudioMessage = ({
   msg,
@@ -53,6 +57,7 @@ export const AudioMessage = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const rawFileName =
     fileName || msg.fileName || getFileNameFromUrl(url, "audio");
@@ -80,12 +85,27 @@ export const AudioMessage = ({
   const handleTogglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    setIsLoading(true);
+
     if (isPlaying) {
       audio.pause();
-    } else {
-      await audio.play();
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setIsLoading(false);
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    try {
+      await resetOtherAudioPlaybacks(String(msg.msg_id || msg._id || ""));
+      await audio.play();
+      setIsPlaying(true);
+    } catch {
+      setIsPlaying(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSeek = (event: MouseEvent<HTMLDivElement>) => {
@@ -125,6 +145,23 @@ export const AudioMessage = ({
       link.remove();
     }
   };
+
+  useEffect(() => {
+    const audioId = String(msg.msg_id || msg._id || "");
+    if (!audioId) return undefined;
+
+    return registerAudioPlaybackHandler(audioId, () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setIsLoading(false);
+    });
+  }, [msg._id, msg.msg_id]);
 
   return (
     <MessageLayout
@@ -192,11 +229,13 @@ export const AudioMessage = ({
                 onClick={handleTogglePlay}
                 className={`
                   w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 active:scale-95
-                  ${isMe ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-primary-500 text-white hover:bg-primary-600"}
+                  ${isMe ? "bg-primary-600 text-white hover:bg-primary-700" : "bg-primary-300 text-white hover:bg-primary-400"}
                 `}
-                disabled={hasUploadState}
+                disabled={hasUploadState || isLoading}
               >
-                {isPlaying ? (
+                {isLoading ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : isPlaying ? (
                   <Pause size={20} fill="currentColor" />
                 ) : (
                   <Play size={20} fill="currentColor" className="ml-0.5" />
@@ -229,7 +268,7 @@ export const AudioMessage = ({
                 className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
                   isMe
                     ? "bg-primary-200/60 text-primary-700 hover:bg-primary-200"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    : "bg-primary-50 text-slate-600 hover:bg-primary-100"
                 }`}
                 title="Tải xuống"
                 disabled={hasUploadState}

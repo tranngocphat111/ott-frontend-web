@@ -42,6 +42,20 @@ export const ChatMessage = memo(
     const isDeleted = !!msg.is_deleted;
     const isRevoked = !!msg.is_revoked;
 
+    const fullUrl = useMemo(() => {
+      if (msgType === "text" || msgType === "link" || msgType === "image") {
+        return "";
+      }
+      const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
+      return getFullUrl(content);
+    }, [msg.content, msgType]);
+
+    const imageUrls = useMemo(() => {
+      if (msgType !== "image") return [];
+      const content = Array.isArray(msg.content) ? msg.content : [msg.content];
+      return content.map((c: string) => getFullUrl(c));
+    }, [msg.content, msgType]);
+
     if (isRevoked) {
       return (
         <RevokedMessage
@@ -77,22 +91,6 @@ export const ChatMessage = memo(
         />
       );
     }
-
-    // Cho video/file/audio: chỉ lấy phần tử đầu tiên
-    const fullUrl = useMemo(() => {
-      if (msgType === "text" || msgType === "link" || msgType === "image") {
-        return "";
-      }
-      const content = Array.isArray(msg.content) ? msg.content[0] : msg.content;
-      return getFullUrl(content);
-    }, [msg.content, msgType]);
-
-    // Cho ảnh: lấy toàn bộ mảng URL
-    const imageUrls = useMemo(() => {
-      if (msgType !== "image") return [];
-      const content = Array.isArray(msg.content) ? msg.content : [msg.content];
-      return content.map((c: string) => getFullUrl(c));
-    }, [msg.content, msgType]);
 
     switch (msgType) {
       case "image":

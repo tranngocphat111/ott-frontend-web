@@ -22,7 +22,10 @@ import {
   getFullUrl,
   getFileNameFromUrl,
 } from "../../../utils";
-import { convertDisplayShortcodeToEmoji } from "../../../constants/emoji.constants";
+import {
+  convertDisplayShortcodeToEmoji,
+  convertEmojiImageMarkupToText,
+} from "../../../constants/emoji.constants";
 import { EmojiGlyph } from "../EmojiGlyph";
 
 type MessageLayoutProps = {
@@ -192,6 +195,10 @@ export const MessageLayout = ({
       ? "Bạn"
       : replyTo?.sender_name || "Tin nhắn gốc";
   const replyType = replyTo?.type;
+  const normalizePreviewText = (value: unknown) =>
+    convertDisplayShortcodeToEmoji(
+      convertEmojiImageMarkupToText(String(value || "")),
+    );
   const rawReplyContent = Array.isArray(replyTo?.content)
     ? replyTo.content[0]
     : replyTo?.content;
@@ -225,13 +232,27 @@ export const MessageLayout = ({
         )
       : "");
   const replyPreviewContent = replyTo?.is_deleted
-    ? "Tin nhắn đã bị xóa"
+    ? "Tin nhắn đã bị xóa ở phía bạn"
     : replyTo?.is_revoked
       ? "Tin nhắn đã được thu hồi"
-      : rawReplyContent || "[Đính kèm]";
+      : normalizePreviewText(rawReplyContent || "[Đính kèm]");
 
   const handleJumpToReplyMessage = () => {
     if (!replyTo?.msg_id || !msg.conversation_id) return;
+
+    if (replyTo?.is_deleted || replyTo?.is_revoked) {
+      window.dispatchEvent(
+        new CustomEvent("chat:open-removed-reference-notice", {
+          detail: {
+            title: "Không thể mở tin nhắn gốc",
+            message: replyTo?.is_deleted
+              ? "Tin nhắn gốc đã bị gỡ ở phía bạn."
+              : "Tin nhắn gốc đã được thu hồi.",
+          },
+        }),
+      );
+      return;
+    }
 
     window.dispatchEvent(
       new CustomEvent("chat:jump", {
@@ -444,8 +465,8 @@ export const MessageLayout = ({
     msg.local_status === "uploading" || msg.local_status === "error";
   const containerMargin = isLast
     ? hasReactions
-      ? "mb-3"
-      : "mb-1.5"
+      ? "mb-5"
+      : "mb-4"
     : hasReactions
       ? "mb-4"
       : "mb-1";
@@ -674,6 +695,8 @@ export const MessageLayout = ({
                     src={getFullUrl(replyImageUrls[0])}
                     className="w-full h-full object-cover"
                     alt="reply"
+                    loading="lazy"
+                    decoding="async"
                   />
                   {replyImageCount > 1 && (
                     <div className="absolute inset-0 bg-black/45 text-white text-[10px] font-semibold leading-none flex items-center justify-center">
@@ -710,7 +733,7 @@ export const MessageLayout = ({
                   isMe ? "text-[#a3845c]" : "text-slate-500"
                 }`}
               >
-                {replySenderName}
+                {normalizePreviewText(replySenderName)}
               </span>
 
               <div
@@ -775,7 +798,7 @@ export const MessageLayout = ({
           </div>
         )}
 
-        <div className="relative  w-fit max-w-full">
+        <div className="relative w-fit max-w-full">
           {/* NỘI DUNG TIN NHẮN CHÍNH */}
           {children(borderRadius)}
 

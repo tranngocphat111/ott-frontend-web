@@ -2,6 +2,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useCallback,
   type ReactElement,
   type ClipboardEvent,
   type ChangeEvent,
@@ -23,7 +24,11 @@ import {
 } from "lucide-react";
 import { MessageService } from "../../../services";
 import type { ChatInputProps } from "../../../types/message.type";
-import { convertEmojiImageMarkupToText } from "../../../constants/emoji.constants";
+import {
+  convertDisplayShortcodeToEmoji,
+  convertEmojiImageMarkupToText,
+} from "../../../constants/emoji.constants";
+import { socketService } from "../../../services";
 import { getFullUrl } from "../../../utils";
 import { getFileNameFromUrl } from "../../../utils";
 import { EmojiPicker } from "./EmojiPicker";
@@ -124,6 +129,23 @@ const isStandaloneLink = (value: string): boolean => {
   return !!normalizeLink(candidate);
 };
 
+const getContentValue = (value: unknown): string => {
+  if (typeof value === "string") return value;
+
+  if (typeof value === "object" && value) {
+    const candidate = value as { text?: string; url?: string; name?: string };
+    return String(candidate.text || candidate.url || candidate.name || "");
+  }
+
+  return String(value || "");
+};
+
+const normalizePreviewText = (value: unknown): string => {
+  return convertDisplayShortcodeToEmoji(
+    convertEmojiImageMarkupToText(String(value || "")),
+  );
+};
+
 const createUploadClientId = () =>
   `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -197,6 +219,8 @@ export const ChatInput = ({
   );
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const typingActiveRef = useRef(false);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Input ẩn dành riêng cho nút "+" trong StagingArea
   const addMoreInputRef = useRef<HTMLInputElement>(null);
@@ -247,6 +271,16 @@ export const ChatInput = ({
 
   useEffect(() => {
     return () => {
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = null;
+      }
+
+      if (typingActiveRef.current) {
+        socketService.stopTyping(conversationId, senderId);
+        typingActiveRef.current = false;
+      }
+
       clearRecordingTimer();
       stopStreamTracks();
       if (
@@ -300,7 +334,7 @@ export const ChatInput = ({
 
   const getReplyPreviewText = () => {
     if (!replyToMessage) return "";
-    if (replyToMessage.is_deleted) return "Tin nhắn đã bị xóa";
+    if (replyToMessage.is_deleted) return "Tin nhắn đã bị xóa ở phía bạn";
     if (replyToMessage.is_revoked) return "Tin nhắn đã được thu hồi";
     if (replyToMessage.type === "image") return "[Hình ảnh]";
     if (replyToMessage.type === "video") return "[Video]";
@@ -311,7 +345,7 @@ export const ChatInput = ({
       ? replyToMessage.content[0]
       : replyToMessage.content;
 
-    return String(raw || "").trim() || "[Tin nhắn]";
+    return normalizePreviewText(raw || "[Tin nhắn]").trim() || "[Tin nhắn]";
   };
 
   const renderReplyPreview = () => {
@@ -331,39 +365,19 @@ export const ChatInput = ({
           ? replyToMessage.content
           : [replyToMessage.content]
       )
-        .filter(Boolean)
-        .map((item) => String(item));
+        .map((item) => getContentValue(item))
+        .filter(Boolean);
       const previewUrl = imageUrls[0] ? getFullUrl(imageUrls[0]) : "";
 
       return (
         <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 max-w-full">
-          {imageUrls.length > 1 ? (
-            <div className="grid grid-cols-2 gap-0.5 w-10 h-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white">
-              {imageUrls.slice(0, 4).map((url, index) => (
-                <div
-                  key={index}
-                  className="relative overflow-hidden bg-slate-100"
-                >
-                  <img
-                    src={getFullUrl(url)}
-                    alt="reply-image"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  {index === 3 && imageUrls.length > 4 && (
-                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-[10px] font-semibold">
-                      +{imageUrls.length - 4}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : previewUrl ? (
+          {previewUrl ? (
             <img
               src={previewUrl}
-              alt="reply-image"
-              className="w-8 h-8 rounded-md object-cover border border-slate-200"
+              alt="reply-image-preview"
+              className="w-9 h-9 rounded-md object-cover border border-slate-200"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <span className="w-8 h-8 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center">
@@ -374,9 +388,9 @@ export const ChatInput = ({
             <span className="text-xs text-slate-600 truncate font-medium">
               Ảnh
             </span>
-            {imageUrls.length > 1 && (
+            {imageUrls.length > 0 && (
               <span className="text-[11px] text-slate-500 truncate">
-                Cụm {imageUrls.length} ảnh
+                {imageUrls.length > 1 ? `Cụm ${imageUrls.length} ảnh` : "1 ảnh"}
               </span>
             )}
           </div>
@@ -388,7 +402,7 @@ export const ChatInput = ({
       const raw = Array.isArray(replyToMessage.content)
         ? replyToMessage.content[0]
         : replyToMessage.content;
-      const previewUrl = raw ? getFullUrl(raw) : "";
+      const previewUrl = raw ? getFullUrl(getContentValue(raw)) : "";
       const fileName = raw ? getFileNameFromUrl(previewUrl, "Video") : "Video";
 
       return (
@@ -423,7 +437,7 @@ export const ChatInput = ({
         ? replyToMessage.content[0]
         : replyToMessage.content;
       const fileName = raw
-        ? getFileNameFromUrl(getFullUrl(raw), "File")
+        ? getFileNameFromUrl(getFullUrl(getContentValue(raw)), "File")
         : "File";
 
       return (
@@ -503,6 +517,59 @@ export const ChatInput = ({
     if (replyToMessage.sender_name) return replyToMessage.sender_name;
     return "tin nhắn";
   };
+
+  const stopTyping = useCallback(() => {
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+
+    if (!typingActiveRef.current) return;
+
+    socketService.stopTyping(conversationId, senderId);
+    typingActiveRef.current = false;
+  }, [conversationId, senderId]);
+
+  const startTyping = useCallback(() => {
+    if (!conversationId || !senderId) return;
+
+    if (!typingActiveRef.current) {
+      socketService.startTyping(conversationId, senderId);
+      typingActiveRef.current = true;
+    }
+
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+    }
+
+    typingStopTimerRef.current = setTimeout(() => {
+      stopTyping();
+    }, 2000);
+  }, [conversationId, senderId, stopTyping]);
+
+  const handleTextChange = useCallback(
+    (value: string) => {
+      setText(value);
+
+      if (value.length > 0) {
+        startTyping();
+      } else {
+        stopTyping();
+      }
+    },
+    [startTyping, stopTyping],
+  );
+
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      stopTyping();
+    };
+
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [stopTyping]);
 
   const normalizeUploadError = (error: unknown, fallback: string) => {
     if (error instanceof Error && error.message.trim()) {
@@ -804,6 +871,8 @@ export const ChatInput = ({
   const handleSend = async () => {
     if (isUploading) return;
     if (!text.trim() && pendingFiles.length === 0) return;
+
+    stopTyping();
 
     const replyToMsgId = replyToMessage?.msg_id;
     const filesToUpload = [...pendingFiles];
@@ -1116,7 +1185,7 @@ export const ChatInput = ({
 
   return (
     <div
-      className="p-4 bg-white border-t border-gray-100 relative"
+      className="p-4 bg-white border-t border-gray-100 relative "
       onPaste={handlePaste}
     >
       {showEmojiPicker && (
@@ -1279,8 +1348,9 @@ export const ChatInput = ({
           <TextInput
             ref={textInputRef}
             value={text}
-            onChange={setText}
+            onChange={handleTextChange}
             onKeyDown={handleTextKeyDown}
+            onBlur={stopTyping}
             placeholder={isUploading ? "Đang tải lên..." : "Nhập tin nhắn..."}
             disabled={isUploading}
           />
