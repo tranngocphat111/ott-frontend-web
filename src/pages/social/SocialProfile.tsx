@@ -151,6 +151,7 @@ const SocialProfile: React.FC = () => {
               loading={loading}
               onToggleLike={handleToggleLike}
               onDeletePost={handleDeletePost}
+              onEditPost={() => {}}
             />
           )}
 

@@ -8,7 +8,7 @@ interface Props {
   time: string;
   canEdit: boolean;
   showMenu: boolean;
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   onToggleMenu: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -29,11 +29,18 @@ const PostHeader: React.FC<Props> = ({
   <div className="flex items-center justify-between px-4 pt-4 pb-2">
     <div className="flex items-center gap-3">
       <div
-        onClick={() => onProfile(author.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onProfile(author.id);
+        }}
         className="rounded-full overflow-hidden cursor-pointer ring-2 ring-transparent hover:ring-primary-400 transition shrink-0">
         <UserAvatar user={author} size="size-10" />
       </div>
-      <div onClick={() => onProfile(author.id)}>
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onProfile(author.id);
+        }}>
         <p className="font-semibold text-gray-800 hover:underline cursor-pointer leading-tight">
           {author.name}
         </p>
@@ -47,7 +54,10 @@ const PostHeader: React.FC<Props> = ({
     <div className="flex items-center">
       <div ref={menuRef} className="relative">
         <button
-          onClick={onToggleMenu}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMenu();
+          }}
           className="p-2 rounded-full hover:bg-primary-50 transition">
           <MoreHorizontal className="size-5 text-primary-400" />
         </button>
@@ -56,13 +66,19 @@ const PostHeader: React.FC<Props> = ({
             {canEdit ?
               <>
                 <button
-                  onClick={onEdit}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.();
+                  }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 transition">
                   <Pencil className="size-4 text-primary-400" />
                   Chỉnh sửa bài viết
                 </button>
                 <button
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete?.();
+                  }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
                   <Trash2 className="size-4" />
                   Xóa bài viết

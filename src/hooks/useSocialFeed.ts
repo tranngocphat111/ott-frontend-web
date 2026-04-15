@@ -50,7 +50,7 @@ export const useSocialFeed = () => {
         containerRef,
     });
 
-    const { toggleLikePost, handleDeletePost, handleNewPost } =
+    const { toggleLikePost, handleDeletePost, handleNewPost, handleUpdatePost } =
         useSocialFeedActions({
             currentUser,
             setPosts,
@@ -73,5 +73,6 @@ export const useSocialFeed = () => {
         toggleLikePost,
         handleDeletePost,
         handleNewPost,
+        handleUpdatePost,
     };
 };

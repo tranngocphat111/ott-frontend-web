@@ -9,6 +9,7 @@ interface Props {
   postReactionCountsMap: Record<string, Record<string, number>>;
   onToggleLike: (id: string, key: ReactionKey | null) => void;
   onDelete: (id: string) => void;
+  onEdit: (post: Post) => void;
   currentUser: PostUser;
   loading?: boolean;
 }
@@ -34,6 +35,7 @@ const PostsList: React.FC<Props> = ({
   postReactionCountsMap,
   onToggleLike,
   onDelete,
+  onEdit,
   currentUser,
   loading = false,
 }) => (
@@ -56,6 +58,7 @@ const PostsList: React.FC<Props> = ({
           }
           onToggleLike={(key) => onToggleLike(post.id, key)}
           onDelete={onDelete}
+          onEdit={onEdit}
           currentUser={currentUser}
         />
       ))

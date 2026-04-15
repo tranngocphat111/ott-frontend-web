@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { Post, PostUser } from "./types";
 import RelationshipBadge from "./RelationshipBadge";
-import PostHeader from "./post/PostHeader";
 import PostBody from "./post/PostBody";
 import PostReactionsSummary from "./post/PostReactionsSummary";
 import PostActions from "./post/PostActions";
-import PostCommentsSection from "./post/PostCommentsSection";
+import PostDetailModal from "./PostDetailModal";
 import { useNavigate } from "react-router-dom";
 import { getReactionByKey, type ReactionKey } from "./post/reactions";
+import PostHeader from "./post/PostHeader";
 
 interface Props {
   post: Post;
@@ -34,7 +34,6 @@ const PostCard: React.FC<Props> = ({
   onEdit,
   currentUser,
 }) => {
-  const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comments);
   const [reaction, setReaction] = useState<ReactionKey | null>(
     initialReaction ?? null,
@@ -58,6 +57,8 @@ const PostCard: React.FC<Props> = ({
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalShowComments, setModalShowComments] = useState(false);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -121,66 +122,121 @@ const PostCard: React.FC<Props> = ({
     navigate(`/social/profile/${acccountId}`);
   };
 
+  const openModal = (showComments = false) => {
+    setShowMenu(false);
+    setModalShowComments(showComments);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const toggleModalComments = () => {
+    setModalShowComments((prev) => !prev);
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
-      {/* Relationship badge */}
-      <RelationshipBadge
-        relationship={post.relationship}
-        label={post.relationshipLabel}
-      />
-      <PostHeader
-        author={post.author}
-        time={post.time}
-        canEdit={post.relationship === "self"}
+    <>
+      <div
+        className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4"
+        onClick={() => openModal(false)}>
+        {/* Relationship badge */}
+        <RelationshipBadge
+          relationship={post.relationship}
+          label={post.relationshipLabel}
+        />
+        <div>
+          <PostHeader
+            author={post.author}
+            time={post.time}
+            canEdit={post.relationship === "self"}
+            showMenu={showMenu}
+            menuRef={menuRef}
+            onToggleMenu={() => setShowMenu((v) => !v)}
+            onEdit={() => {
+              setShowMenu(false);
+              onEdit?.(post);
+            }}
+            onDelete={() => {
+              setShowMenu(false);
+              onDelete?.(post.id);
+            }}
+            onProfile={goToProfile}
+          />
+        </div>
+
+        <PostBody content={post.content} media={post.media} />
+
+        <div>
+          <PostReactionsSummary
+            reactionCounts={reactionCounts}
+            commentCount={commentCount}
+            shares={post.shares}
+            onToggleComments={() => openModal(true)}
+          />
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <PostActions
+            reaction={reaction}
+            reactionLabel={currentReaction ? currentReaction.label : "Thích"}
+            reactionEmoji={currentReaction?.emoji}
+            reactionColor={
+              currentReaction ? currentReaction.color : "text-gray-400"
+            }
+            showComments={false}
+            showPicker={showPicker}
+            onLikeClick={handleLikeButtonClick}
+            onToggleComments={() => openModal(true)}
+            onSelectReaction={handleReactionClick}
+            onLikeMouseEnter={onMouseEnterLike}
+            onLikeMouseLeave={onMouseLeaveLike}
+            onPickerMouseEnter={onMouseEnterPicker}
+            onPickerMouseLeave={onMouseLeavePicker}
+          />
+        </div>
+      </div>
+
+      <PostDetailModal
+        isOpen={isModalOpen}
+        post={post}
+        currentUser={currentUser}
         showMenu={showMenu}
         menuRef={menuRef}
         onToggleMenu={() => setShowMenu((v) => !v)}
         onEdit={() => {
           setShowMenu(false);
+          closeModal();
           onEdit?.(post);
         }}
         onDelete={() => {
           setShowMenu(false);
+          closeModal();
           onDelete?.(post.id);
         }}
         onProfile={goToProfile}
-      />
-
-      <PostBody content={post.content} media={post.media} />
-
-      <PostReactionsSummary
-        reactionCounts={reactionCounts}
         commentCount={commentCount}
-        shares={post.shares}
-        onToggleComments={() => setShowComments((v) => !v)}
-      />
-
-      <PostActions
+        reactionCounts={reactionCounts}
         reaction={reaction}
-        reactionLabel={currentReaction ? currentReaction.label : "Thích"}
-        reactionEmoji={currentReaction?.emoji}
-        reactionColor={
+        currentReactionLabel={currentReaction ? currentReaction.label : "Thích"}
+        currentReactionEmoji={currentReaction?.emoji}
+        currentReactionColor={
           currentReaction ? currentReaction.color : "text-gray-400"
         }
-        showComments={showComments}
         showPicker={showPicker}
+        showComments={modalShowComments}
+        onClose={closeModal}
+        onToggleComments={toggleModalComments}
         onLikeClick={handleLikeButtonClick}
-        onToggleComments={() => setShowComments((v) => !v)}
         onSelectReaction={handleReactionClick}
         onLikeMouseEnter={onMouseEnterLike}
         onLikeMouseLeave={onMouseLeaveLike}
         onPickerMouseEnter={onMouseEnterPicker}
         onPickerMouseLeave={onMouseLeavePicker}
+        onCountChange={(delta) => setCommentCount((prev) => prev + delta)}
       />
-
-      {showComments && (
-        <PostCommentsSection
-          postId={post.id}
-          currentUser={currentUser}
-          onCountChange={(delta) => setCommentCount((prev) => prev + delta)}
-        />
-      )}
-    </div>
+    </>
   );
 };
 

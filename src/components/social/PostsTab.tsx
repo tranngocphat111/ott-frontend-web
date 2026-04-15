@@ -11,6 +11,7 @@ interface PostsTabProps {
   loading: boolean;
   onToggleLike: (postId: string, reactionKey: ReactionKey | null) => void;
   onDeletePost: (postId: string) => void;
+  onEditPost: (post: Post) => void;
 }
 
 const PostsTab: React.FC<PostsTabProps> = ({
@@ -21,6 +22,7 @@ const PostsTab: React.FC<PostsTabProps> = ({
   loading,
   onToggleLike,
   onDeletePost,
+  onEditPost,
 }) => {
   return (
     <PostList
@@ -31,6 +33,7 @@ const PostsTab: React.FC<PostsTabProps> = ({
       loading={loading}
       onToggleLike={onToggleLike}
       onDeletePost={onDeletePost}
+      onEditPost={onEditPost}
     />
   );
 };

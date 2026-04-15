@@ -99,7 +99,7 @@ const SocialRightSidebar: React.FC<Props> = ({ currentUserId }) => {
 
     loadRequests();
     loadFriends();
-  }, [currentUserId, updateFromPayload]);
+  }, [currentUserId, updateFromPayload, loadFriends, loadRequests]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -217,18 +217,6 @@ const SocialRightSidebar: React.FC<Props> = ({ currentUserId }) => {
               ))}
             </div>
           )}
-        </div>
-
-        {/* ── Birthdays ────────────────────────────────── */}
-        <div className="border-t border-primary-200 pt-4">
-          <h3 className="font-semibold text-primary-800 mb-3">Sinh nhat</h3>
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-primary-100 cursor-pointer transition">
-            <Gift className="size-8 text-primary-500 shrink-0" />
-            <p className="text-sm text-gray-700">
-              Hom nay la sinh nhat cua{" "}
-              <span className="font-semibold">Tan Nghi</span>.
-            </p>
-          </div>
         </div>
 
         {/* ── Friends ─────────────────────────────────── */}

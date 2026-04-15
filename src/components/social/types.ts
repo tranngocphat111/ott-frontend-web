@@ -1,6 +1,8 @@
 export interface PostMediaItem {
     type: "image" | "video";
     url: string;
+    id?: string;
+    caption?: string | null;
 }
 
 export interface User {
@@ -25,6 +27,7 @@ export interface Post {
     visibility?: string;
     relationship?: "self" | "friend" | "friend-of-friend" | "stranger";
     relationshipLabel?: string;
+    accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
 }
 
 export interface StoryItem {

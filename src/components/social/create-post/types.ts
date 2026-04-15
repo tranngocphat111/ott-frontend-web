@@ -2,10 +2,11 @@ import type { LucideIcon } from "lucide-react";
 
 export interface UploadedMedia {
     id: string;
-    file: File;
+    file?: File;
     url: string;
     type: "image" | "video";
     caption?: string;
+    isExisting?: boolean;
 }
 
 export interface FeelingOption {

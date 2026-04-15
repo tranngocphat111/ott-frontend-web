@@ -216,8 +216,10 @@ export function useSocialLayoutController() {
             media: UploadedMedia[],
             visibility: string,
             accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
-        ) => {
-            if (!currentUser.id) return;
+        ): Promise<{ ok: boolean; error?: string }> => {
+            if (!currentUser.id) {
+                return { ok: false, error: "Không tìm thấy tài khoản." };
+            }
 
             const tempId = `temp-${Date.now()}`;
             const optimisticPost: Post = {
@@ -236,7 +238,7 @@ export function useSocialLayoutController() {
 
             const files = media.map((m) => m.file);
             const captions = media.map((m) => m.caption ?? "");
-            const saved = await createPost(
+            const result = await createPost(
                 currentUser.id,
                 content,
                 visibility,
@@ -245,9 +247,15 @@ export function useSocialLayoutController() {
                 accessControls,
             );
 
-            if (saved) {
-                setPosts((prev) => prev.map((p) => (p.id === tempId ? saved : p)));
+            if (result.post) {
+                setPosts((prev) =>
+                    prev.map((p) => (p.id === tempId ? result.post! : p)),
+                );
+                return { ok: true };
             }
+
+            setPosts((prev) => prev.filter((p) => p.id !== tempId));
+            return { ok: false, error: result.error };
         },
         [currentUser],
     );

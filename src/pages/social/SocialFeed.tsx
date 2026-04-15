@@ -1,16 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 import SocialRightSidebar from "../../components/social/SocialRightSidebar";
 import SocialLeftSidebar from "../../components/social/SocialLeftSidebar";
 import PostFeed from "../../components/social/PostFeed";
 import CreatePostModal from "../../components/social/CreatePostModal";
+import { ConfirmModal } from "../../components/modal/ConfirmModal";
 import SocialFeedLayout from "../../components/social/layout/SocialFeedLayout";
 import InfiniteScrollIndicator from "../../components/social/feed/InfiniteScrollIndicator";
 import EndOfFeedNotice from "../../components/social/feed/EndOfFeedNotice";
 import StoryFeed from "../../components/social/story/StoryFeed";
 import CreatePostEntry from "../../components/social/feed/CreatePostEntry";
 import { useSocialFeed } from "../../hooks/useSocialFeed";
+import type { Post } from "../../components/social/types";
 
 const SocialFeed: React.FC = () => {
   const {
@@ -29,7 +31,25 @@ const SocialFeed: React.FC = () => {
     toggleLikePost,
     handleDeletePost,
     handleNewPost,
+    handleUpdatePost,
   } = useSocialFeed();
+
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const openCreateModal = (withFeeling = false) => {
+    setEditingPost(null);
+    openModal(withFeeling);
+  };
+
+  const openEditModal = (post: Post) => {
+    closeModal();
+    setEditingPost(post);
+  };
+
+  const closeEditModal = () => {
+    setEditingPost(null);
+  };
 
   console.log(currentUser);
 
@@ -67,8 +87,8 @@ const SocialFeed: React.FC = () => {
           <>
             <CreatePostEntry
               currentUser={currentUser}
-              onOpenModal={() => openModal(false)}
-              onOpenWithFeeling={() => openModal(true)}
+              onOpenModal={() => openCreateModal(false)}
+              onOpenWithFeeling={() => openCreateModal(true)}
             />
             <StoryFeed
               currentUserAvatar={currentUser.avatar ?? ""}
@@ -80,7 +100,8 @@ const SocialFeed: React.FC = () => {
               userReactionMap={userReactionMap}
               postReactionCountsMap={postReactionCountsMap}
               onToggleLike={toggleLikePost}
-              onDelete={handleDeletePost}
+              onDelete={(id) => setDeleteTargetId(id)}
+              onEdit={openEditModal}
               currentUser={currentUser}
               loading={loadingDB}
             />
@@ -98,11 +119,44 @@ const SocialFeed: React.FC = () => {
       />
 
       <CreatePostModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
+        key={
+          editingPost ? `edit-${editingPost.id}`
+          : isModalOpen ?
+            `create-${openWithFeeling ? "feeling" : "plain"}`
+          : "closed"
+        }
+        isOpen={isModalOpen || Boolean(editingPost)}
+        onClose={editingPost ? closeEditModal : closeModal}
         onPost={handleNewPost}
+        onUpdate={handleUpdatePost}
         currentUser={currentUser}
-        openWithFeeling={openWithFeeling}
+        openWithFeeling={editingPost ? false : openWithFeeling}
+        initialPost={
+          editingPost ?
+            {
+              id: editingPost.id,
+              content: editingPost.content,
+              visibility: editingPost.visibility,
+              media: editingPost.media,
+              accessControls: editingPost.accessControls,
+            }
+          : undefined
+        }
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Xóa bài viết"
+        message="Bạn có chắc chắn muốn xóa bài viết này không?"
+        confirmText="Xóa"
+        isDangerous
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={async () => {
+          if (deleteTargetId) {
+            await handleDeletePost(deleteTargetId);
+          }
+          setDeleteTargetId(null);
+        }}
       />
     </>
   );

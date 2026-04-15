@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 
-import { createPost, deletePost, toggleLike } from "../../services/post.service";
+import {
+    createPost,
+    deletePost,
+    toggleLike,
+    updatePost,
+} from "../../services/post.service";
 import type { Post, User } from "../../components/social/types";
 import type { UploadedMedia } from "../../components/social/create-post";
 
@@ -65,13 +70,66 @@ export const useSocialFeedActions = ({
 
     const handleDeletePost = useCallback(
         async (id: string) => {
-            if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
-                return;
-            }
             setPosts((prev) => prev.filter((p) => p.id !== id));
             await deletePost(id);
         },
         [setPosts],
+    );
+
+    const handleUpdatePost = useCallback(
+        async (
+            postId: string,
+            content: string,
+            media: UploadedMedia[],
+            visibility: string,
+            accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
+        ): Promise<{ ok: boolean; error?: string }> => {
+            if (!currentUser.id) {
+                return { ok: false, error: "Không tìm thấy tài khoản." };
+            }
+            let previousPost: Post | null = null;
+            setPosts((prev) =>
+                prev.map((p) => {
+                    if (p.id !== postId) return p;
+                    previousPost = p;
+                    return {
+                        ...p,
+                        content,
+                        visibility,
+                        media: media.map((m) => ({
+                            type: m.type,
+                            url: m.url,
+                            caption: m.caption ?? null,
+                        })),
+                        accessControls,
+                        time: "Vừa xong",
+                    };
+                }),
+            );
+
+            const result = await updatePost(
+                postId,
+                currentUser.id,
+                content,
+                visibility,
+                media,
+                accessControls,
+            );
+            if (result.post) {
+                setPosts((prev) =>
+                    prev.map((p) => (p.id === postId ? result.post! : p)),
+                );
+                return { ok: true };
+            }
+
+            if (previousPost) {
+                setPosts((prev) =>
+                    prev.map((p) => (p.id === postId ? previousPost! : p)),
+                );
+            }
+            return { ok: false, error: result.error };
+        },
+        [currentUser.id, setPosts],
     );
 
     const handleNewPost = useCallback(
@@ -80,8 +138,10 @@ export const useSocialFeedActions = ({
             media: UploadedMedia[],
             visibility: string,
             accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
-        ) => {
-            if (!currentUser.id) return;
+        ): Promise<{ ok: boolean; error?: string }> => {
+            if (!currentUser.id) {
+                return { ok: false, error: "Không tìm thấy tài khoản." };
+            }
             const tempId = `temp-${Date.now()}`;
             const optimisticPost: Post = {
                 id: tempId,
@@ -97,9 +157,10 @@ export const useSocialFeedActions = ({
             };
             setPosts((prev) => [optimisticPost, ...prev]);
 
-            const files = media.map((m) => m.file);
-            const captions = media.map((m) => m.caption ?? "");
-            const saved = await createPost(
+            const fileMedia = media.filter((m) => m.file) as Required<UploadedMedia>[];
+            const files = fileMedia.map((m) => m.file);
+            const captions = fileMedia.map((m) => m.caption ?? "");
+            const result = await createPost(
                 currentUser.id,
                 content,
                 visibility,
@@ -108,12 +169,18 @@ export const useSocialFeedActions = ({
                 accessControls,
             );
 
-            if (saved) {
-                setPosts((prev) => prev.map((p) => (p.id === tempId ? saved : p)));
+            if (result.post) {
+                setPosts((prev) =>
+                    prev.map((p) => (p.id === tempId ? result.post! : p)),
+                );
+                return { ok: true };
             }
+
+            setPosts((prev) => prev.filter((p) => p.id !== tempId));
+            return { ok: false, error: result.error };
         },
         [currentUser, setPosts],
     );
 
-    return { toggleLikePost, handleDeletePost, handleNewPost };
+    return { toggleLikePost, handleDeletePost, handleNewPost, handleUpdatePost };
 };

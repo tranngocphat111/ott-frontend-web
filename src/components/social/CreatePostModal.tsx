@@ -24,7 +24,7 @@ interface CreatePostModalProps {
     media: UploadedMedia[],
     visibility: string,
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
-  ) => void;
+  ) => Promise<{ ok: boolean; error?: string }>;
   currentUser: {
     id: string;
     displayName: string;
@@ -32,6 +32,20 @@ interface CreatePostModalProps {
     avatar?: string;
   };
   openWithFeeling?: boolean;
+  initialPost?: {
+    id: string;
+    content: string;
+    visibility?: string;
+    media?: { url: string; type: "image" | "video"; caption?: string | null }[];
+    accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
+  };
+  onUpdate?: (
+    postId: string,
+    content: string,
+    media: UploadedMedia[],
+    visibility: string,
+    accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
+  ) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /* ─── Feelings ──────────────────────────────────────── */
@@ -73,30 +87,48 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onPost,
   currentUser,
   openWithFeeling = false,
+  initialPost,
+  onUpdate,
 }) => {
-  const [content, setContent] = useState("");
-  const [mediaFiles, setMediaFiles] = useState<UploadedMedia[]>([]);
-  const [visibility, setVisibility] = useState("public");
+  const [content, setContent] = useState(() => initialPost?.content ?? "");
+  const [mediaFiles, setMediaFiles] = useState<UploadedMedia[]>(() =>
+    (initialPost?.media ?? []).map((m, index) => ({
+      id: `existing-${index}-${m.url}`,
+      url: m.url,
+      type: m.type,
+      caption: m.caption ?? "",
+      isExisting: true,
+    })),
+  );
+  const [visibility, setVisibility] = useState(
+    () => initialPost?.visibility?.toLowerCase() ?? "public",
+  );
   const [showVisibility, setShowVisibility] = useState(false);
-  const [showDropZone, setShowDropZone] = useState(false);
+  const [showDropZone, setShowDropZone] = useState(
+    () => (initialPost?.media?.length ?? 0) === 0,
+  );
   const [feeling, setFeeling] = useState<FeelingOption | null>(null);
-  const [showFeelingPicker, setShowFeelingPicker] = useState(false);
+  const [showFeelingPicker, setShowFeelingPicker] = useState(
+    () => openWithFeeling,
+  );
   const [feelingSearch, setFeelingSearch] = useState("");
   const [customRuleType, setCustomRuleType] = useState<"INCLUDE" | "EXCLUDE">(
-    "INCLUDE",
+    () => initialPost?.accessControls?.[0]?.ruleType ?? "INCLUDE",
   );
   const [friends, setFriends] = useState<FriendOption[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [friendSearch, setFriendSearch] = useState("");
-  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>(
+    () =>
+      (initialPost?.visibility?.toLowerCase() === "custom" ?
+        initialPost?.accessControls?.map((c) => c.accountId)
+      : []) ?? [],
+  );
   const [customError, setCustomError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShowFeelingPicker(openWithFeeling);
-    }
-  }, [isOpen, openWithFeeling]);
+  const isEditing = Boolean(initialPost);
 
   useEffect(() => {
     if (!isOpen || visibility !== "custom" || !currentUser.id) return;
@@ -112,15 +144,10 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
     loadFriends();
   }, [currentUser.id, friends.length, isOpen, visibility]);
 
-  useEffect(() => {
-    if (visibility !== "custom") {
-      setCustomError(null);
-    }
-  }, [visibility]);
-
   /* ── Handlers ───────────────────────────────────────── */
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
+    setSubmitError(null);
     const newItems: UploadedMedia[] = [];
     Array.from(files).forEach((file) => {
       const isImage = file.type.startsWith("image/");
@@ -135,6 +162,12 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
         });
       }
     });
+    if (typeof createImageBitmap === "function") {
+      newItems.forEach((item) => {
+        if (item.type !== "image" || !item.file) return;
+        createImageBitmap(item.file).catch(() => undefined);
+      });
+    }
     setMediaFiles((prev) => [...prev, ...newItems]);
     setShowDropZone(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -156,12 +189,50 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (isEditing && initialPost) {
+      if (!content.trim() && mediaFiles.length === 0 && !feeling) return;
+      if (visibility === "custom" && selectedFriendIds.length === 0) {
+        setCustomError(
+          "Vui lòng chọn ít nhất một người cho phạm vi tùy chỉnh.",
+        );
+        return;
+      }
+      setSubmitError(null);
+      const feelingText =
+        feeling ? ` — đang cảm thấy ${feeling.emoji} ${feeling.label}` : "";
+      const accessControls =
+        visibility === "custom" ?
+          selectedFriendIds.map((id) => ({
+            accountId: id,
+            ruleType: customRuleType,
+          }))
+        : undefined;
+      setIsSubmitting(true);
+      const result = await onUpdate?.(
+        initialPost.id,
+        content + feelingText,
+        mediaFiles,
+        visibility,
+        accessControls,
+      );
+      setIsSubmitting(false);
+      if (!result?.ok) {
+        setSubmitError(
+          result?.error ?? "Cập nhật bài viết thất bại. Vui lòng thử lại.",
+        );
+        return;
+      }
+      onClose();
+      return;
+    }
     if (!content.trim() && mediaFiles.length === 0 && !feeling) return;
     if (visibility === "custom" && selectedFriendIds.length === 0) {
       setCustomError("Vui lòng chọn ít nhất một người cho phạm vi tùy chỉnh.");
       return;
     }
+    setSubmitError(null);
     const feelingText =
       feeling ? ` — đang cảm thấy ${feeling.emoji} ${feeling.label}` : "";
     const accessControls =
@@ -171,14 +242,20 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
           ruleType: customRuleType,
         }))
       : undefined;
-    onPost(content + feelingText, mediaFiles, visibility, accessControls);
-    setContent("");
-    setMediaFiles([]);
-    setShowDropZone(false);
-    setFeeling(null);
-    setFeelingSearch("");
-    setShowFeelingPicker(false);
-    setCustomError(null);
+    setIsSubmitting(true);
+    const result = await onPost(
+      content + feelingText,
+      mediaFiles,
+      visibility,
+      accessControls,
+    );
+    setIsSubmitting(false);
+    if (!result.ok) {
+      setSubmitError(
+        result.error ?? "Tạo bài viết thất bại. Vui lòng thử lại.",
+      );
+      return;
+    }
     onClose();
   };
 
@@ -210,7 +287,10 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
       />
 
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <CreatePostModalHeader onClose={onClose} />
+        <CreatePostModalHeader
+          onClose={onClose}
+          title={isEditing ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
+        />
 
         {/* ── Scrollable body ─────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
@@ -224,6 +304,10 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             onSelectVisibility={(value) => {
               setVisibility(value);
               setShowVisibility(false);
+              if (value !== "custom") {
+                setSelectedFriendIds([]);
+                setCustomError(null);
+              }
             }}
             visibilityOptions={VISIBILITY_OPTIONS}
           />
@@ -253,7 +337,10 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
           <div className="px-4 pb-2">
             <textarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                setSubmitError(null);
+              }}
               placeholder={`${currentUser.displayName.split(" ").pop()} ơi, bạn đang nghĩ gì vậy?`}
               className="w-full resize-none outline-none text-gray-800 placeholder-gray-400 text-lg leading-relaxed min-h-25"
               rows={4}
@@ -274,10 +361,12 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
           {/* Drop zone (when toolbar Image button clicked but no files yet) */}
           {showDropZone && mediaFiles.length === 0 && (
-            <DropZone
-              onDropFiles={handleFileSelect}
-              onPickFiles={() => fileInputRef.current?.click()}
-            />
+            <>
+              <DropZone
+                onDropFiles={handleFileSelect}
+                onPickFiles={() => fileInputRef.current?.click()}
+              />
+            </>
           )}
 
           {/* Feeling picker panel */}
@@ -307,7 +396,16 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
         </div>
 
         {/* ── Footer ─────────────────────────────────── */}
-        <CreatePostModalFooter onSubmit={handleSubmit} canPost={canPost} />
+        {submitError && (
+          <p className="px-4 pb-2 text-xs text-red-600">{submitError}</p>
+        )}
+
+        <CreatePostModalFooter
+          onSubmit={handleSubmit}
+          canPost={canPost}
+          isSubmitting={isSubmitting}
+          submitLabel={isEditing ? "Lưu" : "Đăng"}
+        />
 
         {/* Hidden file input */}
         <input

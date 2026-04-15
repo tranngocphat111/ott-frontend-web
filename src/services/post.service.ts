@@ -38,6 +38,7 @@ export interface ApiPost {
     updatedAt: string;
     visibility: string;
     hashTags: string[] | null;
+    accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -78,6 +79,8 @@ export function mapMedia(medias: ApiMedia[] | null): PostMediaItem[] {
         .map((m) => ({
             type: m.type === "VIDEO_MEDIA" ? "video" : "image",
             url: m.url,
+            id: m.id,
+            caption: m.caption,
         }));
 }
 
@@ -86,6 +89,7 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
     const author: PostUser = {
         id: p.accountId,
         name: p.accountDisplayName ?? p.accountUsername,
+        displayName: p.accountDisplayName ?? p.accountUsername,
         avatar: p.accountAvatarUrl ?? undefined,
         color: colorFor(colorIndex),
     };
@@ -100,6 +104,7 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
         shares: p.totalShares,
         visibility: p.visibility,
         relationship: p.accountId === currentUserId ? "self" : undefined,
+        accessControls: p.accessControls,
     };
 }
 
@@ -198,7 +203,6 @@ export async function findPostsWithAuthorized(
     currentUserId?: string,
 ): Promise<PostsPage | null> {
     try {
-        console.log(`${API_MEDIA_SERVER_URL}/posts/page/${currentUserId}?page=${page}&size=${size}&sort=createdAt,desc`);
         const res = await fetch(
             `${API_MEDIA_SERVER_URL}/posts/page/${currentUserId}?page=${page}&size=${size}&sort=createdAt,desc`,
             { signal: AbortSignal.timeout(10_000) },
@@ -269,6 +273,30 @@ export async function fetchPostById(postId: string, currentUserId?: string): Pro
  * Upload ảnh lên S3 qua backend (multipart/form-data).
  * Trả về bài post đã lưu DB, hoặc null nếu lỗi.
  */
+function buildUploadErrorMessage(
+    actionLabel: string,
+    status: number,
+    bodyText?: string,
+): string {
+    const normalized = bodyText?.toLowerCase() ?? "";
+    if (normalized.includes("max_media_count_exceeded")) {
+        return "Bạn đã chọn quá nhiều file. Tối đa 20 file.";
+    }
+    if (normalized.includes("filecountlimitexceededexception")) {
+        return "Bạn đã chọn quá nhiều file. Vui lòng giảm số lượng và thử lại.";
+    }
+    if (normalized.includes("filesizelimitexceededexception")) {
+        return "Một hoặc nhiều file vượt quá giới hạn dung lượng.";
+    }
+    if (normalized.includes("sizelimitexceededexception")) {
+        return "Tổng dung lượng upload vượt quá giới hạn cho phép.";
+    }
+    if (normalized.includes("failed to parse multipart")) {
+        return "Upload thất bại. Vui lòng kiểm tra số lượng hoặc dung lượng file.";
+    }
+    return `${actionLabel} thất bại (${status}). Vui lòng thử lại.`;
+}
+
 export async function createPost(
     accountId: string,
     caption: string,
@@ -276,7 +304,7 @@ export async function createPost(
     files: File[],
     captions?: string[],
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
-): Promise<Post | null> {
+): Promise<{ post: Post | null; error?: string }> {
     try {
         const form = new FormData();
         form.append("accountId", accountId);
@@ -298,21 +326,104 @@ export async function createPost(
         });
 
         if (!res.ok) {
-            // Log lỗi chi tiết từ backend để debug S3 issues
+            let errBody: string | undefined;
             try {
-                const errBody = await res.text();
+                errBody = await res.text();
                 console.error(`[createPost] Backend error ${res.status}:`, errBody);
             } catch {
                 console.error(`[createPost] Backend error ${res.status}: (no body)`);
             }
-            return null;
+            return {
+                post: null,
+                error: buildUploadErrorMessage("Tạo bài viết", res.status, errBody),
+            };
         }
 
         const p: ApiPost = await res.json();
-        return mapPost(p, 0, accountId); // author = chính mình
+        return { post: mapPost(p, 0, accountId) };
     } catch (err) {
         console.error("[createPost] Network/timeout error:", err);
-        return null;
+        return {
+            post: null,
+            error: "Không thể kết nối đến máy chủ. Vui lòng thử lại.",
+        };
+    }
+}
+
+/**
+ * Cap nhat noi dung bai post.
+ * Chi ho tro caption + visibility.
+ */
+export async function updatePost(
+    postId: string,
+    accountId: string,
+    caption: string,
+    visibility: string,
+    media: Array<PostMediaItem & { file?: File }>,
+    accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[],
+): Promise<{ post: Post | null; error?: string }> {
+    try {
+        const form = new FormData();
+        form.append("accountId", accountId);
+        form.append("caption", caption);
+        form.append("visibility", visibility.toUpperCase());
+
+        if (accessControls && accessControls.length > 0) {
+            form.append("accessControls", JSON.stringify(accessControls));
+        }
+
+        const existingMedias = media
+            .filter((m) => !m.file)
+            .map((m, index) => ({
+                type: m.type === "video" ? "VIDEO_MEDIA" : "IMAGE_MEDIA",
+                url: m.url,
+                caption: m.caption ?? null,
+                orderIndex: index,
+            }));
+
+        if (existingMedias.length > 0) {
+            form.append("existingMedias", JSON.stringify(existingMedias));
+        }
+
+        const newMedia = media.filter((m) => m.file) as Array<
+            PostMediaItem & { file: File }
+        >;
+        newMedia.forEach((m) => {
+            const file = m.file;
+            form.append("files", file);
+            form.append("captions", m.caption ?? "");
+        });
+
+        const res = await fetch(`${API_MEDIA_SERVER_URL}/posts/${postId}`, {
+            method: "PUT",
+            body: form,
+            signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) {
+            let errBody: string | undefined;
+            try {
+                errBody = await res.text();
+                console.error(`[updatePost] Backend error ${res.status}:`, errBody);
+            } catch {
+                console.error(`[updatePost] Backend error ${res.status}: (no body)`);
+            }
+            return {
+                post: null,
+                error: buildUploadErrorMessage(
+                    "Cập nhật bài viết",
+                    res.status,
+                    errBody,
+                ),
+            };
+        }
+        const p: ApiPost = await res.json();
+        return { post: mapPost(p, 0, accountId) };
+    } catch (err) {
+        console.error("[updatePost] Network/timeout error:", err);
+        return {
+            post: null,
+            error: "Không thể kết nối đến máy chủ. Vui lòng thử lại.",
+        };
     }
 }
 
