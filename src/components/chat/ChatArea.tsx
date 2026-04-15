@@ -45,7 +45,9 @@ import { ForwardMessageModal } from "../modal/ForwardMessageModal";
 import {
   shouldShowTimestamp,
   formatChatTimestamp,
+  getCallOpenBlockReason,
   getConversationDisplayName,
+  getConversationDisplayAvatar,
   getFullUrl,
   getFileNameFromUrl,
 } from "../../utils";
@@ -60,6 +62,9 @@ interface ExtendedChatAreaProps extends ChatAreaProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }
+
+const isSystemLikeType = (type?: string) =>
+  String(type || "").startsWith("system_");
 
 const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   conversation,
@@ -216,10 +221,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     } else {
       setInternalSidebarOpen(!internalSidebarOpen);
     }
-  };
-
-  const getConversationName = () => {
-    return getConversationDisplayName(activeConversation, normalizedUserId);
   };
 
   const revokePreviewUrls = useCallback((urls?: string[]) => {
@@ -749,7 +750,12 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         | "system_block"
         | "system_leave"
         | "system_pin"
-        | "system_unpin";
+        | "system_unpin"
+        | "call_start"
+        | "call_join"
+        | "call_end"
+        | "call_cancel"
+        | "call_no_answer";
       const rawReplyContent = Array.isArray(replyTarget.content)
         ? extractContentValue(replyTarget.content[0])
         : extractContentValue(replyTarget.content);
@@ -819,7 +825,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     for (let index = 0; index < hydratedMessages.length; index += 1) {
       const currentMsg = hydratedMessages[index];
       const prevMsg = hydratedMessages[index - 1];
-      const isSystemMsg = currentMsg.type?.startsWith("system_");
+      const isSystemMsg = isSystemLikeType(currentMsg.type);
 
       if (!isSystemMsg) {
         items.push({
@@ -849,7 +855,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       let endIndex = index;
       while (endIndex + 1 < hydratedMessages.length) {
         const nextMsg = hydratedMessages[endIndex + 1];
-        if (!nextMsg.type?.startsWith("system_")) {
+        if (!isSystemLikeType(nextMsg.type)) {
           break;
         }
 
@@ -954,11 +960,29 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   ) => {
     if (!activeConversation?._id) return;
 
+    const blockReason = getCallOpenBlockReason(activeConversation._id);
+    if (blockReason === "other") {
+      window.alert("Bạn đang ở trong cuộc gọi khác.");
+      return;
+    }
+    if (blockReason === "same") {
+      window.alert("Bạn đang ở trong cuộc gọi này.");
+      return;
+    }
+
+    const displayName = getConversationDisplayName(
+      activeConversation,
+      normalizedUserId,
+    );
+    const displayAvatar =
+      getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
+
     const params = new URLSearchParams({
       conversationId: activeConversation._id,
       type,
       action,
-      name: getConversationName(),
+      name: displayName,
+      avatar: displayAvatar,
     });
 
     setIsOpeningCall(true);
@@ -1669,7 +1693,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                 sender_id: String(previousMessage.sender_id || ""),
                 sender_name: previousMessage.sender_name || "",
                 content: displayContent,
-                type: previousMessage.type?.startsWith("system_")
+                type: isSystemLikeType(previousMessage.type)
                   ? "text"
                   : (previousMessage.type as
                       | "text"
@@ -2432,13 +2456,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               const index = item.index;
               const prevMsg = hydratedMessages[index - 1];
               const nextMsg = hydratedMessages[index + 1];
-              const prevIsSystem = prevMsg?.type?.startsWith("system_");
-              const nextIsSystem = nextMsg?.type?.startsWith("system_");
+              const prevIsSystem = isSystemLikeType(prevMsg?.type);
+              const nextIsSystem = isSystemLikeType(nextMsg?.type);
               const nextShowTime = nextMsg
                 ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
                 : false;
               const firstUserMessageIndex = hydratedMessages.findIndex(
-                (message) => !message.type?.startsWith("system_"),
+                (message) => !isSystemLikeType(message.type),
               );
               const isTopBoundary = index === firstUserMessageIndex;
               const isMe = msg.sender_id === normalizedUserId;

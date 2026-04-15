@@ -7,6 +7,7 @@ import { FileMessage } from "./FileMessage";
 import { AudioMessage } from "./AudioMessage";
 import { LinkMessage } from "./LinkMessage";
 import { RevokedMessage } from "./RevokedMessage";
+import { CallMessage } from "./CallMessage";
 
 export const ChatMessage = memo(
   ({
@@ -190,6 +191,24 @@ export const ChatMessage = memo(
             onDelete={onDelete}
             onPin={onPin}
             onForward={onForward}
+          />
+        );
+
+      case "call_start":
+      case "call_join":
+      case "call_end":
+      case "call_missed":
+      case "call_cancel":
+      case "call_no_answer":
+        return (
+          <CallMessage
+            msg={msg}
+            isMe={isMe}
+            currentUserId={currentUserId}
+            isFirstInSequence={isFirstInSequence}
+            isLastInSequence={isLastInSequence}
+            isTopBoundary={isTopBoundary}
+            onDelete={onDelete}
           />
         );
 

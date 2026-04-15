@@ -69,8 +69,17 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     const lastMsg = conversation.last_message;
     if (!lastMsg?.content) return "Chưa có tin nhắn";
 
-    // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
+    // System messages hiển thị thẳng.
+    // Call preview chỉ giữ lại trạng thái cuối cùng để không lộ các type trung gian.
     if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
+
+    if ((lastMsg.type as string)?.startsWith("call_")) {
+      if (lastMsg.type === "call_start" || lastMsg.type === "call_join") {
+        return "Cuộc gọi";
+      }
+
+      return lastMsg.content;
+    }
 
     const senderParticipant = (conversation.participants || []).find(
       (participant) => {

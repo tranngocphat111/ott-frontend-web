@@ -65,10 +65,12 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   const [callType, setCallType] = useState<CallType | null>(null);
   const [isInCall, setIsInCall] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [busyUserIds, setBusyUserIds] = useState<string[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStreamItem[]>([]);
   const [participants, setParticipants] = useState<string[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -77,6 +79,9 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     new Map(),
   );
   const activeConversationRef = useRef<string | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const cameraTrackBeforeShareRef = useRef<MediaStreamTrack | null>(null);
+  const cameraOffBeforeShareRef = useRef(false);
 
   const canHandleCall = Boolean(conversationId && userId);
 
@@ -84,13 +89,18 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     setIsInCall(false);
     setIsConnecting(false);
     setCallType(null);
+    setBusyUserIds([]);
     setParticipants([]);
     setRemoteStreams([]);
     setIsMuted(false);
     setIsCameraOff(false);
+    setIsScreenSharing(false);
     remoteMediaStreamRef.current.clear();
     pendingIceCandidatesRef.current.clear();
     activeConversationRef.current = null;
+    screenTrackRef.current = null;
+    cameraTrackBeforeShareRef.current = null;
+    cameraOffBeforeShareRef.current = false;
   }, []);
 
   const stopLocalStream = useCallback(() => {
@@ -273,12 +283,30 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     [],
   );
 
+  const replaceOutgoingVideoTrack = useCallback(
+    (nextTrack: MediaStreamTrack | null) => {
+      peerConnectionsRef.current.forEach((pc) => {
+        const sender = pc
+          .getSenders()
+          .find((item) => item.track?.kind === "video" || item.track === null);
+
+        if (sender && typeof sender.replaceTrack === "function") {
+          sender.replaceTrack(nextTrack).catch((error) => {
+            console.error("Khong the cap nhat video track:", error);
+          });
+        }
+      });
+    },
+    [],
+  );
+
   const startCall = useCallback(
     async (mode: CallType) => {
       if (!canHandleCall || !conversationId || !userId) return;
 
       try {
         setIsConnecting(true);
+        setBusyUserIds([]);
         await ensureLocalStream(mode);
 
         activeConversationRef.current = conversationId;
@@ -311,6 +339,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
 
       try {
         setIsConnecting(true);
+        setBusyUserIds([]);
         await ensureLocalStream(mode);
 
         activeConversationRef.current = conversationId;
@@ -390,6 +419,14 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     }
 
     cleanupAllPeers();
+
+    const currentScreenTrack = screenTrackRef.current;
+    if (currentScreenTrack) {
+      currentScreenTrack.onended = null;
+      currentScreenTrack.stop();
+      screenTrackRef.current = null;
+    }
+
     stopLocalStream();
     resetCallState();
   }, [cleanupAllPeers, resetCallState, stopLocalStream, userId]);
@@ -407,6 +444,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
 
   const toggleCamera = useCallback(() => {
     if (callType !== "video") return;
+    if (isScreenSharing) return;
 
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -416,7 +454,105 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     });
 
     setIsCameraOff((prev) => !prev);
-  }, [callType]);
+  }, [callType, isScreenSharing]);
+
+  const stopScreenShare = useCallback(async () => {
+    if (callType !== "video") return;
+
+    const stream = localStreamRef.current;
+    const activeScreenTrack = screenTrackRef.current;
+
+    if (!stream || !activeScreenTrack) {
+      setIsScreenSharing(false);
+      return;
+    }
+
+    activeScreenTrack.onended = null;
+    stream.removeTrack(activeScreenTrack);
+    activeScreenTrack.stop();
+    screenTrackRef.current = null;
+
+    let restoreTrack = cameraTrackBeforeShareRef.current;
+
+    if (!restoreTrack || restoreTrack.readyState !== "live") {
+      try {
+        const media = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+        [restoreTrack] = media.getVideoTracks();
+      } catch (error) {
+        console.error("Khong the khoi phuc camera sau khi dung share:", error);
+        restoreTrack = null;
+      }
+    }
+
+    if (restoreTrack) {
+      restoreTrack.enabled = !cameraOffBeforeShareRef.current;
+      stream.addTrack(restoreTrack);
+      replaceOutgoingVideoTrack(restoreTrack);
+      setIsCameraOff(cameraOffBeforeShareRef.current);
+    } else {
+      replaceOutgoingVideoTrack(null);
+      setIsCameraOff(true);
+    }
+
+    cameraTrackBeforeShareRef.current = null;
+    cameraOffBeforeShareRef.current = false;
+    setIsScreenSharing(false);
+  }, [callType, replaceOutgoingVideoTrack]);
+
+  const startScreenShare = useCallback(async () => {
+    if (callType !== "video" || isScreenSharing) return;
+
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const [screenTrack] = displayStream.getVideoTracks();
+
+      if (!screenTrack) return;
+
+      const currentCameraTrack = stream.getVideoTracks()[0] || null;
+      cameraTrackBeforeShareRef.current = currentCameraTrack;
+      cameraOffBeforeShareRef.current = isCameraOff;
+
+      if (currentCameraTrack) {
+        stream.removeTrack(currentCameraTrack);
+      }
+
+      stream.addTrack(screenTrack);
+      replaceOutgoingVideoTrack(screenTrack);
+      screenTrackRef.current = screenTrack;
+      setIsScreenSharing(true);
+      setIsCameraOff(false);
+
+      screenTrack.onended = () => {
+        void stopScreenShare();
+      };
+    } catch (error) {
+      console.error("Khong the bat dau chia se man hinh:", error);
+    }
+  }, [
+    callType,
+    isCameraOff,
+    isScreenSharing,
+    replaceOutgoingVideoTrack,
+    stopScreenShare,
+  ]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (isScreenSharing) {
+      void stopScreenShare();
+      return;
+    }
+
+    void startScreenShare();
+  }, [isScreenSharing, startScreenShare, stopScreenShare]);
 
   useEffect(() => {
     const handleIncomingCall = (payload: IncomingCall) => {
@@ -585,6 +721,25 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       console.log(`User ${payload.userId} tu choi cuoc goi`);
     };
 
+    const handleCallBusy = (payload: {
+      conversationId: string;
+      targetUserId: string;
+    }) => {
+      if (
+        !activeConversationRef.current ||
+        payload.conversationId !== activeConversationRef.current
+      ) {
+        return;
+      }
+
+      setBusyUserIds((prev) => {
+        if (prev.includes(payload.targetUserId)) {
+          return prev;
+        }
+        return [...prev, payload.targetUserId];
+      });
+    };
+
     socketService.onIncomingCall(handleIncomingCall);
     socketService.onCallJoined(handleCallJoined);
     socketService.onOffer(handleOffer);
@@ -593,6 +748,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     socketService.onCallLeft(handleCallLeft);
     socketService.onCallEnded(handleCallEnded);
     socketService.onCallDeclined(handleCallDeclined);
+    socketService.onCallBusy(handleCallBusy);
 
     return () => {
       socketService.offIncomingCall(handleIncomingCall);
@@ -603,6 +759,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       socketService.offCallLeft(handleCallLeft);
       socketService.offCallEnded(handleCallEnded);
       socketService.offCallDeclined(handleCallDeclined);
+      socketService.offCallBusy(handleCallBusy);
     };
   }, [
     cleanupAllPeers,
@@ -636,11 +793,13 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       isInCall,
       isConnecting,
       callType,
+      busyUserIds,
       localStream,
       remoteStreams,
       participants,
       isMuted,
       isCameraOff,
+      isScreenSharing,
       startCall,
       joinExistingCall,
       acceptIncomingCall,
@@ -648,6 +807,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       endCall,
       toggleMic,
       toggleCamera,
+      toggleScreenShare,
     }),
     [
       acceptIncomingCall,
@@ -656,9 +816,11 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       endCall,
       incomingCall,
       isCameraOff,
+      isScreenSharing,
       isConnecting,
       isInCall,
       isMuted,
+      busyUserIds,
       localStream,
       participants,
       remoteStreams,
@@ -666,6 +828,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       joinExistingCall,
       toggleCamera,
       toggleMic,
+      toggleScreenShare,
     ],
   );
 };

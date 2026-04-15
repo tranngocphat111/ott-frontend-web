@@ -484,6 +484,7 @@ export const MessageLayout = ({
     !msg.is_deleted &&
     !msg.is_revoked &&
     !String(msg.type || "").startsWith("system_") &&
+    !String(msg.type || "").startsWith("call_") &&
     !isUploadInFlight &&
     !!onForward;
 

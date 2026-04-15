@@ -392,6 +392,23 @@ class SocketService {
       this.socket?.removeAllListeners("nguoi_dung_tu_choi_goi");
     }
   }
+
+  onCallBusy(
+    callback: (payload: {
+      conversationId: string;
+      targetUserId: string;
+    }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_ban_goi", callback);
+  }
+
+  offCallBusy(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_ban_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_ban_goi");
+    }
+  }
 }
 
 export const socketService = new SocketService();

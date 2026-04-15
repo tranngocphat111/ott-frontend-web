@@ -22,6 +22,12 @@ export const ChatNotification: React.FC<ChatNotificationProps> = ({
       return <PinNotification content={content} />;
     case "system_unpin":
       return <UnpinNotification content={content} />;
+    case "call_start":
+    case "call_join":
+    case "call_end":
+    case "call_cancel":
+    case "call_no_answer":
+      return <DefaultNotification content={content} />;
     default:
       return <DefaultNotification content={content} />;
   }

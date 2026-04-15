@@ -23,7 +23,13 @@ export interface Message {
     | "system_block"
     | "system_leave"
     | "system_pin"
-    | "system_unpin";
+    | "system_unpin"
+    | "call_start"
+    | "call_join"
+    | "call_end"
+    | "call_missed"
+    | "call_cancel"
+    | "call_no_answer";
   created_at: string;
   createdAt?: string; // For backwards compatibility
   sender_id: String;
@@ -70,7 +76,13 @@ export interface MessageReplyPreview {
     | "system_block"
     | "system_leave"
     | "system_pin"
-    | "system_unpin";
+    | "system_unpin"
+    | "call_start"
+    | "call_join"
+    | "call_end"
+    | "call_missed"
+    | "call_cancel"
+    | "call_no_answer";
   content: string;
   raw_content?: string;
   file_name?: string;
