@@ -180,6 +180,7 @@ const CallPage: React.FC = () => {
     isCameraOff,
     isScreenSharing,
     remoteCameraStates,
+    busyUserIds,
     startCall,
     joinExistingCall,
     endCall,
@@ -190,6 +191,23 @@ const CallPage: React.FC = () => {
     conversationId,
     userId: normalizedUserId,
   });
+
+  // Khi người nhận đang bận: thông báo về parent window rồi đóng tab này
+  useEffect(() => {
+    if (busyUserIds && busyUserIds.length > 0) {
+      // Gửi tên người nhận về ChatPage để hiện modal
+      const opener = window.opener;
+      if (opener) {
+        opener.postMessage({ type: "call-target-busy", name: remoteDisplayName }, "*");
+      }
+      // Đóng cửa sổ gọi
+      endCall();
+      setTimeout(() => {
+        window.close();
+        window.location.href = "about:blank";
+      }, 200);
+    }
+  }, [busyUserIds, endCall, remoteDisplayName]);
 
   const hasRemoteAnswered =
     participants.some((id) => String(id) !== String(normalizedUserId || "")) ||
@@ -295,6 +313,7 @@ const CallPage: React.FC = () => {
 
   const handleExit = () => {
     endCall();
+    // window.opener chỉ tồn tại khi window được mở bằng window.open — an toàn để close
     if (window.opener) {
       window.close();
       return;
@@ -309,6 +328,8 @@ const CallPage: React.FC = () => {
         isClosingByNoAnswerRef.current ||
         isClosingByCancelRef.current
       ) {
+        // Chỉ tự đóng khi có opener (mở bằng window.open), không dùng window.name
+        // vì window.name tồn tại qua F5 và sẽ gây đóng trang khi reload
         if (window.opener) {
           window.close();
           return;

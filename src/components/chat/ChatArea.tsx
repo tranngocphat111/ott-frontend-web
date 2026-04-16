@@ -98,6 +98,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const isInitialLoading = loading && messages.length === 0;
 
   const [isOpeningCall, setIsOpeningCall] = useState(false);
+  const [callBlockModal, setCallBlockModal] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     action: "revoke" | "delete" | null;
@@ -124,6 +128,12 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const prevMessageCountRef = useRef(0);
   const prevLastMessageIdRef = useRef<string | null>(null);
   const autoFillOlderRef = useRef(false);
+  const pendingCallParamsRef = useRef<{
+    type: "voice" | "video";
+    action: "start" | "join";
+    displayName: string;
+    displayAvatar: string;
+  } | null>(null);
 
   // State quản lý Media Viewer & Tin nhắn
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -954,31 +964,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     [getPinnedMediaValue],
   );
 
-  const openCallWindow = (
+  // Helper thực sự mở cửa sổ gọi (sau khi đã xác nhận sẵn sàng)
+  const doOpenCallWindow = (
     type: "voice" | "video",
-    action: "start" | "join" = "start",
+    action: "start" | "join",
+    displayName: string,
+    displayAvatar: string,
   ) => {
-    if (!activeConversation?._id) return;
-
-    const blockReason = getCallOpenBlockReason(activeConversation._id);
-    if (blockReason === "other") {
-      window.alert("Bạn đang ở trong cuộc gọi khác.");
-      return;
-    }
-    if (blockReason === "same") {
-      window.alert("Bạn đang ở trong cuộc gọi này.");
-      return;
-    }
-
-    const displayName = getConversationDisplayName(
-      activeConversation,
-      normalizedUserId,
-    );
-    const displayAvatar =
-      getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
-
     const params = new URLSearchParams({
-      conversationId: activeConversation._id,
+      conversationId: activeConversation!._id,
       type,
       action,
       name: displayName,
@@ -997,6 +991,77 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     }
     setTimeout(() => setIsOpeningCall(false), 500);
   };
+
+  const openCallWindow = (
+    type: "voice" | "video",
+    action: "start" | "join" = "start",
+  ) => {
+    if (!activeConversation?._id) return;
+
+    const blockReason = getCallOpenBlockReason(activeConversation._id);
+    if (blockReason === "other") {
+      setCallBlockModal({
+        title: "Đang trong cuộc gọi",
+        message:
+          "Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc trước khi gọi mới.",
+      });
+      return;
+    }
+    if (blockReason === "same") {
+      setCallBlockModal({
+        title: "Đang trong cuộc gọi",
+        message: "Bạn đang ở trong cuộc gọi này rồi.",
+      });
+      return;
+    }
+
+    const displayName = getConversationDisplayName(
+      activeConversation,
+      normalizedUserId,
+    );
+    const displayAvatar =
+      getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
+
+    // Nếu là Join (chấp nhận cuộc gọi) -> mở luôn
+    if (action === "join") {
+      doOpenCallWindow(type, action, displayName, displayAvatar);
+      return;
+    }
+
+    // Nếu là Start (bắt đầu gọi) -> Check bận trước
+    pendingCallParamsRef.current = {
+      type,
+      action,
+      displayName,
+      displayAvatar,
+    };
+    socketService.checkCallAvailability(
+      activeConversation._id,
+      normalizedUserId as string,
+    );
+  };
+
+  useEffect(() => {
+    const onCallReady = (payload: { conversationId: string }) => {
+      if (payload.conversationId !== activeConversation?._id) return;
+      const params = pendingCallParamsRef.current;
+      if (params) {
+        doOpenCallWindow(
+          params.type,
+          params.action,
+          params.displayName,
+          params.displayAvatar,
+        );
+        pendingCallParamsRef.current = null;
+      }
+    };
+
+    socketService.onCallReady(onCallReady);
+
+    return () => {
+      socketService.offCallReady(onCallReady);
+    };
+  }, [activeConversation?._id, normalizedUserId]);
 
   // Logic đánh dấu đã đọc
   useEffect(() => {
@@ -2635,6 +2700,16 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           setForwardingMessage(null);
         }}
         onConfirm={handleConfirmForwardMessage}
+      />
+
+      <ConfirmModal
+        isOpen={!!callBlockModal}
+        title={callBlockModal?.title ?? ""}
+        message={callBlockModal?.message ?? ""}
+        confirmText="Đóng"
+        hideCancelButton
+        onConfirm={() => setCallBlockModal(null)}
+        onCancel={() => setCallBlockModal(null)}
       />
     </div>
   );

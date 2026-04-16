@@ -207,6 +207,24 @@ class SocketService {
     });
   }
 
+  /** Kiểm tra người nhận có đang bận không TRƯỚC khi mở cửa sổ gọi */
+  checkCallAvailability(conversationId: string, callerId: string) {
+    this.emitWhenConnected("kiem_tra_ban_goi", { conversationId, callerId });
+  }
+
+  /** Server trả về: người nhận sẵn sàng → an toàn để mở cửa sổ gọi */
+  onCallReady(callback: (payload: { conversationId: string }) => void) {
+    this.socket?.on("san_sang_de_goi", callback);
+  }
+
+  offCallReady(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("san_sang_de_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("san_sang_de_goi");
+    }
+  }
+
   emitCameraState(conversationId: string, userId: string, isCameraOff: boolean) {
     this.emitWhenConnected("trang_thai_camera", {
       conversationId,
