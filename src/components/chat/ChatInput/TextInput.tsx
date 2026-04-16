@@ -193,6 +193,22 @@ export const TextInput = forwardRef<TextInputHandle, TextInputProps>(
     };
 
     const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+      const items = event.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === "file") {
+            if (typeof item.webkitGetAsEntry === "function") {
+              const entry = item.webkitGetAsEntry();
+              if (entry && entry.isDirectory) {
+                event.preventDefault();
+                return;
+              }
+            }
+          }
+        }
+      }
+
       event.preventDefault();
       const text = event.clipboardData.getData("text/plain");
       if (text) insertText(text);

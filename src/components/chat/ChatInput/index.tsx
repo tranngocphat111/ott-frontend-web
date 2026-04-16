@@ -1141,18 +1141,79 @@ export const ChatInput = ({
     if (!items) return;
 
     const files: File[] = [];
+    let hasFolder = false;
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.kind === "file") {
+        if (typeof item.webkitGetAsEntry === "function") {
+          const entry = item.webkitGetAsEntry();
+          if (entry && entry.isDirectory) {
+            hasFolder = true;
+            continue;
+          }
+        }
         const file = item.getAsFile();
         if (file) files.push(file);
       }
+    }
+
+    if (hasFolder) {
+      e.preventDefault();
+      setUploadLimitModal({
+        isOpen: true,
+        title: "Không hỗ trợ gửi thư mục",
+        message: "Vui lòng nén thư mục hoặc gửi từng tệp tin riêng lẻ.",
+      });
+      return;
     }
 
     if (files.length > 0) {
       e.preventDefault();
       addToPending(files);
     }
+  };
+
+  // Kéo thả (Drag & Drop): chặn folder và đưa file vào staging
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const items = e.dataTransfer?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    let hasFolder = false;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        if (typeof item.webkitGetAsEntry === "function") {
+          const entry = item.webkitGetAsEntry();
+          if (entry && entry.isDirectory) {
+            hasFolder = true;
+            continue;
+          }
+        }
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+
+    if (hasFolder) {
+      setUploadLimitModal({
+        isOpen: true,
+        title: "Không hỗ trợ gửi thư mục",
+        message: "Vui lòng nén thư mục hoặc gửi từng tệp tin riêng lẻ.",
+      });
+      return;
+    }
+
+    if (files.length > 0) {
+      addToPending(files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // bắt buộc để cho phép drop
   };
 
   const canSend =
@@ -1187,6 +1248,8 @@ export const ChatInput = ({
     <div
       className="p-4 bg-white border-t border-gray-100 relative "
       onPaste={handlePaste}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
     >
       {showEmojiPicker && (
         <EmojiPicker
