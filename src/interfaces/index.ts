@@ -2,23 +2,20 @@
 export type {
   ConversationListProps,
   ConversationItemProps,
-} from './conversation.interface';
+} from "./conversation.interface";
 
 // Chat related interfaces
-export type {
-  ChatLayoutProps,
-  ChatAreaProps,
-} from './chat.interface';
+export type { ChatLayoutProps, ChatAreaProps } from "./chat.interface";
 
 // Sidebar interfaces
-export type { SidebarProps } from './sidebar.interface';
+export type { SidebarProps } from "./sidebar.interface";
 
 // Navigation interfaces
 export type {
   NavigationSidebarProps,
   NavigationItem,
   NavigationItemProps,
-} from './navigation.interface';
+} from "./navigation.interface";
 
 // Modal interfaces
 export type {
@@ -39,11 +36,10 @@ export type {
   CategorySubmenuProps,
   CategoryItemProps,
   AddCategoryFormProps,
-} from './modal.interface';
-
+} from "./modal.interface";
 
 // Layout interfaces
-export type { MainLayoutProps } from './layout.interface';
+export type { MainLayoutProps } from "./layout.interface";
 
 // Common component interfaces
 export type {
@@ -51,13 +47,28 @@ export type {
   LoadingSkeletonProps,
   ErrorStateProps,
   SearchBarProps,
-} from './common.interface';
+} from "./common.interface";
 
 // Service interfaces
+export type { LoadingState, ChatServiceResponse } from "./service.interface";
+
+// Admin interfaces
 export type {
-  LoadingState,
-  ChatServiceResponse,
-} from './service.interface';
+  OverviewResponse,
+  UserSummary,
+  MessageTypesResponse,
+  TimeRange,
+  DailyPostPoint,
+  DailyActivityPoint,
+  EventReport,
+  AdminNavItem,
+} from "./admin.interface";
 
 // Re-export types
-export type { Conversation, Message, Participant, User, MessageAttachment } from '../types';
+export type {
+  Conversation,
+  Message,
+  Participant,
+  User,
+  MessageAttachment,
+} from "../types";
