@@ -14,6 +14,8 @@ import {
   Eye,
   EyeOff,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface StreamVideoProps {
@@ -158,6 +160,7 @@ const CallPage: React.FC = () => {
   const myAvatar = String(currentUser?.avatar || "").trim();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isLocalPreviewVisible, setIsLocalPreviewVisible] = useState(true);
+  const [isLocalVideoCollapsed, setIsLocalVideoCollapsed] = useState(false);
   const [isRemoteVideoActive, setIsRemoteVideoActive] = useState(false);
   const [isRemoteAvatarBroken, setIsRemoteAvatarBroken] = useState(false);
   const [isMyAvatarBroken, setIsMyAvatarBroken] = useState(false);
@@ -524,31 +527,49 @@ const CallPage: React.FC = () => {
           )}
         </div>
 
-        {/* 3. Local Video (PiP) - Đã thu nhỏ nhẹ */}
+        {/* 3. Local Video (PiP) - Collapsible logic */}
         {callType === "video" && isLocalPreviewVisible && (
-          <div className="w-32 md:w-48 aspect-video rounded-xl border border-white/10 overflow-hidden bg-primary-800 shadow-2xl">
-            {localStream && !isCameraOff ? (
-              <StreamVideo
-                stream={localStream}
-                muted
-                className="w-full h-full object-cover transform scale-x-[-1]"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-primary-900">
-                <div className="h-10 w-10 rounded-full bg-primary-700 flex items-center justify-center text-xs font-bold text-white border border-white/10 overflow-hidden">
-                  {myAvatarSrc && !isMyAvatarBroken ? (
-                    <img
-                      src={myAvatarSrc}
-                      alt={myDisplayName}
-                      className="h-full w-full object-cover"
-                      onError={() => setIsMyAvatarBroken(true)}
-                    />
-                  ) : (
-                    getAvatarInitial(myDisplayName)
-                  )}
+          <div
+            className={`transition-all duration-500 ease-in-out relative ${isLocalVideoCollapsed ? "translate-x-[calc(100%-12px)]" : "translate-x-0"
+              }`}
+          >
+            <div className="w-32 md:w-48 aspect-video rounded-xl border border-white/10 overflow-hidden bg-primary-800 shadow-2xl relative group">
+              {/* Toggle Collapse Button (Chevron only) */}
+              <button
+                onClick={() => setIsLocalVideoCollapsed((prev) => !prev)}
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-8 h-full bg-transparent flex items-center justify-center text-white transition-all hover:scale-110"
+                title={isLocalVideoCollapsed ? "Hiện khung hình" : "Ẩn khung hình"}
+              >
+                {isLocalVideoCollapsed ? (
+                  <ChevronLeft size={24} strokeWidth={2.5} />
+                ) : (
+                  <ChevronRight size={24} strokeWidth={2.5} />
+                )}
+              </button>
+
+              {localStream && !isCameraOff ? (
+                <StreamVideo
+                  stream={localStream}
+                  muted
+                  className="w-full h-full object-cover transform scale-x-[-1]"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-primary-900">
+                  <div className="h-10 w-10 rounded-full bg-primary-700 flex items-center justify-center text-xs font-bold text-white border border-white/10 overflow-hidden">
+                    {myAvatarSrc && !isMyAvatarBroken ? (
+                      <img
+                        src={myAvatarSrc}
+                        alt={myDisplayName}
+                        className="h-full w-full object-cover"
+                        onError={() => setIsMyAvatarBroken(true)}
+                      />
+                    ) : (
+                      getAvatarInitial(myDisplayName)
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -558,11 +579,10 @@ const CallPage: React.FC = () => {
         {/* Mic toggle */}
         <button
           onClick={toggleMic}
-          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${
-            isMuted
+          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${isMuted
               ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
               : "bg-white/10 hover:bg-white/20 text-white"
-          }`}
+            }`}
         >
           {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
         </button>
@@ -572,11 +592,10 @@ const CallPage: React.FC = () => {
           <button
             onClick={toggleCamera}
             disabled={isScreenSharing}
-            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${
-              isCameraOff
+            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${isCameraOff
                 ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
                 : "bg-white/10 hover:bg-white/20 text-white"
-            } ${isScreenSharing ? "opacity-20" : ""}`}
+              } ${isScreenSharing ? "opacity-20" : ""}`}
           >
             {isCameraOff ? <VideoOff size={18} /> : <Video size={18} />}
           </button>
@@ -595,28 +614,16 @@ const CallPage: React.FC = () => {
           <button
             onClick={toggleScreenShare}
             disabled={!hasRemoteAnswered}
-            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${
-              isScreenSharing
+            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${isScreenSharing
                 ? "bg-primary-400 text-black"
                 : "bg-white/10 hover:bg-white/20 text-white"
-            } ${!hasRemoteAnswered ? "opacity-20" : ""}`}
+              } ${!hasRemoteAnswered ? "opacity-20" : ""}`}
           >
             <MonitorUp size={18} />
           </button>
         )}
 
         {/* Toggle local preview */}
-        {callType === "video" && (
-          <button
-            onClick={() => setIsLocalPreviewVisible((prev) => !prev)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"
-            title={
-              isLocalPreviewVisible ? "Ẩn khung của tôi" : "Hiện khung của tôi"
-            }
-          >
-            {isLocalPreviewVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-        )}
 
         {/* Settings */}
         <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all">
