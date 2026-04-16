@@ -1,16 +1,28 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import "./index.css";
-import App from "./App.tsx";
-import { ConversationsProvider } from "./contexts/ConversationsContext.tsx";
-import { UserProvider } from "./contexts/UserContext.tsx";
+
+import AppRouter from "./routers/AppRouter";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ConversationsProvider } from "./contexts/ConversationsContext";
+import { UserProvider } from "./contexts/UserContext";
+import { ToastProvider } from './contexts/ToastContext';
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <UserProvider>
-      <ConversationsProvider>
-        <App />
-      </ConversationsProvider>
-    </UserProvider>
-  </StrictMode>,
+    <div className="app-zoom-shell">
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <UserProvider>
+              <ConversationsProvider>
+                <AppRouter />
+              </ConversationsProvider>
+            </UserProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
+    </div>
+  </StrictMode>
 );

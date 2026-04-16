@@ -1,14 +1,47 @@
-// User types
+// ===== Existing exports =====
+export * from './enums';
+export * from './request';
+export * from './response';
+export * from './entities';
+
+// ===== User types =====
 export type { User } from './user.type';
 
-// Message types
-export type { Message, MessageAttachment } from './message.type';
+// ===== Message types =====
+export type { Message, MessageContent, MessageAttachment } from './message.type';
 
-// Participant types
+// ===== Participant types =====
 export type { Participant, ConversationParticipant } from './participant.type';
 
-// Conversation types
+// ===== Conversation types =====
 export type { Conversation, ConversationWithParticipant } from './conversation.type';
 
-// Category types
+// ===== Category types =====
 export type { Category } from './category.type';
+
+// ===== Search types =====
+export type {
+  SearchEverythingResponse,
+  SearchContactItem,
+  SearchConversationItem,
+  SearchMessageItem,
+  SearchFileItem,
+  SearchMediaItem,
+} from './search.type';
+
+// ===== Chat sidebar left types =====
+export type {
+  FilterMode,
+  SearchTab,
+  SenderOption,
+  ConversationMeta,
+  RecentSearchListProps,
+  SearchMessageRowProps,
+  SenderFilterDropdownProps,
+  SearchContactsSectionProps,
+  SearchConversationsSectionProps,
+  SearchMessagesSectionProps,
+  SearchFilesSectionProps,
+  SearchResultsPanelProps,
+  SidebarHeaderProps,
+} from './chat-sidebar-left.type';

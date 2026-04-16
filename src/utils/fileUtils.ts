@@ -36,5 +36,23 @@ export const getFullUrl = (content: any): string => {
 
   if (!path) return "";
 
-  return `${URL_S3}${path}`;
+  const normalized = String(path).trim();
+  if (!normalized) return "";
+
+  // Keep already absolute URLs untouched.
+  if (/^(https?:)?\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  // Support in-memory/local sources.
+  if (/^(blob:|data:)/i.test(normalized)) {
+    return normalized;
+  }
+
+  const base = String(URL_S3 || "").replace(/\/$/, "");
+  const suffix = normalized.replace(/^\//, "");
+
+  if (!base) return `/${suffix}`;
+
+  return `${base}/${suffix}`;
 };

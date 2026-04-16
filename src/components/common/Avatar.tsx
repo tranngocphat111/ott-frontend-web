@@ -9,22 +9,31 @@ const Avatar: React.FC<AvatarProps> = ({
   className = '',
   onClick 
 }) => {
-  const getInitials = (name: string): string => {
+  const getInitials = (name: string = ""): string => {
+    if (!name || name.trim().length === 0) {
+      return "??";
+    }
     return name
+      .trim()
       .split(' ')
+      .filter(word => word.length > 0)
       .map(word => word.charAt(0))
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
-  const getGradientColor = (name: string): string => {
+  const getGradientColor = (name: string = ""): string => {
     const colors = [
       'from-primary-500 to-primary-400',
       'from-primary-400 to-primary-300',
       'from-primary-300 to-primary-200',
       'from-primary-200 to-primary-500',
     ];
+    
+    if (!name || name.length === 0) {
+      return colors[0]; // Default color
+    }
     
     const index = name.charCodeAt(0) % colors.length;
     return colors[index];
@@ -53,8 +62,7 @@ const Avatar: React.FC<AvatarProps> = ({
         />
       ) : (
         <div 
-          className={`w-full h-full flex items-center justify-center text-white font-semibold ${getGradientColor(name)}`}
-          style={{ background: 'linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to))' }}
+          className={`w-full h-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${getGradientColor(name)}`}
         >
           {name ? (
             <span className={size === 48 ? 'text-lg' : size === 40 ? 'text-base' : 'text-sm'}>

@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import SocialFeed from "./social/SocialFeed";
 import SocialProfile from "./social/SocialProfile";
+import SocialDemoLogin from "./social/SocialDemoLogin";
 
 /**
  * SocialPage - Component chính cho trang xã hội
@@ -12,6 +13,9 @@ const SocialPage: React.FC = () => {
     <Routes>
       {/* Trang chủ - Feed */}
       <Route index element={<SocialFeed />} />
+
+      {/* Demo login */}
+      <Route path="demo-login" element={<SocialDemoLogin />} />
 
       {/* Trang cá nhân - Profile */}
       <Route path="profile/:userId" element={<SocialProfile />} />

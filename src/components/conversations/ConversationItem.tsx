@@ -4,12 +4,18 @@ import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
 import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
 import CategoryManagementModal from "../modal/category/CategoryManagementModal";
+import { ConfirmModal } from "../modal/ConfirmModal";
 import type { ConversationItemProps } from "../../interfaces";
 import { ParticipantService } from "../../services";
 import type { Category } from "../../types";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { PiTagSimpleFill } from "react-icons/pi";
 import { FaBellSlash } from "react-icons/fa6";
+import {
+  getConversationDisplayAvatar,
+  getConversationDisplayName,
+} from "../../utils";
+import { EmojiText } from "../chat/EmojiText";
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   item,
@@ -18,7 +24,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations, updateParticipant } = useConversations();
+  const { categories, refreshConversations, updateParticipant } =
+    useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -26,6 +33,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   } | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
 
   useEffect(() => {
     // Find and set current category from participant settings
@@ -40,65 +49,68 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   }, [participant.settings.category_id, categories]);
 
   // Check if conversation is muted
-  const isMuted = !!(participant.settings.notification_status === 'mute' && 
-                    participant.settings.mute_until && 
-                    new Date(participant.settings.mute_until) > new Date());
+  const isMuted = !!(
+    participant.settings.notification_status === "mute" &&
+    participant.settings.mute_until &&
+    new Date(participant.settings.mute_until) > new Date()
+  );
 
   const getConversationName = (): string => {
-    if (conversation.name) return conversation.name;
-
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].display_name;
-    }
-
-    return "Conversation";
+    return (
+      getConversationDisplayName(conversation, currentUserId) || "Conversation"
+    );
   };
 
   const getConversationAvatar = (): string | undefined => {
-    // Ưu tiên avatar của conversation (dùng cho group)
-    if (conversation.avatar) return conversation.avatar;
-    
-    // Với private chat, lấy avatar của người kia
-    if (
-      conversation.type === "private" &&
-      conversation.participants &&
-      conversation.participants.length > 0
-    ) {
-      return conversation.participants[0].avatar;
-    }
-    
-    return undefined;
+    return getConversationDisplayAvatar(conversation, currentUserId);
   };
 
   const getLatestMessagePreview = (): string => {
     const lastMsg = conversation.last_message;
     if (!lastMsg?.content) return "Chưa có tin nhắn";
 
-    // System messages (thêm vào nhóm, v.v.) hiển thị thẳng, không cần tiền tố tên
+    // System messages hiển thị thẳng.
+    // Call preview chỉ giữ lại trạng thái cuối cùng để không lộ các type trung gian.
     if ((lastMsg.type as string)?.startsWith("system")) return lastMsg.content;
 
-    const prefix = lastMsg.sender_id === currentUserId
-      ? "Bạn"
-      : (lastMsg.sender_name || "");
+    if ((lastMsg.type as string)?.startsWith("call_")) {
+      if (lastMsg.type === "call_start" || lastMsg.type === "call_join") {
+        return "Cuộc gọi";
+      }
+
+      return lastMsg.content;
+    }
+
+    const senderParticipant = (conversation.participants || []).find(
+      (participant) => {
+        const participantId = String(
+          participant.user_id || participant._id || "",
+        );
+        return participantId === String(lastMsg.sender_id || "");
+      },
+    );
+
+    const preferredSenderName =
+      (senderParticipant?.nickname || "").trim() ||
+      (senderParticipant?.display_name || "").trim() ||
+      (senderParticipant?.name || "").trim() ||
+      (lastMsg.sender_name || "").trim();
+
+    const prefix =
+      lastMsg.sender_id === currentUserId ? "Bạn" : preferredSenderName;
 
     return prefix ? `${prefix}: ${lastMsg.content}` : lastMsg.content;
   };
 
   const getTimeDisplay = (): string => {
     // Ưu tiên thời gian từ last_message
-    const time =
-      conversation.last_message?.createdAt || conversation.createdAt;
+    const time = conversation.last_message?.createdAt || conversation.createdAt;
     return formatTimeAgo(time);
   };
 
-  const lastMsgId = conversation.last_message?.msg_id || "0";
-  const lastReadMsgId = participant.last_read_message_id || "0";
-  const hasUnreadMessage =
-    lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadMsgId);
+  const unreadCount = Number(participant.unread_count || 0);
+  const hasUnreadMessage = !isSelected && unreadCount > 0;
+  const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -147,21 +159,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (!currentUserId) return;
 
     let muteUntil: Date | null = null;
-    let status: 'on' | 'mute' = 'mute';
+    let status: "on" | "mute" = "mute";
 
     // Handle unmute
-    if (duration === 'unmute') {
-      status = 'on';
+    if (duration === "unmute") {
+      status = "on";
       muteUntil = null;
-    } else if (duration === '1h') {
+    } else if (duration === "1h") {
       muteUntil = new Date(Date.now() + 60 * 60 * 1000);
-    } else if (duration === '4h') {
+    } else if (duration === "4h") {
       muteUntil = new Date(Date.now() + 4 * 60 * 60 * 1000);
-    } else if (duration === '8h') {
+    } else if (duration === "8h") {
       muteUntil = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    } else if (duration === 'forever') {
+    } else if (duration === "forever") {
       // Set a far future date for "forever"
-      muteUntil = new Date('2099-12-31');
+      muteUntil = new Date("2099-12-31");
     }
 
     try {
@@ -171,7 +183,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         status,
         muteUntil,
       );
-      
+
       // Refresh from API to get updated data from database
       await refreshConversations(currentUserId);
     } catch (error) {
@@ -179,21 +191,31 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!currentUserId) return;
-    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử hội thoại này?")) return;
+  const handleDelete = () => {
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleConfirmDeleteConversation = async () => {
+    if (!currentUserId || isDeletingConversation) return;
+
+    setIsDeletingConversation(true);
     try {
       const updatedParticipant = await ParticipantService.deleteConversation(
         conversation._id,
         currentUserId,
       );
       // Cập nhật deleted_msg_id trong state — Sidebar filter sẽ tự động ẩn conversation
-      updateParticipant(conversation._id, { deleted_msg_id: updatedParticipant.deleted_msg_id });
+      updateParticipant(conversation._id, {
+        deleted_msg_id: updatedParticipant.deleted_msg_id,
+      });
+      setIsDeleteModalOpen(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
-      alert(message);
+      const message =
+        error instanceof Error ? error.message : "Không thể xóa cuộc hội thoại";
+      window.alert(message);
       console.error("Error deleting conversation:", error);
+    } finally {
+      setIsDeletingConversation(false);
     }
   };
 
@@ -244,12 +266,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <MessageCircle className="w-3 h-3 text-primary-500" />
               )}
             </div>
-
-            {/* Online status indicator for private chats */}
-            {conversation.type === "private" &&
-              conversation.participants?.[0]?.status === "online" && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full ring-2 ring-white shadow-sm" />
-              )}
           </div>
 
           {/* Content */}
@@ -271,10 +287,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </div>
 
               <div className="flex items-center space-x-1 ml-2 ">
-                {isMuted && (
-                  <FaBellSlash  className="w-4 h-4 text-gray-400" />
-                )}
-                <span className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}>
+                {isMuted && <FaBellSlash className="w-4 h-4 text-gray-400" />}
+                <span
+                  className={`text-xs  whitespace-nowrap select-none max-w-18 ${hasUnreadMessage ? "text-primary-500 font-medium" : "text-gray-400"}`}
+                >
                   {getTimeDisplay()}
                 </span>
               </div>
@@ -289,13 +305,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 />
               )}
 
-              <p className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}>
-                {getLatestMessagePreview()}
+              <p
+                className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}
+              >
+                <EmojiText
+                  text={getLatestMessagePreview()}
+                  emojiSize={15}
+                  emojiClassName="inline-block align-[-0.2em] me-1"
+                />
               </p>
 
               {/* Unread badge */}
               {hasUnreadMessage && (
-                <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse shrink-0" />
+                <div className="min-w-5 h-5 px-1 rounded-full bg-primary-500 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
+                  {unreadLabel}
+                </div>
               )}
             </div>
           </div>
@@ -324,6 +348,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           setIsCategoryModalOpen(false);
         }}
         userId={currentUserId || ""}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Xóa hội thoại"
+        message="Bạn có chắc chắn muốn xóa lịch sử hội thoại này không? Bạn vẫn có thể nhận lại tin nhắn mới từ cuộc trò chuyện này sau đó."
+        confirmText={isDeletingConversation ? "Đang xóa..." : "Xóa hội thoại"}
+        cancelText="Hủy"
+        isDangerous={true}
+        onConfirm={handleConfirmDeleteConversation}
+        onCancel={() => {
+          if (!isDeletingConversation) {
+            setIsDeleteModalOpen(false);
+          }
+        }}
       />
     </>
   );

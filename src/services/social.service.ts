@@ -19,6 +19,40 @@ export interface ApiUser {
     location: string | null;
     relationshipStatus: string | null;
 }
+export interface RelationshipResponse {
+    id: string;
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatarUrl: string;
+    receiverId: string;
+    receiverUsername: string;
+    receiverAvatarUrl: string;
+    status: "PENDING" | "ACCEPTED" | "BLOCKED" | "REMOVED";
+    type: "FRIEND",
+    createAt: Date,
+    acceptedAt: Date
+}
+export interface ApiRelationshipResponse {
+    id: string;
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatarUrl: string | null;
+    receiverId: string;
+    receiverUsername: string;
+    receiverAvatarUrl: string | null;
+}
+
+export interface FriendOption {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+}
+
+export interface FriendRequestOption {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+}
 
 /* ─── Public API ──────────────────────────────────────── */
 
@@ -67,6 +101,157 @@ export async function fetchUserById(id: string): Promise<ApiUser | null> {
         if (!res.ok) return null;
         return (await res.json()) as ApiUser;
     } catch {
+        return null;
+    }
+}
+
+export async function fetchFriends(userId: string): Promise<FriendOption[]> {
+    try {
+        const res = await fetch(`${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`, {
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return [];
+        const raw = (await res.json()) as ApiRelationshipResponse[];
+        if (!Array.isArray(raw)) return [];
+        return raw.map((rel) => {
+            const isRequester = rel.requesterId === userId;
+            return {
+                id: isRequester ? rel.receiverId : rel.requesterId,
+                name: isRequester ? rel.receiverUsername : rel.requesterUsername,
+                avatarUrl: isRequester ? rel.receiverAvatarUrl ?? undefined : rel.requesterAvatarUrl ?? undefined,
+            };
+        });
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchRelationshipOf(
+    user1: string,
+    user2?: string,
+): Promise<RelationshipResponse | null> {
+    try {
+        const params = new URLSearchParams({ user1 });
+        if (user2) params.set("user2", user2);
+
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships?${params.toString()}`,
+            { signal: AbortSignal.timeout(5_000) },
+        );
+
+        if (!res.ok) return null;
+
+        return (await res.json()) as RelationshipResponse;
+    } catch {
+        return null;
+    }
+}
+
+export async function cancelRelationship(id: string | null): Promise<boolean> {
+    if (!id) return false;
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${id}/cancel`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        if (!res.ok) throw new Error("Không thể xóa lời mời kết bạn");
+        return true;
+    } catch (error) {
+        console.log(error);
+        return false;
+    }
+}
+
+export async function fetchPendingRequests(
+    userId: string,
+): Promise<FriendRequestOption[]> {
+    try {
+        const res = await fetch(`${API_MEDIA_SERVER_URL}/relationships/pending/${userId}`, {
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return [];
+        const raw = (await res.json()) as ApiRelationshipResponse[];
+        if (!Array.isArray(raw)) return [];
+        return raw.map((rel) => ({
+            id: rel.id,
+            name: rel.requesterUsername,
+            avatarUrl: rel.requesterAvatarUrl ?? undefined,
+        }));
+    } catch {
+        return [];
+    }
+}
+
+export async function acceptFriendRequest(
+    relationshipId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/accept`,
+            { method: "PATCH", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function blockRelationship(
+    relationshipId: string,
+    blockerId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/block?blockerId=${blockerId}`,
+            { method: "PATCH", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function unfriendRelationship(
+    relationshipId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/unfriend`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function rejectFriendRequest(
+    relationshipId: string,
+): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/reject`,
+            { method: "DELETE", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function sendFriendRequest(
+    requesterId: string,
+    receiverId?: string,
+): Promise<any> {
+    try {
+        const res = await fetch(
+            `${API_MEDIA_SERVER_URL}/relationships/send?requesterId=${requesterId}&receiverId=${receiverId}`,
+            { method: "POST", signal: AbortSignal.timeout(5_000) },
+        );
+        if (!res.ok) throw new Error("Gửi kết bạn thất bại.")
+        return await res.json();
+    } catch (error) {
+        console.error(error)
         return null;
     }
 }

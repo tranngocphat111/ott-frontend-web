@@ -1,8 +1,26 @@
 import { io, Socket } from "socket.io-client";
 import { SOCKET_CHAT_SERVER_URL } from "../config/api.config";
 
+type CallType = "voice" | "video";
+
 class SocketService {
   private socket: Socket | null = null;
+
+  private ensureSocket(): Socket {
+    return this.socket ?? this.connect();
+  }
+
+  private emitWhenConnected(event: string, payload: unknown) {
+    const socket = this.ensureSocket();
+
+    const emit = () => socket.emit(event, payload);
+
+    if (socket.connected) {
+      emit();
+    } else {
+      socket.once("connect", emit);
+    }
+  }
 
   connect(): Socket {
     if (this.socket) return this.socket;
@@ -29,8 +47,7 @@ class SocketService {
   }
 
   joinUserRoom(userId: string) {
-    const socket = this.socket;
-    if (!socket) return console.error("Socket chưa được khởi tạo");
+    const socket = this.ensureSocket();
 
     const join = () => {
       socket.emit("tham_gia_user_room", userId);
@@ -45,11 +62,7 @@ class SocketService {
   }
 
   joinConversation(conversationId: string) {
-    const socket = this.socket;
-
-    if (!socket) {
-      return console.error("Socket chưa được khởi tạo");
-    }
+    const socket = this.ensureSocket();
 
     const join = () => {
       socket.emit("tham_gia_nhom", conversationId);
@@ -100,8 +113,327 @@ class SocketService {
     }
   }
 
+  onGroupDissolved(callback: (payload: { conversationId: string }) => void) {
+    this.socket?.on("giai_tan_nhom", callback);
+  }
+
+  offGroupDissolved(callback?: (payload: { conversationId: string }) => void) {
+    if (callback) {
+      this.socket?.off("giai_tan_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("giai_tan_nhom");
+    }
+  }
+
+  startTyping(conversationId: string, userId: string) {
+    this.emitWhenConnected("nguoi_dung_dang_soan_tin_nhan", {
+      conversationId,
+      userId,
+    });
+  }
+
+  stopTyping(conversationId: string, userId: string) {
+    this.emitWhenConnected("nguoi_dung_ngung_soan_tin_nhan", {
+      conversationId,
+      userId,
+    });
+  }
+
+  onTyping(
+    callback: (payload: { conversationId: string; userId: string }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_dang_soan_tin_nhan", callback);
+  }
+
+  offTyping(
+    callback?: (payload: { conversationId: string; userId: string }) => void,
+  ) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_dang_soan_tin_nhan", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_dang_soan_tin_nhan");
+    }
+  }
+
+  onTypingStopped(
+    callback: (payload: { conversationId: string; userId: string }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_ngung_soan_tin_nhan", callback);
+  }
+
+  offTypingStopped(
+    callback?: (payload: { conversationId: string; userId: string }) => void,
+  ) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_ngung_soan_tin_nhan", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_ngung_soan_tin_nhan");
+    }
+  }
+
   getSocket(): Socket | null {
     return this.socket;
+  }
+
+  startCall(conversationId: string, callerId: string, callType: CallType) {
+    this.emitWhenConnected("bat_dau_goi", {
+      conversationId,
+      callerId,
+      callType,
+    });
+  }
+
+  joinCall(conversationId: string, userId: string, callType: CallType) {
+    this.emitWhenConnected("tham_gia_cuoc_goi", {
+      conversationId,
+      userId,
+      callType,
+    });
+  }
+
+  leaveCall(conversationId: string, userId: string) {
+    this.emitWhenConnected("roi_cuoc_goi", { conversationId, userId });
+  }
+
+  endCall(conversationId: string, userId: string) {
+    this.emitWhenConnected("ket_thuc_goi", { conversationId, userId });
+  }
+
+  declineCall(conversationId: string, userId: string, callerId: string) {
+    this.emitWhenConnected("tu_choi_goi", {
+      conversationId,
+      userId,
+      callerId,
+    });
+  }
+
+  emitCameraState(conversationId: string, userId: string, isCameraOff: boolean) {
+    this.emitWhenConnected("trang_thai_camera", {
+      conversationId,
+      userId,
+      isCameraOff,
+    });
+  }
+
+  sendOffer(
+    conversationId: string,
+    fromUserId: string,
+    targetUserId: string,
+    offer: RTCSessionDescriptionInit,
+    callType: CallType,
+  ) {
+    this.emitWhenConnected("gui_offer", {
+      conversationId,
+      fromUserId,
+      targetUserId,
+      offer,
+      callType,
+    });
+  }
+
+  sendAnswer(
+    conversationId: string,
+    fromUserId: string,
+    targetUserId: string,
+    answer: RTCSessionDescriptionInit,
+  ) {
+    this.emitWhenConnected("gui_answer", {
+      conversationId,
+      fromUserId,
+      targetUserId,
+      answer,
+    });
+  }
+
+  sendIceCandidate(
+    conversationId: string,
+    fromUserId: string,
+    targetUserId: string,
+    candidate: RTCIceCandidateInit,
+  ) {
+    this.emitWhenConnected("gui_ice_candidate", {
+      conversationId,
+      fromUserId,
+      targetUserId,
+      candidate,
+    });
+  }
+
+  onIncomingCall(
+    callback: (payload: {
+      conversationId: string;
+      callerId: string;
+      callType: CallType;
+      startedAt?: string;
+    }) => void,
+  ) {
+    this.socket?.on("cuoc_goi_den", callback);
+  }
+
+  offIncomingCall(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cuoc_goi_den", callback);
+    } else {
+      this.socket?.removeAllListeners("cuoc_goi_den");
+    }
+  }
+
+  onCallJoined(
+    callback: (payload: {
+      conversationId: string;
+      userId: string;
+      participants: string[];
+      callType: CallType;
+    }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_tham_gia_goi", callback);
+  }
+
+  offCallJoined(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_tham_gia_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_tham_gia_goi");
+    }
+  }
+
+  onCallLeft(
+    callback: (payload: {
+      conversationId: string;
+      userId: string;
+      participants: string[];
+    }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_roi_goi", callback);
+  }
+
+  offCallLeft(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_roi_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_roi_goi");
+    }
+  }
+
+  onOffer(
+    callback: (payload: {
+      conversationId: string;
+      fromUserId: string;
+      offer: RTCSessionDescriptionInit;
+      callType: CallType;
+    }) => void,
+  ) {
+    this.socket?.on("nhan_offer", callback);
+  }
+
+  offOffer(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nhan_offer", callback);
+    } else {
+      this.socket?.removeAllListeners("nhan_offer");
+    }
+  }
+
+  onAnswer(
+    callback: (payload: {
+      conversationId: string;
+      fromUserId: string;
+      answer: RTCSessionDescriptionInit;
+    }) => void,
+  ) {
+    this.socket?.on("nhan_answer", callback);
+  }
+
+  offAnswer(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nhan_answer", callback);
+    } else {
+      this.socket?.removeAllListeners("nhan_answer");
+    }
+  }
+
+  onIceCandidate(
+    callback: (payload: {
+      conversationId: string;
+      fromUserId: string;
+      candidate: RTCIceCandidateInit;
+    }) => void,
+  ) {
+    this.socket?.on("nhan_ice_candidate", callback);
+  }
+
+  offIceCandidate(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nhan_ice_candidate", callback);
+    } else {
+      this.socket?.removeAllListeners("nhan_ice_candidate");
+    }
+  }
+
+  onCallEnded(
+    callback: (payload: {
+      conversationId: string;
+      endedBy?: string | null;
+    }) => void,
+  ) {
+    this.socket?.on("ket_thuc_phong_goi", callback);
+  }
+
+  offCallEnded(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("ket_thuc_phong_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("ket_thuc_phong_goi");
+    }
+  }
+
+  onCallDeclined(
+    callback: (payload: { conversationId: string; userId: string }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_tu_choi_goi", callback);
+  }
+
+  offCallDeclined(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_tu_choi_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_tu_choi_goi");
+    }
+  }
+
+  onCallBusy(
+    callback: (payload: {
+      conversationId: string;
+      targetUserId: string;
+    }) => void,
+  ) {
+    this.socket?.on("nguoi_dung_ban_goi", callback);
+  }
+
+  offCallBusy(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("nguoi_dung_ban_goi", callback);
+    } else {
+      this.socket?.removeAllListeners("nguoi_dung_ban_goi");
+    }
+  }
+
+  onCameraStateChanged(
+    callback: (payload: {
+      conversationId: string;
+      userId: string;
+      isCameraOff: boolean;
+    }) => void,
+  ) {
+    this.socket?.on("thay_doi_trang_thai_camera", callback);
+  }
+
+  offCameraStateChanged(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("thay_doi_trang_thai_camera", callback);
+    } else {
+      this.socket?.removeAllListeners("thay_doi_trang_thai_camera");
+    }
   }
 }
 

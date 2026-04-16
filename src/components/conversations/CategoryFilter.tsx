@@ -3,10 +3,14 @@ import { ChevronDown, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Category } from '../../types';
 
+type FilterMode = 'all' | 'unread' | 'category';
+
 interface CategoryFilterProps {
   categories: Category[];
   selectedCategoryIds: string[];
   onSelectCategories: (categoryIds: string[]) => void;
+  filterMode: FilterMode;
+  onFilterModeChange: (mode: FilterMode) => void;
   onManageCategories?: () => void;
 }
 
@@ -14,10 +18,11 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
   categories,
   selectedCategoryIds,
   onSelectCategories,
+  filterMode,
+  onFilterModeChange,
   onManageCategories,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [filterMode, setFilterMode] = useState<'all' | 'unread' | 'category'>('all');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,8 +44,8 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
     }
   };
 
-  const handleModeChange = (mode: 'all' | 'unread' | 'category') => {
-    setFilterMode(mode);
+  const handleModeChange = (mode: FilterMode) => {
+    onFilterModeChange(mode);
     if (mode === 'all' || mode === 'unread') {
       onSelectCategories([]);
     }

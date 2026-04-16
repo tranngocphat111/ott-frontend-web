@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
 import { routes, ROUTE_PATHS } from "./routers";
+import CallPage from "./pages/CallPage";
 import "./App.css";
 
 function AppContent() {
@@ -19,7 +20,7 @@ function AppContent() {
 
   if (isAdminRoute) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-white">
+      <div className="w-screen h-screen overflow-hidden bg-white">
         <Routes>
           {adminRoutes.map((route) => (
             <Route key={route.path} path={route.path} element={route.element} />
@@ -33,8 +34,22 @@ function AppContent() {
     );
   }
 
+  if (location.pathname === ROUTE_PATHS.CALL) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-slate-950">
+        <Routes>
+          <Route path={ROUTE_PATHS.CALL} element={<CallPage />} />
+          <Route
+            path="*"
+            element={<Navigate to={ROUTE_PATHS.CALL} replace />}
+          />
+        </Routes>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen w-screen overflow-hidden bg-white">
+    <div className="w-screen h-screen overflow-hidden bg-white">
       {/* {isAuthenticated ? ( */}
       <MainLayout>
         <Routes>

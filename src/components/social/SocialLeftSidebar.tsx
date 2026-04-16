@@ -57,7 +57,7 @@ const SocialLeftSidebar: React.FC<Props> = ({ currentUser }) => {
             <UserAvatar user={currentUser} size="size-9" />
           </div>
           <span className="font-semibold text-gray-800">
-            {currentUser.name}
+            {currentUser.displayName}
           </span>
         </div>
 

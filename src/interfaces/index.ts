@@ -8,7 +8,22 @@ export type {
 export type { ChatLayoutProps, ChatAreaProps } from "./chat.interface";
 
 // Sidebar interfaces
-export type { SidebarProps } from "./sidebar.interface";
+export type {
+  SidebarProps,
+  ChatSidebarRightProps,
+  ConversationMember,
+  LinkData,
+  ViewMode,
+  StorageTab,
+  GroupInfoHeaderProps,
+  GroupActionButtonsProps,
+  MembersFullViewProps,
+  StorageViewProps,
+  CollapsibleSectionProps,
+  PinnedMessagesProps,
+  GroupActionsProps,
+  AddMemberModalProps,
+} from './sidebar.interface';
 
 // Navigation interfaces
 export type {

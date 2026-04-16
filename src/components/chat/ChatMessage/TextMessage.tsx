@@ -1,5 +1,5 @@
 import type { Message } from "../../../types";
-import { convertShortcodeToEmoji } from "../../../utils";
+import { EmojiText } from "../EmojiText";
 import { MessageLayout } from "./MessageLayout";
 
 export const TextMessage = ({
@@ -8,16 +8,26 @@ export const TextMessage = ({
   currentUserId,
   isFirstInSequence,
   isLastInSequence,
+  isTopBoundary,
   onReply,
   onReact,
+  onRevoke,
+  onDelete,
+  onPin,
+  onForward,
 }: {
   msg: Message;
   isMe: boolean;
   currentUserId?: string;
   isFirstInSequence: boolean;
   isLastInSequence: boolean;
+  isTopBoundary?: boolean;
   onReply?: (msg: Message) => void;
   onReact?: (msg: Message, reactionType: string) => void;
+  onRevoke?: (msg: Message) => void;
+  onDelete?: (msg: Message) => void;
+  onPin?: (msg: Message) => void;
+  onForward?: (msg: Message) => void;
 }) => {
   const text = Array.isArray(msg.content)
     ? msg.content.join("")
@@ -30,8 +40,13 @@ export const TextMessage = ({
       currentUserId={currentUserId}
       isFirst={isFirstInSequence}
       isLast={isLastInSequence}
+      isTopBoundary={isTopBoundary}
       onReply={onReply}
       onReact={onReact}
+      onRevoke={onRevoke}
+      onDelete={onDelete}
+      onPin={onPin}
+      onForward={onForward}
     >
       {(borderRadius) => (
         <div
@@ -44,7 +59,11 @@ export const TextMessage = ({
           ${borderRadius} 
           `}
         >
-          {convertShortcodeToEmoji(text)}
+          <EmojiText
+            text={text}
+            emojiSize={18}
+            emojiClassName="inline-block align-[-0.2em] me-1"
+          />
         </div>
       )}
     </MessageLayout>

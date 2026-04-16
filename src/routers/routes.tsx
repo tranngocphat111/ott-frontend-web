@@ -8,6 +8,7 @@ import NotificationsPage from "../pages/NotificationsPage";
 import SettingsPage from "../pages/SettingsPage";
 import SocialPage from "../pages/SocialPage";
 import UserSelectionPage from "../pages/UserSelectionPage";
+import CallPage from "../pages/CallPage";
 import { SocialProfile } from "../pages/social";
 import Dashboard from "../pages/admin/Dashboard";
 import ContentModeration from "../pages/admin/ContentModeration";
@@ -86,6 +87,8 @@ export const routes: RouteObject[] = [
         <UserManagement />
       </AdminLayout>
     ),
+    path: "/call",
+    element: <CallPage />,
   },
 ];
 
@@ -104,10 +107,8 @@ export const ROUTE_PATHS = {
   SOCIAL: "/social",
   ADMIN: "/admin",
   ADMIN_MODERATION: "/admin/moderation",
-  ADMIN_USERS: "/admin/users",
-  SOCIAL_FEED: "/social",
+  CALL: "/call",
   SOCIAL_PROFILE: (userId?: string) =>
-    userId ? `/social/profile/${userId}` : "/social/profile",
 } as const;
 
 export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];

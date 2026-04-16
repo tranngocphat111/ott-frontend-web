@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { User } from "../types";
+import {
+  relationshipSocketService,
+  type RelationshipRealtimePayload,
+} from "../services/relationshipSocket.service";
+import { useToast } from "./ToastContext";
 
 interface UserContextType {
   currentUser: User | null;
@@ -23,6 +28,12 @@ interface UserProviderProps {
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [secondUser, setSecondUserState] = useState<User | null>(null);
+  const { showToast } = useToast();
+
+  const getNormalizedUserId = (user: User | null) => {
+    const raw = user as { user_id?: string; _id?: string; id?: string } | null;
+    return raw?.user_id || raw?._id || raw?.id || "";
+  };
 
   // Load users from localStorage on mount
   useEffect(() => {
@@ -47,6 +58,87 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const normalizedUserId = getNormalizedUserId(currentUser);
+    if (!normalizedUserId) {
+      relationshipSocketService.disconnect();
+      return;
+    }
+    relationshipSocketService.connect();
+
+    const relSocket = relationshipSocketService.getSocket();
+    const handleRelConnect = () =>
+      showToast("Ket noi realtime ket ban thanh cong", "success");
+    const handleRelDisconnect = () =>
+      showToast("Mat ket noi realtime ket ban", "warning");
+
+    relSocket?.on("connect", handleRelConnect);
+    relSocket?.on("disconnect", handleRelDisconnect);
+
+    return () => {
+      relSocket?.off("connect", handleRelConnect);
+      relSocket?.off("disconnect", handleRelDisconnect);
+    };
+  }, [currentUser, showToast]);
+
+  useEffect(() => {
+    const normalizedUserId = getNormalizedUserId(currentUser);
+    if (!normalizedUserId) return;
+
+    const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
+      if (!payload) return;
+
+      const targetIds = payload.targetUserIds || [];
+      const isTarget =
+        targetIds.includes(normalizedUserId) ||
+        payload.requesterId === normalizedUserId ||
+        payload.receiverId === normalizedUserId;
+
+      if (!isTarget) return;
+
+      const isActor = payload.actorId === normalizedUserId;
+
+      switch (payload.type) {
+        case "REQUEST_SENT":
+          if (payload.receiverId === normalizedUserId) {
+            showToast("Ban co loi moi ket ban moi", "info");
+          }
+          break;
+        case "REQUEST_ACCEPTED":
+          if (!isActor && payload.requesterId === normalizedUserId) {
+            showToast("Loi moi ket ban da duoc chap nhan", "success");
+          }
+          break;
+        case "REQUEST_REJECTED":
+          if (!isActor && payload.requesterId === normalizedUserId) {
+            showToast("Loi moi ket ban bi tu choi", "warning");
+          }
+          break;
+        case "REQUEST_CANCELED":
+          if (payload.receiverId === normalizedUserId) {
+            showToast("Loi moi ket ban da bi huy", "info");
+          }
+          break;
+        case "UNFRIENDED":
+          if (!isActor) {
+            showToast("Quan he ban be da bi huy", "info");
+          }
+          break;
+        case "BLOCKED":
+          if (!isActor) {
+            showToast("Ban da bi chan", "warning");
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    relationshipSocketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () =>
+      relationshipSocketService.offRelationshipUpdate(handleRelationshipUpdate);
+  }, [currentUser, showToast]);
 
   const setCurrentUser = (user: User | null) => {
     setCurrentUserState(user);
@@ -86,11 +178,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     } else {
       setCurrentUser(null);
     }
+    relationshipSocketService.disconnect();
   };
 
   const logoutAll = () => {
     setCurrentUser(null);
     setSecondUser(null);
+    relationshipSocketService.disconnect();
   };
 
   const allLoggedInUsers = [currentUser, secondUser].filter(

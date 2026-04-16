@@ -8,7 +8,10 @@ const AWS_REGION = "ap-southeast-1";
 
 export const API_CHAT_SERVER_URL = "http://localhost:5000/api";
 export const SOCKET_CHAT_SERVER_URL = "http://localhost:5000";
-export const API_MEDIA_SERVER_URL = "http://localhost:8080/media/api";
+export const API_MEDIA_SERVER_URL = "http://localhost:8090/media/api";
+export const SOCKET_RELATIONSHIP_SERVER_URL = (
+  import.meta.env.VITE_RELATIONSHIP_SOCKET_URL || ""
+).trim();
 
 // export const API_CHAT_SERVER_URL =
 //   "https://abactinal-billy-sportily.ngrok-free.dev/api";

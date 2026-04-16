@@ -1,4 +1,5 @@
-export { default as Sidebar } from './sidebar/Sidebar';
+export { default as ChatSidebarLeft } from './chat/ChatSidebarLeft';
+export { default as ChatSidebarRight } from './chat/ChatSidebarRight';
 export { default as NavigationSidebar } from './navigation/NavigationSidebar';
 export { default as ConversationList } from './conversations/ConversationList';
 export { default as ConversationItem } from './conversations/ConversationItem';

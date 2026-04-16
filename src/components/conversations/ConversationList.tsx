@@ -18,7 +18,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+    <div className="h-full overflow-y-auto custom-scrollbar">
       <div className="p-2 space-y-1">
         {conversations.map((item) => (
           <ConversationItem
