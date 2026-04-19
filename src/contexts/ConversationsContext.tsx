@@ -66,7 +66,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   // Update specific conversation
   const updateConversation = useCallback(
@@ -247,6 +247,31 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
+  const handleCategoryUpdated = useCallback((payload: any) => {
+    const conversationId = String(payload?.conversationId || "");
+    if (!conversationId) return;
+
+    const nextCategoryId =
+      payload?.categoryId ?? payload?.participant?.settings?.category_id ?? null;
+
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.conversation._id === conversationId ?
+          {
+            ...item,
+            participant: {
+              ...item.participant,
+              settings: {
+                ...item.participant.settings,
+                category_id: nextCategoryId,
+              },
+            },
+          }
+        : item,
+      ),
+    );
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -258,6 +283,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
     const socket = socketService.getSocket();
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
+    socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
 
     const handleGroupDissolved = (payload: { conversationId?: string }) => {
       const conversationId = String(payload?.conversationId || "");
@@ -274,16 +300,40 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       );
     };
 
+    const handleNewConversation = async () => {
+      const currentUserId = String(
+        (user as { user_id?: string } | null)?.user_id || "",
+      ).trim();
+      if (!currentUserId) return;
+
+      try {
+        const loadedConversations =
+          await ConversationService.getUserConversations(currentUserId);
+        setConversations(loadedConversations);
+      } catch (err) {
+        console.error("Failed to refresh conversations on new conversation event", err);
+      }
+    };
+
     socketService.onGroupDissolved(handleGroupDissolved);
+    socketService.onNewConversation(handleNewConversation);
 
     return () => {
       socketService.offNewMessage(handleIncomingMessage);
 
       const cleanupSocket = socketService.getSocket();
       cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
+      cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
       socketService.offGroupDissolved(handleGroupDissolved);
+      socketService.offNewConversation(handleNewConversation);
     };
-  }, [handleIncomingMessage, handleRevokedMessage, isAuthenticated]);
+  }, [
+    handleCategoryUpdated,
+    handleIncomingMessage,
+    handleRevokedMessage,
+    isAuthenticated,
+    user,
+  ]);
 
   // Category Actions
   const addCategory = useCallback((category: Category) => {
