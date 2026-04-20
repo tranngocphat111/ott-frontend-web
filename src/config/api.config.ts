@@ -6,9 +6,9 @@
 const AWS_S3_BUCKET_NAME = "riff-storage-iuh";
 const AWS_REGION = "ap-southeast-1";
 
-export const API_CHAT_SERVER_URL = "http://192.168.1.26:5000/api";
-export const SOCKET_CHAT_SERVER_URL = "http://192.168.1.26:5000";
-export const API_MEDIA_SERVER_URL = "http://192.168.1.26.10.2:8090/media/api";
+export const API_CHAT_SERVER_URL =  import.meta.env.VITE_CHAT_API_URL;
+export const SOCKET_CHAT_SERVER_URL = import.meta.env.VITE_CHAT_SERVER_URL;
+export const API_MEDIA_SERVER_URL = "http://192.168.5.171:8090/media/api";
 export const SOCKET_RELATIONSHIP_SERVER_URL = (
   import.meta.env.VITE_RELATIONSHIP_SOCKET_URL || ""
 ).trim();

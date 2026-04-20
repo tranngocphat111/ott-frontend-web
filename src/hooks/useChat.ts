@@ -547,10 +547,25 @@ export const useChat = (conversationId: string, userId?: string) => {
     [conversationId],
   );
 
+  const handleConversationSynced = useCallback(
+    (payload: any) => {
+      const payloadConversationId = String(
+        payload?._id || payload?.conversation?._id || payload?.conversationId || "",
+      );
+      if (!payloadConversationId || payloadConversationId !== String(conversationId || "")) {
+        return;
+      }
+
+      void loadMessages();
+    },
+    [conversationId, loadMessages],
+  );
+
   useEffect(() => {
     loadMessages();
     socketService.joinConversation(conversationId);
     socketService.onNewMessage(handleNewMessage);
+    socketService.onNewConversation(handleConversationSynced);
     socketService.onMessageReaction(handleReactionUpdate);
 
     // Add new event listeners for edit/delete/revoke
@@ -565,6 +580,7 @@ export const useChat = (conversationId: string, userId?: string) => {
 
     return () => {
       socketService.offNewMessage(handleNewMessage);
+      socketService.offNewConversation(handleConversationSynced);
       socketService.offMessageReaction(handleReactionUpdate);
 
       const socket = socketService.getSocket();
@@ -580,6 +596,7 @@ export const useChat = (conversationId: string, userId?: string) => {
     conversationId,
     loadMessages,
     handleNewMessage,
+    handleConversationSynced,
     handleReactionUpdate,
     handleMessageEdited,
     handleMessageDeleted,
