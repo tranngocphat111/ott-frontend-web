@@ -8,7 +8,6 @@ import VideoPage from "../pages/VideoPage";
 import NotificationsPage from "../pages/NotificationsPage";
 import SettingsPage from "../pages/SettingsPage";
 import SocialPage from "../pages/SocialPage";
-import UserSelectionPage from "../pages/UserSelectionPage";
 import CallPage from "../pages/CallPage";
 import { SocialProfile } from "../pages/social";
 import Dashboard from "../pages/admin/Dashboard";
@@ -36,10 +35,6 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
  * Centralized route definitions for better maintainability
  */
 export const routes: RouteObject[] = [
-  {
-    path: "/select-user",
-    element: <UserSelectionPage />,
-  },
   {
     path: "/chat",
     element: <ChatPage />,
@@ -115,6 +110,8 @@ export const routes: RouteObject[] = [
         <UserManagement />
       </AdminLayout>
     ),
+  },
+  {
     path: "/call",
     element: <CallPage />,
   },
@@ -124,7 +121,6 @@ export const routes: RouteObject[] = [
  * Route paths constants for type-safe navigation
  */
 export const ROUTE_PATHS = {
-  SELECT_USER: "/select-user",
   CHAT: "/chat",
   CONTACTS: "/contacts",
   SEARCH: "/search",
@@ -136,7 +132,7 @@ export const ROUTE_PATHS = {
   ADMIN: "/admin",
   ADMIN_MODERATION: "/admin/moderation",
   CALL: "/call",
-  SOCIAL_PROFILE: (userId?: string) =>
+  SOCIAL_PROFILE: (userId?: string) => userId ? `/social/profile/${userId}` : "/social/profile",
 } as const;
 
 export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];

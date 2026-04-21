@@ -8,7 +8,7 @@ import { UserService } from "../../../services/user.service";
 import { ConversationService } from "../../../services/conversation.service";
 import { CategoryService, socketService } from "../../../services";
 import { useConversations } from "../../../contexts/ConversationsContext";
-import { useUser } from "../../../contexts/UserContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import type {
   ConversationWithParticipant,
   FilterMode,
@@ -22,8 +22,8 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
   onConversationSelect,
   selectedConversationId,
 }) => {
-  const { currentUser } = useUser();
-  const normalizedUserId = currentUser?.user_id || currentUser?._id;
+  const { user: currentUser } = useAuth();
+  const normalizedUserId = currentUser?.id;
   const {
     conversations,
     categories,
@@ -111,7 +111,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       try {
         const users = await UserService.getAllUsers();
         const otherUsers = users.filter(
-          (u) => (u._id || u.user_id) !== currentUser._id,
+          (u) => (u._id || u.user_id) !== currentUser?.id,
         );
         setAvailableUsers(otherUsers);
       } catch (err) {
@@ -119,7 +119,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       }
     };
     loadUsers();
-  }, [normalizedUserId, currentUser?._id]);
+  }, [normalizedUserId, currentUser?.id]);
 
   useEffect(() => {
     let filtered = conversations;
@@ -310,7 +310,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       <CategoryManagementModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
-        userId={currentUser?._id || ""}
+        userId={currentUser?.id || ""}
       />
     </>
   );

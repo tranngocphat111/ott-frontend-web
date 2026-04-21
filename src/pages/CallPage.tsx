@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useCall, type CallType } from "../hooks/useCall";
 import { socketService } from "../services";
 import { clearActiveCallLock, getFullUrl, setActiveCallLock } from "../utils";
@@ -146,7 +146,7 @@ const isUsableAvatar = (value?: string | null): boolean => {
 const CallPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentUser } = useUser();
+  const { user: currentUser } = useAuth();
 
   const conversationId = searchParams.get("conversationId") || "";
   const callType = normalizeCallType(searchParams.get("type"));
@@ -155,9 +155,9 @@ const CallPage: React.FC = () => {
   const remoteDisplayName = String(conversationName || "Cuoc goi").trim();
   const remoteAvatar = String(searchParams.get("avatar") || "").trim();
   const myDisplayName = String(
-    currentUser?.display_name || currentUser?.name || "Me",
+    currentUser?.fullName || "Me",
   ).trim();
-  const myAvatar = String(currentUser?.avatar || "").trim();
+  const myAvatar = String(currentUser?.avatarUrl || "").trim();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isLocalPreviewVisible, setIsLocalPreviewVisible] = useState(true);
   const [isLocalVideoCollapsed, setIsLocalVideoCollapsed] = useState(false);
@@ -165,7 +165,7 @@ const CallPage: React.FC = () => {
   const [isRemoteAvatarBroken, setIsRemoteAvatarBroken] = useState(false);
   const [isMyAvatarBroken, setIsMyAvatarBroken] = useState(false);
 
-  const normalizedUserId = currentUser?.user_id || currentUser?._id || "";
+  const normalizedUserId = currentUser?.id || "";
   const startedRef = useRef(false);
   const callConnectedAtRef = useRef<number | null>(null);
   const hasEverConnectedRef = useRef(false);

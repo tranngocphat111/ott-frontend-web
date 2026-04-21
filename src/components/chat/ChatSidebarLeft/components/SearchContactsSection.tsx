@@ -1,6 +1,7 @@
 import React from "react";
 import { Users } from "lucide-react";
 import Avatar from "../../../common/Avatar";
+import { getFullUrl } from "../../../../utils";
 import type { SearchContactsSectionProps } from "../../../../types";
 
 const SearchContactsSection: React.FC<SearchContactsSectionProps> = ({
@@ -26,7 +27,7 @@ const SearchContactsSection: React.FC<SearchContactsSectionProps> = ({
                 onClick={() => targetConversationId && onOpenConversation(targetConversationId)}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-gray-50"
               >
-                <Avatar src={item.avatar || ""} name={item.name} size={40} />
+                <Avatar src={getFullUrl(item.avatar || "")} name={item.name} size={40} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-900">{item.name}</p>
                   <p className="text-xs text-gray-500">{item.phone || item.user_id}</p>

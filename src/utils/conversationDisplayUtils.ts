@@ -1,4 +1,5 @@
-    import type { Conversation, ConversationParticipant } from "../types";
+import type { Conversation, ConversationParticipant } from "../types";
+import { getFullUrl } from "./fileUtils";
 
 const normalizeId = (value?: string) => String(value || "").trim();
 
@@ -65,12 +66,16 @@ export const getConversationDisplayAvatar = (
   conversation: Conversation,
   currentUserId?: string,
 ): string | undefined => {
+  if (conversation.is_self_conversation && !conversation.avatar) {
+    return "SPECIAL_AVATAR_SELF";
+  }
+
   const explicitAvatar = String(conversation.avatar || "").trim();
-  if (explicitAvatar) return explicitAvatar;
+  if (explicitAvatar) return getFullUrl(explicitAvatar);
 
   if (conversation.type === "private") {
     const other = getOtherParticipant(conversation, currentUserId);
-    return other?.avatar;
+    return other?.avatar ? getFullUrl(other.avatar) : undefined;
   }
 
   return undefined;

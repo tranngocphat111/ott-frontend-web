@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Search } from "lucide-react";
-import { useUser } from "../../../../contexts/UserContext";
+import { useAuth } from "../../../../contexts/AuthContext";
 import { ConversationService, UserService } from "../../../../services";
 import Avatar from "../../../common/Avatar";
 import type { User } from "../../../../types";
@@ -13,7 +13,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
   currentMembers,
   onMembersAdded,
 }) => {
-  const { currentUser } = useUser();
+  const { user: currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
@@ -64,7 +64,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
       const result = await ConversationService.addMembers(
         conversationId,
         userIds,
-        currentUser?._id || ""
+        currentUser?.id || ""
       );
 
       onMembersAdded(result.members || []);

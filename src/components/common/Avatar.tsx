@@ -39,6 +39,15 @@ const Avatar: React.FC<AvatarProps> = ({
     return colors[index];
   };
 
+  const [imgError, setImgError] = React.useState(false);
+
+  // Reset error when src changes
+  React.useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
+  const showFallback = !src || src === "SPECIAL_AVATAR_SELF" || imgError;
+
   return (
     <div
       className={`
@@ -50,28 +59,33 @@ const Avatar: React.FC<AvatarProps> = ({
       `}
       onClick={onClick}
     >
-      {src ? (
-        <img
-          src={`https://riff-storage-iuh.s3.ap-southeast-1.amazonaws.com${src}`}
-          alt={name}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            // If image fails to load, hide it and show initials
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      ) : (
-        <div
-          className={`w-full h-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${getGradientColor(name)}`}
-        >
-          {name ? (
+      <div
+        className={`absolute inset-0 flex items-center justify-center text-white font-semibold bg-gradient-to-br ${getGradientColor(name)}`}
+      >
+        {src === "SPECIAL_AVATAR_SELF" ||
+          name?.toLowerCase().includes("my documents") ||
+          name?.toLowerCase().includes("truyền file") ||
+          name?.toLowerCase().includes("cloud của tôi")
+          ? (
+            <span className={size === 48 ? 'text-2xl' : size === 40 ? 'text-xl' : 'text-lg'}>
+              📁
+            </span>
+          ) : name ? (
             <span className={size === 48 ? 'text-lg' : size === 40 ? 'text-base' : 'text-sm'}>
               {getInitials(name)}
             </span>
           ) : (
             <User className={`text-white/70 ${size === 48 ? 'w-6 h-6' : size === 40 ? 'w-5 h-5' : 'w-4 h-4'}`} />
           )}
-        </div>
+      </div>
+
+      {!showFallback && (
+        <img
+          src={src}
+          alt={name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
       )}
 
       {/* Subtle border overlay */}

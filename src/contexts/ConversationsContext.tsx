@@ -16,7 +16,7 @@ import type {
   ConversationParticipant,
 } from "../types";
 import { ConversationService, CategoryService, socketService } from "../services";
-import { useUser } from "./UserContext";
+import { useAuth } from "./AuthContext";
 
 interface ConversationsContextType {
   // State
@@ -76,7 +76,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDoneRef = useRef<string | null>(null);
-  const { isAuthenticated, currentUser: user } = useUser();
+  const { isAuthenticated, user } = useAuth();
 
   // Helper to apply dissolution logic to any incoming conversations array
   const applyDissolutionLogic = useCallback((
@@ -422,8 +422,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     };
 
     const handleNewConversation = async (newConv?: any) => {
-      const currentUserId = (user as { user_id?: string; _id?: string; id?: string } | null);
-      const normalizedUserId = (currentUserId?.user_id || currentUserId?._id || currentUserId?.id || "").trim();
+      const currentUserId = (user as { id?: string } | null);
+      const normalizedUserId = (currentUserId?.id || "").trim();
       
       if (!normalizedUserId) return;
 
@@ -529,8 +529,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       if (!convId || !leftUserId) return;
 
       const currentUserId = String(
-        (user as { user_id?: string; _id?: string } | null)?.user_id ||
-        (user as { _id?: string } | null)?._id ||
+        (user as { id?: string } | null)?.id ||
         "",
       );
 
@@ -677,8 +676,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
   // Initial Load - Centralized source of truth
   useEffect(() => {
-    const rawUser = user as { user_id?: string; _id?: string; id?: string } | null;
-    const currentUserId = (rawUser?.user_id || rawUser?._id || rawUser?.id || "").trim();
+    const rawUser = user as { id?: string } | null;
+    const currentUserId = (rawUser?.id || "").trim();
 
     if (isAuthenticated && currentUserId) {
       // Prevent redundant loads if already done for this user ID

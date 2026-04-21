@@ -12,7 +12,6 @@ import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 // Main pages
 import SocialPage from "../pages/SocialPage";
 import CallPage from "../pages/CallPage";
-import UserSelectionPage from "../pages/UserSelectionPage";
 import ProfilePage from "../pages/ProfilePage";
 
 // Account settings pages
@@ -95,7 +94,6 @@ export const AppRouter: React.FC = () => {
           </PrivateRoute>
         }
       >
-        <Route path="/select-user" element={<UserSelectionPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/social/*" element={<SocialPage />} />
       </Route>

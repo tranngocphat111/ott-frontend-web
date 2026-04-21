@@ -12,7 +12,6 @@ const MainLayout: React.FC = () => {
     if (path.includes('/chat')) return 'chat';
     if (path.includes('/social')) return 'social';
     if (path.includes('/call')) return 'call';
-    if (path.includes('/select-user')) return 'select-user';
     return 'chat';
   };
 

@@ -1,5 +1,6 @@
 import React from "react";
 import Avatar from "../../../common/Avatar";
+import { getFullUrl } from "../../../../utils";
 import type { SearchMessageRowProps } from "../../../../types";
 
 const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
@@ -24,7 +25,7 @@ const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
     >
       <div className="flex items-center gap-2.5">
         <Avatar
-          src={conversationMeta?.avatar || ""}
+          src={getFullUrl(conversationMeta?.avatar || "")}
           name={conversationMeta?.name || "Đoạn chat"}
           size={40}
         />
