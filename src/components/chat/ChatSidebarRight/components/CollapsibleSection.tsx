@@ -38,7 +38,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             </span>
           )}
         </div>
-        
+
         {/* Show arrow only if no onClick (collapsible mode) */}
         {!onClick && showIndicator && (
           <>
@@ -49,13 +49,10 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             )}
           </>
         )}
-        
-        {/* Show navigation arrow for onClick sections */}
-        {onClick && showIndicator && (
-          <ChevronDown size={16} className="text-gray-400" />
-        )}
+
+
       </button>
-      
+
       {/* Only show content for collapsible sections (no onClick) */}
       {!onClick && isOpen && children && <div className="px-4 pb-3">{children}</div>}
     </div>

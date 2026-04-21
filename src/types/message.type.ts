@@ -138,6 +138,7 @@ export interface ChatInputProps {
   onUploadError?: (payload: ImageSendError) => void;
   replyToMessage?: Message | null;
   onCancelReply?: () => void;
+  conversationType?: string;
 }
 
 export interface ImageSendDraft {

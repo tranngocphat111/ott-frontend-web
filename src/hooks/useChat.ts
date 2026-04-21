@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MessageService, socketService } from "../services";
+import { MessageService } from "../services";
+import { socketService } from "../services/socket.service";
 import type { Message } from "../interfaces";
 
 const CHAT_API_URL =
@@ -567,29 +568,28 @@ export const useChat = (conversationId: string, userId?: string) => {
     socketService.onNewMessage(handleNewMessage);
     socketService.onNewConversation(handleConversationSynced);
     socketService.onMessageReaction(handleReactionUpdate);
+    socketService.onPollUpdate(handleMessageUpdated);
+    socketService.onMessageDestroyed(handleMessageDeleted);
+    socketService.onMessageRecalled(handleMessageRevoked);
 
-    // Add new event listeners for edit/delete/revoke
     const socket = socketService.getSocket();
     if (socket) {
       socket.on("tin_nhan_da_chinh_sua", handleMessageEdited);
-      socket.on("tin_nhan_da_xoa", handleMessageDeleted);
-      socket.on("tin_nhan_thu_hoi", handleMessageRevoked);
       socket.on("tin_nhan_pin", handleMessagePin);
-      socket.on("tin_nhan_cap_nhat", handleMessageUpdated);
     }
 
     return () => {
       socketService.offNewMessage(handleNewMessage);
       socketService.offNewConversation(handleConversationSynced);
       socketService.offMessageReaction(handleReactionUpdate);
+      socketService.offPollUpdate(handleMessageUpdated);
+      socketService.offMessageDestroyed(handleMessageDeleted);
+      socketService.offMessageRecalled(handleMessageRevoked);
 
       const socket = socketService.getSocket();
       if (socket) {
         socket.off("tin_nhan_da_chinh_sua", handleMessageEdited);
-        socket.off("tin_nhan_da_xoa", handleMessageDeleted);
-        socket.off("tin_nhan_thu_hoi", handleMessageRevoked);
         socket.off("tin_nhan_pin", handleMessagePin);
-        socket.off("tin_nhan_cap_nhat", handleMessageUpdated);
       }
     };
   }, [
