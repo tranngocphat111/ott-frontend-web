@@ -113,6 +113,42 @@ class SocketService {
     }
   }
 
+  onPollUpdate(callback: (payload: any) => void) {
+    this.socket?.on("tin_nhan_cap_nhat", callback);
+  }
+
+  offPollUpdate(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("tin_nhan_cap_nhat", callback);
+    } else {
+      this.socket?.removeAllListeners("tin_nhan_cap_nhat");
+    }
+  }
+
+  onMessageDestroyed(callback: (payload: { msg_id: string; conversation_id: string }) => void) {
+    this.socket?.on("tin_nhan_da_xoa", callback);
+  }
+
+  offMessageDestroyed(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("tin_nhan_da_xoa", callback);
+    } else {
+      this.socket?.removeAllListeners("tin_nhan_da_xoa");
+    }
+  }
+
+  onMessageRecalled(callback: (payload: { msg_id: string; conversation_id: string }) => void) {
+    this.socket?.on("tin_nhan_thu_hoi", callback);
+  }
+
+  offMessageRecalled(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("tin_nhan_thu_hoi", callback);
+    } else {
+      this.socket?.removeAllListeners("tin_nhan_thu_hoi");
+    }
+  }
+
   onGroupDissolved(callback: (payload: { conversationId: string }) => void) {
     this.socket?.on("giai_tan_nhom", callback);
   }
@@ -122,6 +158,42 @@ class SocketService {
       this.socket?.off("giai_tan_nhom", callback);
     } else {
       this.socket?.removeAllListeners("giai_tan_nhom");
+    }
+  }
+
+  onMemberKicked(callback: (payload: { conversationId: string; userId: string }) => void) {
+    this.socket?.on("xoa_thanh_vien", callback);
+  }
+
+  offMemberKicked(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("xoa_thanh_vien", callback);
+    } else {
+      this.socket?.removeAllListeners("xoa_thanh_vien");
+    }
+  }
+
+  onKickedFromGroup(callback: (payload: { conversationId: string }) => void) {
+    this.socket?.on("bi_xoa_khoi_nhom", callback);
+  }
+
+  offKickedFromGroup(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("bi_xoa_khoi_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("bi_xoa_khoi_nhom");
+    }
+  }
+
+  onMemberLeft(callback: (payload: { conversationId: string; userId: string }) => void) {
+    this.socket?.on("roi_nhom", callback);
+  }
+
+  offMemberLeft(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("roi_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("roi_nhom");
     }
   }
 
@@ -475,4 +547,5 @@ class SocketService {
   }
 }
 
+console.log("🚀 SocketService V2.0.1 Loaded");
 export const socketService = new SocketService();

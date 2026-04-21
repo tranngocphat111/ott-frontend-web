@@ -22,6 +22,8 @@ export type {
   CollapsibleSectionProps,
   PinnedMessagesProps,
   GroupActionsProps,
+  BulletinTab,
+  GroupBulletinBoardProps,
   AddMemberModalProps,
 } from './sidebar.interface';
 

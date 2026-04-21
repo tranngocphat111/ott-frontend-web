@@ -15,6 +15,10 @@ import {
   PinOff,
   Play,
   Volume2,
+  X,
+  AlertTriangle,
+  Info,
+  Trash2,
 } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
 import { useConversations } from "../../contexts/ConversationsContext";
@@ -108,7 +112,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    action: "revoke" | "delete" | null;
+    action: "revoke" | "delete" | "delete-history" | null;
     message: Message | null;
   }>({
     isOpen: false,
@@ -174,6 +178,20 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     title: "",
     message: "",
   });
+
+  const isParticipant = useMemo(() => {
+    if (!activeConversation || activeConversation.type === "private") return true;
+    if (activeConversation.is_self_conversation) return true;
+
+    return (activeConversation.participants || []).some(
+      (p) => String(p.user_id) === String(normalizedUserId),
+    );
+  }, [activeConversation, normalizedUserId]);
+
+  const isDissolved = useMemo(() => {
+    return activeConversation?.status === "dissolved" || Boolean(activeConversation?.is_dissolved);
+  }, [activeConversation]);
+
   const [optimisticImageMessages, setOptimisticImageMessages] = useState<
     Array<ChatMessageType>
   >([]);
@@ -1624,6 +1642,20 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       return;
 
     try {
+      if (action === "delete-history") {
+        await ParticipantService.deleteConversation(activeConversation._id, normalizedUserId);
+        setConfirmModal({ isOpen: false, action: null, message: null });
+
+        // Remove from list
+        window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
+          detail: { conversationId: activeConversation._id }
+        }));
+
+        // Back to welcome screen or another conversation
+        window.dispatchEvent(new CustomEvent("chat:return-to-welcome"));
+        return;
+      }
+
       if (action === "revoke") {
         const revokedResult = await MessageService.revokeMessage(
           activeConversation._id,
@@ -2277,7 +2309,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           disableCallActions={isOpeningCall}
           isSidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
-          hideCallActions={Boolean(activeConversation?.is_self_conversation)}
+          hideCallActions={
+            Boolean(activeConversation?.is_self_conversation) ||
+            !isParticipant ||
+            isDissolved
+          }
         />
 
         <div
@@ -2410,7 +2446,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           )}
 
           {/* No more messages indicator */}
-          {!hasMore && messages.length > 0 && (
+          {!hasMore && messages.length > 0 && !isDissolved && (
             <div className="flex justify-center py-2">
               <div className="text-sm text-gray-400">
                 Đây là tin nhắn đầu tiên của cuộc trò chuyện
@@ -2421,6 +2457,41 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           {isInitialLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 size={20} className="animate-spin text-gray-100" />
+            </div>
+          ) : isDissolved ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4 animate-fade-in px-4 py-8 bg-slate-50/30">
+              <div className="relative group overflow-hidden bg-white/70 backdrop-blur-xl px-10 py-8 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center gap-6 max-w-sm transition-all hover:shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
+                {/* Decorative background element */}
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary-100/30 rounded-full blur-3xl" />
+                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-amber-100/30 rounded-full blur-3xl" />
+
+                <div className="relative w-16 h-16 rounded-3xl bg-amber-50 flex items-center justify-center text-amber-500 shadow-inner">
+                  <AlertTriangle size={32} strokeWidth={2} />
+                </div>
+
+                <div className="relative flex flex-col items-center gap-2">
+                  <h3 className="text-[19px] font-bold text-slate-800 text-center leading-tight">
+                    Nhóm đã được giải tán
+                  </h3>
+                  <p className="text-[14px] text-slate-500 text-center max-w-[240px] leading-relaxed">
+                    Trưởng nhóm đã đóng cuộc hội thoại này. Bạn vẫn có thể xem lại lịch sử tin nhắn.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setConfirmModal({
+                      isOpen: true,
+                      action: "delete-history" as any,
+                      message: { msg_id: "DUMMY_ID" } as any,
+                    });
+                  }}
+                  className="relative px-6 py-2.5 bg-primary-50 hover:bg-primary-100 text-primary-600 font-bold text-[15px] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 shadow-sm"
+                >
+                  <Trash2 size={16} />
+                  Xóa trò chuyện
+                </button>
+              </div>
             </div>
           ) : hydratedMessages.length === 0 ? (
             <ChatEmpty />
@@ -2616,9 +2687,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           {showScrollButton && (
             <button
               onClick={scrollToBottom}
-              className={`fixed ${
-                sidebarOpen ? "right-[344px]" : "right-6"
-              } bottom-32 bg-primary-500 hover:bg-primary-600 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-[110]`}
+              className={`fixed ${sidebarOpen ? "right-[344px]" : "right-6"
+                } bottom-32 bg-primary-500 hover:bg-primary-600 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-[110]`}
               title="Scroll to bottom"
             >
               <ChevronDown size={24} strokeWidth={2} />
@@ -2626,18 +2696,40 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           )}
         </div>
 
-        <ChatInput
-          key={activeConversation._id}
-          conversationId={activeConversation._id}
-          senderId={normalizedUserId || ""}
-          onSendSuccess={handleSendSuccess}
-          onUploadStart={handleImageSendStart}
-          onUploadProgress={handleImageSendProgress}
-          onUploadSuccess={handleImageSendSuccess}
-          onUploadError={handleImageSendError}
-          replyToMessage={replyToMessage}
-          onCancelReply={() => setReplyToMessage(null)}
-        />
+        {isParticipant && !isDissolved ? (
+          <ChatInput
+            key={activeConversation._id}
+            conversationId={activeConversation._id}
+            senderId={normalizedUserId || ""}
+            onSendSuccess={handleSendSuccess}
+            onUploadStart={handleImageSendStart}
+            onUploadProgress={handleImageSendProgress}
+            onUploadSuccess={handleImageSendSuccess}
+            onUploadError={handleImageSendError}
+            replyToMessage={replyToMessage}
+            onCancelReply={() => setReplyToMessage(null)}
+            conversationType={activeConversation?.type}
+          />
+        ) : (
+          <div className="px-5 py-4 bg-white border-t border-slate-100">
+            <div className={`flex items-center gap-3 ${isDissolved ? "text-primary-600" : "text-slate-500"} bg-slate-50 px-4 py-3 rounded-xl border border-slate-100`}>
+              {isDissolved ? (
+                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                  <Info size={18} strokeWidth={2.5} />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                  <AlertTriangle size={18} />
+                </div>
+              )}
+              <p className="text-[14px] font-semibold">
+                {isDissolved
+                  ? "Bạn không thể gửi tin nhắn vào nhóm được nữa"
+                  : "Bạn không còn là thành viên của nhóm này"}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Sidebar */}
@@ -2672,9 +2764,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             ? "Tin nhắn này sẽ bị thu hồi với tất cả mọi người trong đoạn chat"
             : "Tin nhắn này sẽ bị xóa khỏi thiết bị của bạn, nhưng vẫn hiện thị với các thành viên khác trong đoạn chat."
         }
-        confirmText={confirmModal.action === "revoke" ? "Thu Hồi" : "Xóa"}
+        confirmText={
+          confirmModal.action === "revoke"
+            ? "Thu Hồi"
+            : confirmModal.action === "delete-history"
+              ? "Xóa"
+              : "Xóa"
+        }
         cancelText="Hủy"
-        isDangerous={confirmModal.action === "delete"}
+        isDangerous={confirmModal.action === "delete" || confirmModal.action === "delete-history"}
         onConfirm={handleConfirmAction}
         onCancel={() =>
           setConfirmModal({

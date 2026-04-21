@@ -104,58 +104,22 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     return () => socketService.offNewConversation(handleNewConversation);
   }, [handleNewConversation]);
 
-  const loadConversations = useCallback(async () => {
-    if (!normalizedUserId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const users = await UserService.getAllUsers();
-      const otherUsers = users.filter(
-        (user) => (user._id || user.user_id) !== currentUser._id,
-      );
-      setAvailableUsers(otherUsers);
-
-      const loadedConversations =
-        await ConversationService.getUserConversations(normalizedUserId);
-
-      const userId = normalizedUserId;
-      const reconciledConversations = loadedConversations.map((newItem) => {
-        const convId = newItem.conversation._id;
-        const dbId = newItem.participant.last_read_message_id || "0";
-        const lsId = localStorage.getItem(`read_${convId}_${userId}`) || "0";
-        if (lsId !== "0" && BigInt(lsId) > BigInt(dbId)) {
-          return {
-            ...newItem,
-            participant: { ...newItem.participant, last_read_message_id: lsId },
-          };
-        }
-        return newItem;
-      });
-      setConversations(reconciledConversations);
-
-      const loadedCategories =
-        await CategoryService.getUserCategories(normalizedUserId);
-      setCategories(loadedCategories);
-    } catch (loadError) {
-      console.error("Failed to load data from database:", loadError);
-      setError("Không thể tải dữ liệu từ server");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    normalizedUserId,
-    setLoading,
-    setError,
-    currentUser?._id,
-    setConversations,
-    setCategories,
-  ]);
-
+  // Load users for creation but NOT conversations (handled by context)
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+    if (!normalizedUserId) return;
+    const loadUsers = async () => {
+      try {
+        const users = await UserService.getAllUsers();
+        const otherUsers = users.filter(
+          (u) => (u._id || u.user_id) !== currentUser._id,
+        );
+        setAvailableUsers(otherUsers);
+      } catch (err) {
+        console.error("Failed to load users:", err);
+      }
+    };
+    loadUsers();
+  }, [normalizedUserId, currentUser?._id]);
 
   useEffect(() => {
     let filtered = conversations;
@@ -242,7 +206,17 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     }
 
     if (error) {
-      return <ErrorState message={error} onRetry={loadConversations} />;
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+          <p className="text-sm text-red-500 mb-2">{error}</p>
+          <button
+            onClick={() => refreshConversations(normalizedUserId || "")}
+            className="text-xs text-primary-600 font-semibold hover:underline"
+          >
+            Thử lại
+          </button>
+        </div>
+      );
     }
 
     return (

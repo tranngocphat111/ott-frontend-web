@@ -8,6 +8,7 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   conversation,
   currentUserId,
   isOwner = false,
+  isDissolved = false,
   onLeaveSuccess,
   onActionSuccess,
 }) => {
@@ -22,7 +23,12 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   const handleDeleteHistory = async () => {
     try {
       await ParticipantService.deleteConversation(conversation._id, currentUserId);
-      await onActionSuccess?.();
+      
+      // Dispatch event to remove from local session list immediately
+      window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
+        detail: { conversationId: conversation._id }
+      }));
+      
       onLeaveSuccess();
     } catch (error) {
       console.error("Error deleting history:", error);
@@ -30,9 +36,13 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   };
 
   const handleLeaveGroup = async () => {
+    if (isOwner) {
+      alert("Bạn phải chuyển quyền trưởng nhóm trước khi rời nhóm.");
+      return;
+    }
+
     try {
       await ParticipantService.leaveGroup(conversation._id, currentUserId);
-      await onActionSuccess?.();
       onLeaveSuccess();
     } catch (error) {
       console.error("Error leaving group:", error);
@@ -42,7 +52,12 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   const handleDissolveGroup = async () => {
     try {
       await ConversationService.dissolveGroup(conversation._id, currentUserId);
-      await onActionSuccess?.();
+      // For owner, remove immediately from local state
+      if (isOwner) {
+        window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
+          detail: { conversationId: conversation._id }
+        }));
+      }
       onLeaveSuccess();
     } catch (error) {
       console.error("Error dissolving group:", error);
@@ -71,7 +86,8 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   const isGroupChat = conversation.type === "group";
 
   return (
-    <div className="border-t border-gray-100 px-4 py-4 space-y-2">
+    <div className="px-4 py-4 space-y-2">
+      <div className="h-[1px] bg-slate-100 mx-1 mb-4" />
       <button
         onClick={() =>
           setConfirmState({ isOpen: true, action: "delete-history" })
@@ -82,7 +98,7 @@ const GroupActions: React.FC<GroupActionsProps> = ({
         <span>Xoá lịch sử trò chuyện</span>
       </button>
 
-      {isGroupChat && (
+      {!isDissolved && isGroupChat && (
         <button
           onClick={() =>
             setConfirmState({ isOpen: true, action: "leave-group" })
@@ -94,7 +110,7 @@ const GroupActions: React.FC<GroupActionsProps> = ({
         </button>
       )}
 
-      {isGroupChat && isOwner && (
+      {!isDissolved && isGroupChat && isOwner && (
         <button
           onClick={() =>
             setConfirmState({ isOpen: true, action: "dissolve-group" })

@@ -195,6 +195,7 @@ export const ChatInput = ({
   onUploadError,
   replyToMessage,
   onCancelReply,
+  conversationType,
 }: ChatInputProps): ReactElement => {
   const [text, setText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -1439,14 +1440,16 @@ export const ChatInput = ({
             <Mic size={20} />
           </button>
 
-          <button
-            onClick={() => setShowCreatePollModal(true)}
-            disabled={isUploading}
-            className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
-            title="Tạo khảo sát"
-          >
-            <ListChecks size={20} />
-          </button>
+          {conversationType !== "private" && (
+            <button
+              onClick={() => setShowCreatePollModal(true)}
+              disabled={isUploading}
+              className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+              title="Tạo khảo sát"
+            >
+              <ListChecks size={20} />
+            </button>
+          )}
 
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}

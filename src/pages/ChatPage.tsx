@@ -282,10 +282,46 @@ const ChatContent: React.FC = () => {
     const handleConversationDissolved = (event: Event) => {
       const custom = event as CustomEvent<{ conversationId?: string }>;
       const dissolvedId = String(custom.detail?.conversationId || "");
-      if (dissolvedId && selectedConversation?._id === dissolvedId) setSelectedConversation(null);
+      if (!dissolvedId) return;
+
+      // Find the conversation to check ownership
+      const convData = conversations.find(
+        (c) => c.conversation._id === dissolvedId,
+      );
+      const isOwner =
+        convData && String(convData.conversation.created_by) === normalizedUserId;
+
+      if (selectedConversation?._id === dissolvedId && isOwner) {
+        setSelectedConversation(null);
+      }
+      // For members, we don't clear it so they can see history (blocked view)
     };
+
+    const handleKickedFromGroup = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string }>;
+      const convId = String(custom.detail?.conversationId || "");
+      if (convId && selectedConversation?._id === convId) {
+        setSelectedConversation(null);
+      }
+    };
+
+    const handleRemoveConversation = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string }>;
+      const convId = String(custom.detail?.conversationId || "");
+      if (convId && selectedConversation?._id === convId) {
+        setSelectedConversation(null);
+      }
+    };
+
     window.addEventListener("chat:conversation-dissolved", handleConversationDissolved as EventListener);
-    return () => window.removeEventListener("chat:conversation-dissolved", handleConversationDissolved as EventListener);
+    window.addEventListener("chat:kicked-from-group", handleKickedFromGroup as EventListener);
+    window.addEventListener("chat:remove-conversation", handleRemoveConversation as EventListener);
+
+    return () => {
+      window.removeEventListener("chat:conversation-dissolved", handleConversationDissolved as EventListener);
+      window.removeEventListener("chat:kicked-from-group", handleKickedFromGroup as EventListener);
+      window.removeEventListener("chat:remove-conversation", handleRemoveConversation as EventListener);
+    };
   }, [selectedConversation?._id]);
 
   // Resolve caller info

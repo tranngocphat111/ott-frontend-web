@@ -11,7 +11,7 @@ const buildApiBaseUrl = (): string => {
     return `${normalizeBaseUrl(gatewayBase)}/riff/api`;
   }
 
-  return "http://192.168.1.26:8080/riff/api";
+  return "http://192.168.5.116:8080/riff/api";
 };
 
 export const API_CONFIG = {

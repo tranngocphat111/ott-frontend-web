@@ -460,6 +460,17 @@ export class MessageService {
     }
   }
 
+  // Get poll messages (filtered from latest messages)
+  static async getPollMessages(conversationId: string, userId?: string) {
+    try {
+      const messages = await this.getMessages(conversationId, userId);
+      return messages.filter((msg: any) => msg.type === "poll");
+    } catch (error) {
+      console.error("Error fetching poll messages:", error);
+      throw error;
+    }
+  }
+
   // Get media messages (images/videos)
   static async getMediaMessages(conversationId: string, limit = 20, skip = 0) {
     try {

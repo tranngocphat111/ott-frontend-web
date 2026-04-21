@@ -32,10 +32,21 @@ export interface LinkData {
   createdAt: string;
 }
 
-export type ViewMode = "main" | "members" | "storage";
+export type ViewMode = "main" | "members" | "storage" | "bulletin";
 export type StorageTab = "media" | "files" | "links";
+export type BulletinTab = "pinned" | "polls";
 
 // Sidebar Sub-Component Props
+export interface GroupBulletinBoardProps {
+  conversationId: string;
+  currentUserId: string;
+  pinnedMessages: Message[];
+  pollMessages: Message[];
+  activeTab?: BulletinTab;
+  onUnpin: (msgId: string) => void;
+  onBack: () => void;
+  conversationType?: string;
+}
 export interface GroupInfoHeaderProps {
   conversation: Conversation;
   memberCount: number;
@@ -96,6 +107,7 @@ export interface GroupActionsProps {
   conversation: Conversation;
   currentUserId: string;
   isOwner?: boolean;
+  isDissolved?: boolean;
   onLeaveSuccess: () => void;
   onActionSuccess?: () => Promise<void> | void;
 }

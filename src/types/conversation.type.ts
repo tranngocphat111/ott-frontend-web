@@ -39,6 +39,8 @@ export interface Conversation {
   is_deleted: boolean;
   is_self_conversation?: boolean;
   self_owner_id?: string | null;
+  status?: string;
+  is_dissolved?: boolean;
   background: string;
   createdAt: string;
   updatedAt: string;
