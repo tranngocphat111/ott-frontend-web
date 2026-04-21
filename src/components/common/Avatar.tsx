@@ -52,7 +52,7 @@ const Avatar: React.FC<AvatarProps> = ({
     >
       {src ? (
         <img
-          src={src}
+          src={`https://riff-storage-iuh.s3.ap-southeast-1.amazonaws.com${src}`}
           alt={name}
           className="w-full h-full object-cover"
           onError={(e) => {
