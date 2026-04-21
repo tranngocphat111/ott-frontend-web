@@ -6,15 +6,14 @@ import type { UserSelectCardProps } from '../../../interfaces';
 const UserSelectCard: React.FC<UserSelectCardProps> = ({ user, isSelected, onToggle }) => {
   return (
     <div
-      onClick={() => onToggle(user._id)}
+      onClick={() => onToggle(user.user_id)}
       className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer rounded-lg transition-colors"
     >
       <div
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-          isSelected
-            ? 'bg-primary-400 border-primary-400'
-            : 'border-gray-300'
-        }`}
+        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected
+          ? 'bg-primary-400 border-primary-400'
+          : 'border-gray-300'
+          }`}
       >
         {isSelected && (
           <svg

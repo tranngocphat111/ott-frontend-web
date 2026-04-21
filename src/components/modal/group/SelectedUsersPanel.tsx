@@ -36,7 +36,7 @@ const SelectedUsersPanel: React.FC<SelectedUsersPanelProps> = ({
                   {user.display_name}
                 </span>
                 <button
-                  onClick={() => onRemove(user._id)}
+                  onClick={() => onRemove(user.user_id)}
                   className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X className="w-4 h-4 text-gray-400" />
