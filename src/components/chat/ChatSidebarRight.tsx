@@ -10,7 +10,7 @@ import {
   Info,
   Clock3,
 } from "lucide-react";
-import { useUser } from "../../contexts/UserContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { useConversations } from "../../contexts/ConversationsContext";
 import {
   MessageService,
@@ -50,13 +50,14 @@ import MembersFullView from "./ChatSidebarRight/MembersFullView";
 import StorageView from "./ChatSidebarRight/StorageView.tsx";
 import Avatar from "../common/Avatar.tsx";
 import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils/conversationDisplayUtils.ts";
+import { getFullUrl } from "../../utils/fileUtils.ts";
 
 const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   conversation,
   isOpen,
   onClose,
 }) => {
-  const { currentUser } = useUser();
+  const { user: currentUser } = useAuth();
   const {
     conversations,
     categories,
@@ -123,7 +124,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         user_id: member.user_id,
         role: (member.roles || member.role || "user") as "admin" | "user",
         name: member.user?.name || `User ${String(member.user_id).slice(-4)}`,
-        avatar: member.user?.avatar || "",
+        avatar: getFullUrl(member.user?.avatar || ""),
         joined_at: member.joined_at || "",
         added_by: member.added_by,
         nickname: member.nickname,
@@ -151,12 +152,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     try {
       const results = await Promise.allSettled([
         ParticipantService.getMembers(conversation._id),
-        MessageService.getPinnedMessages(conversation._id, currentUser?._id),
+        MessageService.getPinnedMessages(conversation._id, currentUser?.id),
         MessageService.getMediaMessages(conversation._id),
         MessageService.getFileMessages(conversation._id),
         MessageService.getLinkMessages(conversation._id),
-        conversation.type === "group" 
-          ? MessageService.getPollMessages(conversation._id, currentUser?._id)
+        conversation.type === "group"
+          ? MessageService.getPollMessages(conversation._id, currentUser?.id)
           : Promise.resolve([]),
       ]);
 
@@ -229,7 +230,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [conversation?._id, currentUser?._id]);
+  }, [conversation?._id, currentUser?.id]);
 
   // Load data
   useEffect(() => {
@@ -347,7 +348,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         try {
           const users = await UserService.getAllUsers();
           const filtered = (users || []).filter(
-            (u) => u._id !== currentUser?._id && u.user_id !== currentUser?._id,
+            (u) => u._id !== currentUser?.id && u.user_id !== currentUser?.id,
           );
           setAvailableUsers(filtered);
         } catch (error) {
@@ -360,11 +361,11 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
 
   const handleUnpinMessage = async (messageId: string) => {
     try {
-      if (!currentUser?._id || !conversation?._id) return;
+      if (!currentUser?.id || !conversation?._id) return;
       await MessageService.pinMessage(
         conversation._id,
         messageId,
-        currentUser._id,
+        currentUser.id,
         false,
       );
       setPinnedMessages((prev) =>
@@ -390,7 +391,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   };
 
   const handleMemberRemoved = async (userId: string) => {
-    if (!userId || !currentUser?._id || !conversation?._id) return;
+    if (!userId || !currentUser?.id || !conversation?._id) return;
     const target = members.find((item) => item.user_id === userId);
     const displayName =
       (target?.nickname || "").trim() ||
@@ -400,7 +401,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   };
 
   const handleConfirmRemoveMember = async () => {
-    if (!removeMemberTarget || !currentUser?._id || !conversation?._id) {
+    if (!removeMemberTarget || !currentUser?.id || !conversation?._id) {
       setRemoveMemberTarget(null);
       return;
     }
@@ -408,11 +409,11 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       await ParticipantService.removeMember(
         conversation._id,
         removeMemberTarget.userId,
-        currentUser._id,
+        currentUser.id,
       );
       setRemoveMemberTarget(null);
       await loadSidebarData();
-      await refreshConversations(currentUser._id || currentUser.user_id || "");
+      await refreshConversations(currentUser.id || "");
     } catch (error) {
       console.error("Error removing member:", error);
       setError(
@@ -422,13 +423,13 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   };
 
   const handleRoleUpdated = async (userId: string, role: string) => {
-    if (!userId || !role || !currentUser?._id || !conversation?._id) return;
+    if (!userId || !role || !currentUser?.id || !conversation?._id) return;
     try {
       await ParticipantService.updateMemberRole(
         conversation._id,
         userId,
         role as "admin" | "user",
-        currentUser._id,
+        currentUser.id,
       );
       await loadSidebarData();
     } catch (error) {
@@ -443,7 +444,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     userId: string,
     nickname: string,
   ) => {
-    const normalizedUserId = currentUser?._id || currentUser?.user_id;
+    const normalizedUserId = currentUser?.id;
     if (!userId || !normalizedUserId || !conversation?._id) return;
     try {
       await ParticipantService.updateMemberNickname(
@@ -465,7 +466,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   };
 
   const handleTransferOwnership = async (newOwnerId: string) => {
-    const normalizedUserId = currentUser?._id || currentUser?.user_id;
+    const normalizedUserId = currentUser?.id;
     if (!normalizedUserId || !conversation?._id) return;
     try {
       await ParticipantService.transferOwnership(
@@ -488,8 +489,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     return members
       .filter(
         (member) =>
-          member.user_id !== currentUser?._id &&
-          member.user_id !== currentUser?.user_id,
+          member.user_id !== currentUser?.id,
       )
       .map((member) => member.user_id);
   };
@@ -537,10 +537,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     groupAvatar?: string,
   ) => {
     try {
-      if (!currentUser?._id || !conversation?._id) return;
+      if (!currentUser?.id || !conversation?._id) return;
       const userIds = selectedUsers.map((u: User) => u._id || u.user_id);
       const newGroup = await ConversationService.createGroup(
-        currentUser._id,
+        currentUser.id,
         groupName,
         userIds,
         groupAvatar,
@@ -561,8 +561,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     (item) => item.conversation._id === conversation._id,
   )?.conversation || conversation;
 
-  const isOwner = currentUser?._id === activeConversation?.created_by ||
-    currentUser?.user_id === activeConversation?.created_by;
+  const isOwner = currentUser?.id === activeConversation?.created_by;
   const currentParticipant = conversations.find(
     (item) => item.conversation._id === conversation._id,
   )?.participant;
@@ -644,19 +643,19 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               <div className="flex-1 flex flex-col bg-white">
                 <div className="px-4 py-8 text-center">
                   <Avatar
-                    src={getConversationDisplayAvatar(activeConversation, currentUser?._id)}
-                    name={getConversationDisplayName(activeConversation, currentUser?._id)}
+                    src={getConversationDisplayAvatar(activeConversation, currentUser?.id)}
+                    name={getConversationDisplayName(activeConversation, currentUser?.id)}
                     size={80}
                     className="mx-auto mb-3 shadow-md"
                   />
                   <h3 className="text-xl font-bold text-gray-900">
-                    {getConversationDisplayName(activeConversation, currentUser?._id)}
+                    {getConversationDisplayName(activeConversation, currentUser?.id)}
                   </h3>
                 </div>
                 <div className="mt-4">
                   <GroupActions
                     conversation={activeConversation}
-                    currentUserId={currentUser?._id || ""}
+                    currentUserId={currentUser?.id || ""}
                     isOwner={isOwner}
                     isDissolved={true}
                     onLeaveSuccess={() => {
@@ -711,13 +710,13 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                   memberCount={members.length}
                   onUpdate={(updates) => updateConversation?.(conversation._id, updates)}
                   isAdmin={isManager}
-                  currentUserId={currentUser?._id || currentUser?.user_id}
+                  currentUserId={currentUser?.id}
                 />
                 {!isSelfConversation && conversation._id && (
                   <GroupActionButtons
                     conversation={conversation}
                     participant={currentParticipant}
-                    currentUserId={currentUser?._id || ""}
+                    currentUserId={currentUser?.id || ""}
                     onAddMember={() => setShowAddMemberModal(true)}
                     onCreateGroup={() => setShowCreateGroupModal(true)}
                     onParticipantUpdated={(updates) => updateParticipant(conversation._id, updates)}
@@ -733,7 +732,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 )}
 
                 <CollapsibleSection title={isSelfConversation ? "Danh sách nhắc hẹn" : conversation.type === "group" ? "Bảng tin nhóm" : "Tin nhắn đã ghim"} icon={<Pin size={20} />} badge={conversation.type === "group" ? pinnedMessages.length : undefined} defaultOpen={true} onClick={isSelfConversation ? undefined : () => handleOpenBulletin("pinned")} showIndicator={!isSelfConversation}>
-                  <PinnedMessages messages={pinnedMessages} conversationId={conversation._id} currentUserId={currentUser?._id || ""} onUnpin={handleUnpinMessage} />
+                  <PinnedMessages messages={pinnedMessages} conversationId={conversation._id} currentUserId={currentUser?.id || ""} onUnpin={handleUnpinMessage} />
                 </CollapsibleSection>
 
                 <CollapsibleSection title="Ảnh/Video" icon={<Image size={20} />} defaultOpen={true}>
@@ -741,7 +740,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 </CollapsibleSection>
 
                 <CollapsibleSection title="File" icon={<FileText size={20} />} defaultOpen={true}>
-                  <FilesList messages={fileMessagesPreview} onViewAll={handleViewAllFiles} currentUserId={currentUser?._id || currentUser?.user_id} currentConversationId={conversation._id} selfConversationId={selfConversationId} onDataChanged={() => { void loadSidebarData(); }} />
+                  <FilesList messages={fileMessagesPreview} onViewAll={handleViewAllFiles} currentUserId={currentUser?.id} currentConversationId={conversation._id} selfConversationId={selfConversationId} onDataChanged={() => { void loadSidebarData(); }} />
                 </CollapsibleSection>
 
                 <CollapsibleSection title="Link" icon={<LinkIcon size={20} />} defaultOpen={true}>
@@ -751,12 +750,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 {!isSelfConversation && conversation._id && (
                   <GroupActions
                     conversation={conversation}
-                    currentUserId={currentUser?._id || ""}
+                    currentUserId={currentUser?.id || ""}
                     isOwner={isOwner}
                     onLeaveSuccess={onClose}
                     onActionSuccess={async () => {
-                      if (currentUser?._id || currentUser?.user_id) {
-                        await refreshConversations(currentUser._id || currentUser.user_id || "");
+                      if (currentUser?.id) {
+                        await refreshConversations(currentUser.id);
                       }
                     }}
                   />
@@ -771,7 +770,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
             <MembersFullView
               members={members}
               ownerId={conversation.created_by}
-              currentUserId={currentUser?._id || currentUser?.user_id || ""}
+              currentUserId={currentUser?.id || ""}
               isManager={isManager}
               onBack={handleBackToMain}
               onMemberRemoved={handleMemberRemoved}
@@ -797,7 +796,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         {viewMode === "bulletin" && (
           <GroupBulletinBoard
             conversationId={conversation._id}
-            currentUserId={currentUser?._id || ""}
+            currentUserId={currentUser?.id || ""}
             pinnedMessages={pinnedMessages}
             pollMessages={pollMessages}
             activeTab={bulletinTab}
@@ -822,7 +821,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       )}
 
       {conversation._id && showNicknameModal && (
-        <NicknameManagementModal isOpen={showNicknameModal} onClose={() => setShowNicknameModal(false)} members={members} currentUserId={currentUser?._id || ""} onNicknameUpdate={handleMemberNicknameUpdated} />
+        <NicknameManagementModal isOpen={showNicknameModal} onClose={() => setShowNicknameModal(false)} members={members} currentUserId={currentUser?.id || ""} onNicknameUpdate={handleMemberNicknameUpdated} />
       )}
 
       {showCreateGroupModal && conversation.type === "private" && (

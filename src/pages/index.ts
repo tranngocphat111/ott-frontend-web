@@ -5,5 +5,4 @@ export { default as CallsPage } from "./CallsPage";
 export { default as VideoPage } from "./VideoPage";
 export { default as NotificationsPage } from "./NotificationsPage";
 export { default as SettingsPage } from "./SettingsPage";
-export { default as UserSelectionPage } from "./UserSelectionPage";
 export { default as CallPage } from "./CallPage";

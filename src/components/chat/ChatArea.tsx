@@ -20,7 +20,7 @@ import {
   Info,
   Trash2,
 } from "lucide-react";
-import { useUser } from "../../contexts/UserContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { useChat } from "../../hooks/useChat";
 import { primeMessageSenderCache } from "../../hooks/useMessageSender";
@@ -75,7 +75,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   isSidebarOpen = false,
   onToggleSidebar,
 }) => {
-  const { currentUser } = useUser();
+  const { user: currentUser } = useAuth();
   const {
     conversations,
     updateConversation,
@@ -83,7 +83,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     updateConversationParticipant,
   } = useConversations();
 
-  const normalizedUserId = currentUser?.user_id || currentUser?._id;
+  const normalizedUserId = currentUser?.id;
 
   const activeConversation = useMemo(() => {
     const matched = conversations.find(
@@ -319,8 +319,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           createdAt: draft.createdAt || new Date().toISOString(),
           sender_name:
             draft.sender_name ||
-            currentUser?.name ||
-            currentUser?.display_name ||
+            currentUser?.fullName ||
             "Bạn",
           reactions: Array.isArray(draft.reactions) ? draft.reactions : [],
           local_status: draft.local_status || "uploading",
@@ -998,7 +997,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       type,
       action,
       name: displayName,
-      avatar: displayAvatar,
+      // Tránh truyền base64 quá dài gây lỗi HTTP 431 (Request Header Fields Too Large)
+      avatar: displayAvatar.startsWith("data:") ? "" : displayAvatar,
     });
 
     setIsOpeningCall(true);

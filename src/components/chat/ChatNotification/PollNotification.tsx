@@ -1,7 +1,7 @@
 import React from "react";
 import { BarChart2 } from "lucide-react";
 import { BaseNotification } from "./BaseNotification";
-import { useUser } from "../../../contexts/UserContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 interface PollNotificationProps {
   content: string;
@@ -18,8 +18,8 @@ export const PollNotification: React.FC<PollNotificationProps> = ({
   sender_id,
   sender_name,
 }) => {
-  const { currentUser } = useUser();
-  const currentUserId = currentUser?._id || currentUser?.user_id;
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id;
 
   const displayContent = React.useMemo(() => {
     if (sender_id && currentUserId && String(sender_id) === String(currentUserId)) {

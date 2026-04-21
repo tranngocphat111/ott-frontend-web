@@ -8,7 +8,7 @@ import { UnpinNotification } from "./UnpinNotification";
 import { DefaultNotification } from "./DefaultNotification";
 import { PollNotification } from "./PollNotification";
 
-import { useUser } from "../../../contexts/UserContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 export const ChatNotification: React.FC<ChatNotificationProps> = ({
   type,
@@ -18,8 +18,8 @@ export const ChatNotification: React.FC<ChatNotificationProps> = ({
   sender_id,
   sender_name,
 }) => {
-  const { currentUser } = useUser();
-  const currentUserId = currentUser?._id || currentUser?.user_id;
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id;
 
   let displayContent = content;
   if (sender_id && currentUserId && String(sender_id) === String(currentUserId)) {

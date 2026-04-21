@@ -702,7 +702,7 @@ export const MessageLayout = ({
             >
               {senderAvatarUrl ? (
                 <img
-                  src={senderAvatarUrl}
+                  src={getFullUrl(senderAvatarUrl)}
                   alt={senderName}
                   className="w-full h-full object-cover"
                 />

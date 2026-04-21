@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { MessageCircle, Phone, PhoneOff, Video, PhoneCall, X } from "lucide-react";
 import Sidebar from "../components/chat/ChatSidebarLeft";
 import { ConversationsProvider, useConversations } from "../contexts/ConversationsContext";
-import { useUser } from "../contexts/UserContext";
+import { useAuth } from "../contexts/AuthContext";
 import type { Conversation, ConversationWithParticipant } from "../types";
 import { ChatArea } from "../components";
 import { socketService } from "../services";
@@ -73,9 +73,9 @@ const AppModal: React.FC<{
 );
 
 const ChatContent: React.FC = () => {
-  const { currentUser } = useUser();
+  const { user: currentUser } = useAuth();
   const { conversations } = useConversations();
-  const normalizedUserId = currentUser?.user_id || currentUser?._id;
+  const normalizedUserId = currentUser?.id;
 
   useEffect(() => {
     socketService.connect();
@@ -109,7 +109,8 @@ const ChatContent: React.FC = () => {
       type: payload.callType,
       action,
       name: displayName || "Cuoc goi",
-      avatar: displayAvatar,
+      // Tránh truyền base64 quá dài gây lỗi HTTP 431
+      avatar: displayAvatar.startsWith("data:") ? "" : displayAvatar,
     });
 
     const callWindow = window.open(

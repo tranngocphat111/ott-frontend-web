@@ -65,19 +65,18 @@ export const CallMessage = ({
     const conversationId = String(msg.conversation_id || "");
     if (!conversationId) return;
 
+    const avatar = conversation && currentUserId
+      ? getConversationDisplayAvatar(conversation, currentUserId) || ""
+      : "";
+
     const queryParams: Record<string, string> = {
       conversationId,
       type: isVideoCall ? "video" : "voice",
       action: "start",
+      name: (conversation && currentUserId ? getConversationDisplayName(conversation, currentUserId) : "") || "Cuộc gọi",
+      // Tránh truyền base64 quá dài gây lỗi HTTP 431
+      avatar: avatar.startsWith("data:") ? "" : avatar,
     };
-
-    if (conversation && currentUserId) {
-      queryParams.name = getConversationDisplayName(conversation, currentUserId) || "Cuộc gọi";
-      queryParams.avatar = getConversationDisplayAvatar(conversation, currentUserId) || "";
-    } else {
-      queryParams.name = "Cuộc gọi";
-      queryParams.avatar = "";
-    }
 
     const params = new URLSearchParams(queryParams);
 
