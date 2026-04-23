@@ -1,9 +1,17 @@
-import React, { useState, useCallback } from 'react';
-import { X, Search, UserPlus, Check } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { X, Search, UserPlus, Check, Clock, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserService } from '../../../services/user.service';
-import { sendFriendRequest, sendFriendRequestViaChat, fetchRelationshipOf, fetchRelationshipStatusViaChat } from '../../../services/social.service';
+import { 
+  sendFriendRequest, 
+  sendFriendRequestViaChat, 
+  fetchRelationshipOf, 
+  fetchRelationshipStatusViaChat,
+  acceptFriendRequestViaChat,
+  cancelFriendRequestViaChat
+} from '../../../services/social.service';
 import { useAuth } from '../../../contexts/AuthContext';
+import { socketService } from '../../../services/socket.service';
 import { getFullUrl } from '../../../utils/fileUtils';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../../types';
@@ -22,16 +30,43 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
   const [searchError, setSearchError] = useState('');
   const [requestSent, setRequestSent] = useState(false);
   const [isAlreadyFriends, setIsAlreadyFriends] = useState(false);
+  const [isIncomingRequest, setIsIncomingRequest] = useState(false);
+  const [relationship, setRelationship] = useState<any>(null);
   const [avatarError, setAvatarError] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Socket listener for relationship updates
+  useEffect(() => {
+    if (!currentUser || !isOpen) return;
+
+    const handleRelationshipUpdate = (payload: any) => {
+      // If the update involves the current user and the searched user
+      if (searchResult && 
+          (payload.requester_id === searchResult.user_id || 
+           payload.receiver_id === searchResult.user_id)) {
+        setRelationship(payload);
+        setIsAlreadyFriends(payload.status === 'ACCEPTED');
+        setRequestSent(payload.status === 'PENDING' && payload.requester_id === currentUser.id);
+        setIsIncomingRequest(payload.status === 'PENDING' && payload.receiver_id === currentUser.id);
+      }
+    };
+
+    socketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () => {
+      socketService.offRelationshipUpdate(handleRelationshipUpdate);
+    };
+  }, [currentUser, searchResult, isOpen]);
 
   const handleSearch = useCallback(async () => {
-    if (!phoneNumber.trim()) return;
+    if (!phoneNumber.trim() || !currentUser) return;
 
     setIsSearching(true);
     setSearchError('');
     setSearchResult(null);
+    setRelationship(null);
     setRequestSent(false);
     setIsAlreadyFriends(false);
+    setIsIncomingRequest(false);
     setAvatarError(false);
 
     try {
@@ -54,17 +89,22 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
       }
 
       if (user) {
-        if (user.user_id === currentUser?.id || user._id === currentUser?.id) {
+        if (user.user_id === currentUser.id || user._id === currentUser.id) {
           setSearchError('Bạn không thể kết bạn với chính mình.');
         } else {
           setSearchResult(user);
-          // Check relationship status via Chat Service (consistent with current logic)
-          const rel = await fetchRelationshipStatusViaChat(currentUser!.id, user.user_id);
+          // Check relationship status via Chat Service
+          const rel = await fetchRelationshipStatusViaChat(currentUser.id, user.user_id);
+          setRelationship(rel);
           if (rel) {
             if (rel.status === 'ACCEPTED') {
               setIsAlreadyFriends(true);
-            } else if (rel.status === 'PENDING' && rel.requester_id === currentUser!.id) {
-              setRequestSent(true);
+            } else if (rel.status === 'PENDING') {
+              if (rel.requester_id === currentUser.id) {
+                setRequestSent(true);
+              } else {
+                setIsIncomingRequest(true);
+              }
             }
           }
         }
@@ -77,30 +117,75 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsSearching(false);
     }
-  }, [phoneNumber, currentUser?.id]);
+  }, [phoneNumber, currentUser]);
 
   const handleAddFriend = useCallback(async () => {
     if (!currentUser || !searchResult) return;
 
+    setIsProcessing(true);
     try {
       const result = await sendFriendRequestViaChat(currentUser.id, searchResult.user_id);
       if (result) {
         setRequestSent(true);
+        // Refresh relationship
+        const rel = await fetchRelationshipStatusViaChat(currentUser.id, searchResult.user_id);
+        setRelationship(rel);
       } else {
         alert('Gửi lời mời kết bạn thất bại.');
       }
     } catch (error) {
       console.error('Add friend error:', error);
       alert('Đã xảy ra lỗi.');
+    } finally {
+      setIsProcessing(false);
     }
   }, [currentUser, searchResult]);
+
+  const handleAcceptFriend = useCallback(async () => {
+    if (!relationship?._id) return;
+
+    setIsProcessing(true);
+    try {
+      const success = await acceptFriendRequestViaChat(relationship._id);
+      if (success) {
+        setIsAlreadyFriends(true);
+        setIsIncomingRequest(false);
+        const rel = await fetchRelationshipStatusViaChat(currentUser!.id, searchResult!.user_id);
+        setRelationship(rel);
+      }
+    } catch (error) {
+      alert('Chấp nhận kết bạn thất bại.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [relationship?._id, currentUser, searchResult]);
+
+  const handleCancelRequest = useCallback(async () => {
+    if (!relationship?._id) return;
+
+    setIsProcessing(true);
+    try {
+      const success = await cancelFriendRequestViaChat(relationship._id);
+      if (success) {
+        setRequestSent(false);
+        setRelationship(null);
+      }
+    } catch (error) {
+      alert('Hủy yêu cầu thất bại.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [relationship?._id]);
 
   const handleClose = useCallback(() => {
     setPhoneNumber('');
     setSearchResult(null);
+    setRelationship(null);
     setSearchError('');
     setIsSearching(false);
     setRequestSent(false);
+    setIsAlreadyFriends(false);
+    setIsIncomingRequest(false);
     onClose();
   }, [onClose]);
 
@@ -195,21 +280,41 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
                           <Check className="w-4 h-4" />
                           <span className="text-xs font-bold">Bạn bè</span>
                         </div>
+                      ) : isIncomingRequest ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcceptFriend();
+                          }}
+                          disabled={isProcessing}
+                          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-md shadow-primary-500/20 transition-all disabled:bg-gray-300"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                          {isProcessing ? 'Đang xử lý...' : 'Chấp nhận'}
+                        </button>
                       ) : requestSent ? (
-                        <div className="flex items-center gap-1.5 text-green-600 bg-green-50 py-2 px-3 rounded-lg border border-green-100">
-                          <Check className="w-4 h-4" />
-                          <span className="text-xs font-bold">Đã gửi</span>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelRequest();
+                          }}
+                          disabled={isProcessing}
+                          className="flex items-center gap-1.5 text-red-600 bg-red-50 hover:bg-red-100 py-2 px-3 rounded-lg border border-red-100 transition-colors disabled:opacity-50"
+                        >
+                          <X className="w-4 h-4" />
+                          <span className="text-xs font-bold">{isProcessing ? 'Đang hủy...' : 'Hủy yêu cầu'}</span>
+                        </button>
                       ) : (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddFriend();
                           }}
-                          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-md shadow-primary-500/20 transition-all"
+                          disabled={isProcessing}
+                          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-md shadow-primary-500/20 transition-all disabled:bg-gray-300"
                         >
                           <UserPlus className="w-4 h-4" />
-                          Kết bạn
+                          {isProcessing ? 'Đang gửi...' : 'Kết bạn'}
                         </button>
                       )}
                     </div>
