@@ -213,6 +213,29 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     fetchStatus();
   }, [fetchStatus]);
 
+  // Socket listener for relationship updates (Real-time)
+  useEffect(() => {
+    if (!normalizedUserId) return;
+
+    const handleRelationshipUpdate = (payload: any) => {
+      // If the update involves the current user and the other participant in this private chat
+      if (activeConversation?.type === "private") {
+        const otherParticipantId = activeConversation.participants?.find(p => String(p.user_id) !== String(normalizedUserId))?.user_id;
+        if (otherParticipantId && 
+            (String(payload.requester_id) === String(otherParticipantId) || 
+             String(payload.receiver_id) === String(otherParticipantId))) {
+          console.log("ChatArea: Relationship status updated via socket:", payload.status);
+          setRelationshipStatus(payload);
+        }
+      }
+    };
+
+    socketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () => {
+      socketService.offRelationshipUpdate(handleRelationshipUpdate);
+    };
+  }, [activeConversation, normalizedUserId]);
+
   const myParticipant = useMemo(() => {
     return conversations.find(
       (item) => item.conversation._id === activeConversation?._id,

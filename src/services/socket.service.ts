@@ -129,6 +129,18 @@ class SocketService {
     }
   }
 
+  onRelationshipUpdate(callback: (relationship: any) => void) {
+    this.socket?.on("cap_nhat_quan_he", callback);
+  }
+
+  offRelationshipUpdate(callback?: (relationship: any) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_quan_he", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_quan_he");
+    }
+  }
+
   onMessageDestroyed(callback: (payload: { msg_id: string; conversation_id: string }) => void) {
     this.socket?.on("tin_nhan_da_xoa", callback);
   }
