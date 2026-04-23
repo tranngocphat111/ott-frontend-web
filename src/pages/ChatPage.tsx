@@ -75,7 +75,8 @@ const AppModal: React.FC<{
 const ChatContent: React.FC = () => {
   const { user: currentUser } = useAuth();
   const { conversations } = useConversations();
-  const normalizedUserId = currentUser?.id;
+  const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
+  const normalizedUserId = rawUser?.id || rawUser?.user_id || rawUser?._id;
 
   useEffect(() => {
     socketService.connect();

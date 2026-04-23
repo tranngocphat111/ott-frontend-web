@@ -77,6 +77,9 @@ export interface MembersFullViewProps {
   onTransferOwnership?: (userId: string) => void;
   onAddMember: () => void;
   onAddFriend: (userId: string) => void;
+  pendingFriendRequestIds?: Set<string>;
+  sentFriendRequestIds?: Set<string>;
+  onFriendAccepted?: (userId: string) => Promise<void>;
 }
 
 export interface StorageViewProps {

@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { ArrowLeft, UserPlus, Crown, MoreHorizontal, UserCheck, X } from "lucide-react";
+import { ArrowLeft, UserPlus, Crown, MoreHorizontal, UserCheck, X, Loader2 } from "lucide-react";
 import Avatar from "../../common/Avatar";
 import { ConfirmModal } from "../../modal/ConfirmModal";
 import type { MembersFullViewProps } from "../../../interfaces";
 import { getFullUrl } from "../../../utils";
+import { acceptFriendRequestViaChat } from "../../../services/social.service";
+import { useToast } from "../../../contexts/ToastContext";
 
 const MembersFullView: React.FC<MembersFullViewProps> = ({
   members,
@@ -17,11 +19,19 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   onTransferOwnership,
   onAddMember,
   onAddFriend,
+  pendingFriendRequestIds,
+  sentFriendRequestIds,
+  onFriendAccepted,
 }) => {
-  const validMembers = (members || []).filter(member => member && member.user_id);
+  // Only show members who have joined (not invited)
+  const validMembers = (members || []).filter(member =>
+    member && member.user_id && member.status !== "invited"
+  );
   const [menuOpenForUserId, setMenuOpenForUserId] = useState<string | null>(null);
   const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState<{ id: string; name: string } | null>(null);
+  const [acceptingFriendId, setAcceptingFriendId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const getDisplayName = (member: (typeof validMembers)[number]) => {
     return (member.nickname || "").trim() || member.name || `User ${member.user_id.slice(-4)}`;
@@ -83,7 +93,7 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
           {validMembers.map((member) => {
             const isMe = member.user_id === currentUserId;
             const isFriend = friendIds.has(member.user_id);
-            
+
             return (
               <div
                 key={member.user_id}
@@ -106,18 +116,17 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
-                      member.user_id === ownerId ? "bg-amber-100 text-amber-700" : 
-                      member.role === "admin" ? "bg-blue-100 text-blue-700" : 
-                      member.status === "invited" ? "bg-orange-100 text-orange-600 border border-orange-200" :
-                      "bg-gray-100 text-gray-600"
-                    }`}>
+                    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${member.user_id === ownerId ? "bg-amber-100 text-amber-700" :
+                      member.role === "admin" ? "bg-blue-100 text-blue-700" :
+                        member.status === "invited" ? "bg-orange-100 text-orange-600 border border-orange-200" :
+                          "bg-gray-100 text-gray-600"
+                      }`}>
                       {member.status === "invited" ? "Lời mời" : getRoleLabel(member)}
                     </span>
                     {member.status === "invited" && (
-                       <span className="text-[10px] text-orange-500 font-medium italic">
-                         • Đang chờ...
-                       </span>
+                      <span className="text-[10px] text-orange-500 font-medium italic">
+                        • Đang chờ...
+                      </span>
                     )}
                     {member.joined_at && member.status !== "invited" && (
                       <span className="text-[11px] text-gray-400">
@@ -128,15 +137,44 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1">
-                  {/* Add Friend Button */}
+                  {/* Add Friend / Accept Friend Request Button */}
                   {!isMe && !isFriend && (
-                    <button
-                      onClick={() => onAddFriend(member.user_id)}
-                      className="cursor-pointer p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                      title="Thêm bạn bè"
-                    >
-                      <UserPlus size={18} />
-                    </button>
+                    pendingFriendRequestIds?.has(member.user_id) ? (
+                      <button
+                        onClick={async () => {
+                          setAcceptingFriendId(member.user_id);
+                          try {
+                            if (onFriendAccepted) {
+                              await onFriendAccepted(member.user_id);
+                            }
+                            showToast("Đã chấp nhận lời mời kết bạn", "success");
+                          } catch {
+                            showToast("Không thể chấp nhận lời mời", "error");
+                          } finally {
+                            setAcceptingFriendId(null);
+                          }
+                        }}
+                        disabled={acceptingFriendId === member.user_id}
+                        className="cursor-pointer flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                        title="Chấp nhận lời mời kết bạn"
+                      >
+                        <UserCheck size={14} />
+                        <span>Đồng ý</span>
+                      </button>
+                    ) : sentFriendRequestIds?.has(member.user_id) ? (
+                      <div className="px-2.5 py-1.5 bg-gray-50 text-gray-400 rounded-lg text-xs font-semibold flex items-center gap-1.5" title="Đã gửi lời mời kết bạn">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Đã mời</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onAddFriend(member.user_id)}
+                        className="cursor-pointer p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        title="Thêm bạn bè"
+                      >
+                        <UserPlus size={18} />
+                      </button>
+                    )
                   )}
                   {isFriend && !isMe && (
                     <div className="w-9" /> // Spacer for alignment

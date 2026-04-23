@@ -73,6 +73,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   // Memory check for dissolved groups in current session to prevent F5 flicker/revert
   const [dissolvedSessionIds, setDissolvedSessionIds] = useState<Set<string>>(new Set());
+  const dissolvedSessionIdsRef = useRef<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDoneRef = useRef<string | null>(null);
@@ -86,12 +87,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   ) => {
     return newConversations
       .filter((newItem) => {
-        // If it was dissolved by current user in this session, filter it out for owner
-        const ownerId = String(newItem.conversation.created_by || "");
-        const isOwner = ownerId === currentUserId ||
-          (user as any)?._id === ownerId ||
-          (user as any)?.user_id === ownerId;
-        return !(isOwner && dissolvedIds.has(newItem.conversation._id));
+        // If it was removed/dissolved by current user in this session, filter it out
+        return !dissolvedIds.has(newItem.conversation._id);
       })
       .map((newItem) => {
         const convId = newItem.conversation._id;
@@ -122,9 +119,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       ).trim();
 
       const nextConversations = typeof value === 'function' ? value(prevRaw) : value;
-      return applyDissolutionLogic(nextConversations, currentUserId, dissolvedSessionIds);
+      return applyDissolutionLogic(nextConversations, currentUserId, dissolvedSessionIdsRef.current);
     });
-  }, [user, dissolvedSessionIds, applyDissolutionLogic]);
+  }, [user, applyDissolutionLogic]);
 
   // Update specific conversation
   const updateConversation = useCallback(
@@ -201,25 +198,46 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   );
 
   const addConversation = useCallback((conversation: Conversation) => {
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = String(rawUser?.id || rawUser?.user_id || rawUser?._id || "").trim();
+
+    // Try to find participant info for current user within the conversation object if populated
+    // Use 'as any' because the structure can vary between Participant and ConversationParticipant types
+    const participantFromConv = Array.isArray(conversation.participants)
+      ? conversation.participants.find((p: any) => String(p.user_id || p._id) === currentUserId)
+      : null;
+
     const newItem: ConversationWithParticipant = {
       conversation,
       participant: {
-        _id: "",
-        user_id: "",
+        _id: (participantFromConv as any)?._id || "",
+        user_id: currentUserId,
         conversation_id: conversation._id,
-        settings: { is_pinned: false, notification_status: "on" },
-        last_read_message_id: "0",
-        last_read_at: new Date().toISOString(),
-        deleted_msg_id: "0",
-        unread_count: 0,
-        joined_at: new Date().toISOString(),
-        roles: "user",
+        settings: {
+          is_pinned: (participantFromConv as any)?.settings?.is_pinned || false,
+          notification_status: (participantFromConv as any)?.settings?.notification_status || "on"
+        },
+        last_read_message_id: (participantFromConv as any)?.last_read_message_id || "0",
+        last_read_at: (participantFromConv as any)?.last_read_at || new Date().toISOString(),
+        deleted_msg_id: (participantFromConv as any)?.deleted_msg_id || "0",
+        unread_count: (participantFromConv as any)?.unread_count || 0,
+        joined_at: (participantFromConv as any)?.joined_at || new Date().toISOString(),
+        roles: (participantFromConv as any)?.roles || (conversation.created_by === currentUserId ? "admin" : "user"),
+        status: (participantFromConv as any)?.status || (conversation.created_by === currentUserId ? "joined" : "invited"),
       },
     };
-    setConversations((prev) => [newItem, ...prev]);
-  }, []);
+
+    setConversations((prev) => {
+      // Avoid duplicates
+      if (prev.some(item => item.conversation._id === conversation._id)) {
+        return prev.map(item => item.conversation._id === conversation._id ? newItem : item);
+      }
+      return [newItem, ...prev];
+    });
+  }, [user, setConversations]);
 
   const removeConversation = useCallback((conversationId: string) => {
+    dissolvedSessionIdsRef.current.add(conversationId);
     setDissolvedSessionIds((prev) => {
       const next = new Set(prev);
       next.add(conversationId);
@@ -228,7 +246,73 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     setConversations((prev) =>
       prev.filter((item) => item.conversation._id !== conversationId),
     );
-  }, []);
+  }, [setConversations]);
+
+  // Refresh Conversations with Optimistic Consistency
+  const refreshConversations = useCallback(async (userId: string) => {
+    try {
+      console.log('🔄 Refreshing conversations for user:', userId);
+      const loadedConversations =
+        await ConversationService.getUserConversations(userId);
+
+      const currentUserId = userId;
+
+      setRawConversations((prev) => {
+        const baseFiltered = applyDissolutionLogic(loadedConversations, currentUserId, dissolvedSessionIds);
+
+        // Merge strategy: Keep optimistic items that might not be in the loaded list yet
+        const merged = [...baseFiltered];
+
+        prev.forEach(prevItem => {
+          const exists = baseFiltered.some(
+            newItem => newItem.conversation._id === prevItem.conversation._id
+          );
+
+          // If it's a group invitation we just added optimistically and it's not in the API yet, keep it
+          // ONLY if it hasn't been explicitly rejected/removed in this session
+          if (!exists && prevItem.participant.status === "invited" && !dissolvedSessionIdsRef.current.has(prevItem.conversation._id)) {
+            console.log('✨ Preserving optimistic invitation during refresh:', prevItem.conversation._id);
+            merged.push(prevItem);
+          }
+        });
+
+        // Map and resolve last_read_message_id as before
+        return merged.map((newItem) => {
+          const convId = newItem.conversation._id;
+          const dbId = newItem.participant.last_read_message_id || "0";
+          const existing = prev.find((p) => p.conversation._id === convId);
+          const inMemId = existing?.participant.last_read_message_id || "0";
+          const lsId = localStorage.getItem(`read_${convId}_${currentUserId}`) || "0";
+
+          const candidates = [dbId, inMemId, lsId].filter((id) => id !== "0");
+
+          if (candidates.length === 0) return newItem;
+
+          const bestId = candidates.reduce(
+            (max, id) => (BigInt(id) > BigInt(max) ? id : max),
+            "0",
+          );
+
+          return BigInt(bestId) > BigInt(dbId) ?
+            {
+              ...newItem,
+              participant: {
+                ...newItem.participant,
+                last_read_message_id: bestId,
+              },
+            }
+            : newItem;
+        }).sort((a, b) => {
+          // Re-sort by updatedAt to ensure new items are at top
+          const timeA = new Date(a.conversation.updatedAt || a.conversation.createdAt).getTime();
+          const timeB = new Date(b.conversation.updatedAt || b.conversation.createdAt).getTime();
+          return timeB - timeA;
+        });
+      });
+    } catch (error) {
+      console.error("Failed to refresh conversations:", error);
+    }
+  }, [dissolvedSessionIds, applyDissolutionLogic]);
 
   // Socket: Xử lý tin nhắn mới real-time
   const handleIncomingMessage = useCallback((message: any) => {
@@ -239,7 +323,16 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const targetIndex = prev.findIndex(
         (item) => item.conversation._id === convId,
       );
-      if (targetIndex === -1) return prev;
+
+      if (targetIndex === -1) {
+        // If conversation not found, trigger a refresh to fetch it
+        const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+        const currentId = rawUser?.id || rawUser?.user_id || rawUser?._id;
+        if (currentId) {
+          refreshConversations(currentId);
+        }
+        return prev;
+      }
 
       const rawContent: string =
         Array.isArray(message.content) ?
@@ -298,7 +391,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       newList.unshift(updated);
       return newList;
     });
-  }, []);
+  }, [user, refreshConversations]);
 
   const handleRevokedMessage = useCallback((payload: any) => {
     const convId = payload.conversation_id?.toString();
@@ -363,6 +456,37 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
+  const handleMemberAdded = useCallback((payload: any) => {
+    const convId = String(payload?.conversation_id || "");
+    if (!convId) return;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.conversation._id !== convId) return item;
+
+        const alreadyExists = item.conversation.participants?.some(
+          (p) => String(p.user_id) === String(payload.user_id)
+        );
+
+        if (alreadyExists) return item;
+
+        return {
+          ...item,
+          conversation: {
+            ...item.conversation,
+            participants: [...(item.conversation.participants || []), payload],
+          },
+        };
+      }),
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("chat:member-added", {
+        detail: { conversationId: convId, participant: payload },
+      }),
+    );
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -376,90 +500,245 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
     socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
 
-    const handleGroupDissolved = (payload: { conversationId?: string }) => {
-      const conversationId = String(payload?.conversationId || "");
-      if (!conversationId) return;
+    return () => {
+      socketService.offNewMessage(handleIncomingMessage);
+      const cleanupSocket = socketService.getSocket();
+      cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
+      cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
+      cleanupSocket?.off("them_nguoi_moi", handleMemberAdded);
+    };
+  }, [handleIncomingMessage, handleRevokedMessage, handleCategoryUpdated, handleMemberAdded, isAuthenticated]);
 
-      const currentUserId = String(
-        (user as { user_id?: string; _id?: string } | null)?.user_id ||
-        (user as { user_id?: string; _id?: string } | null)?._id ||
-        "",
-      ).trim();
+  const handleGroupDissolved = useCallback((payload: any) => {
+    const conversationId = String(payload?.conversationId || "");
+    if (!conversationId) return;
 
+    const currentUserId = String(
+      (user as { user_id?: string; _id?: string } | null)?.user_id ||
+      (user as { user_id?: string; _id?: string } | null)?._id ||
+      "",
+    ).trim();
+
+    // Determine if it should be removed (owner) or just marked as dissolved (member)
+    // Preference: use deleteForOwner from socket payload if available
+    const shouldRemoveCompletely = payload?.deleteForOwner === true;
+
+    if (shouldRemoveCompletely) {
+      dissolvedSessionIdsRef.current.add(conversationId);
       setDissolvedSessionIds((prev) => {
         const next = new Set(prev);
         next.add(conversationId);
         return next;
       });
 
+      setConversations((prev) => prev.filter((c) => c.conversation._id !== conversationId));
+    } else {
+      // For members, we don't add to dissolvedSessionIdsRef (so it's not filtered)
+      // but we update the conversation object to reflect dissolved status
       setConversations((prev) => {
-        const item = prev.find((c) => c.conversation._id === conversationId);
-        if (!item) return prev;
+        const existing = prev.find((c) => c.conversation._id === conversationId);
+        if (!existing) return prev;
 
-        const ownerId = String(item.conversation.created_by || "");
+        // Double check if we are actually the owner just in case
+        const ownerId = String(existing.conversation.created_by || "");
         const isOwner = ownerId === currentUserId ||
           (user as any)?._id === ownerId ||
           (user as any)?.user_id === ownerId;
 
-        if (isOwner) {
-          // Trưởng nhóm: Mất luôn giống mobile
+        if (isOwner && !shouldRemoveCompletely) {
+          // If we found out we are actually owner, remove it
+          dissolvedSessionIdsRef.current.add(conversationId);
+          setDissolvedSessionIds((prevSet) => {
+            const next = new Set(prevSet);
+            next.add(conversationId);
+            return next;
+          });
           return prev.filter((c) => c.conversation._id !== conversationId);
-        } else {
-          // Thành viên: Vẫn còn nhưng bị block
-          return prev.map((c) =>
-            c.conversation._id === conversationId ?
-              { ...c, conversation: { ...c.conversation, status: "dissolved", is_dissolved: true } }
-              : c,
-          );
         }
+
+        return prev.map((c) =>
+          c.conversation._id === conversationId ?
+            {
+              ...c,
+              conversation: {
+                ...c.conversation,
+                status: "dissolved",
+                is_dissolved: true,
+                // Update last message if payload provides it
+                last_message: payload.message ? {
+                  msg_id: c.conversation.last_message?.msg_id || "0",
+                  sender_id: c.conversation.last_message?.sender_id || payload.dissolvedBy || "",
+                  sender_name: c.conversation.last_message?.sender_name || payload.dissolvedByName || "Hệ thống",
+                  content: payload.message,
+                  type: "text",
+                  createdAt: new Date().toISOString()
+                } : c.conversation.last_message
+              }
+            }
+            : c,
+        );
       });
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("chat:conversation-dissolved", {
+        detail: { conversationId },
+      }),
+    );
+  }, [user]);
+
+  const handleNewConversation = useCallback(async (newConv?: any) => {
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = (rawUser?.id || rawUser?.user_id || rawUser?._id || "").trim();
+
+    if (!currentUserId) return;
+
+    console.log("ConversationsContext: Received tao_phong_moi", newConv?._id);
+
+    // Optimistically add to the list to ensure immediate visibility
+    if (newConv) {
+      // Clear from dissolved state if it was previously rejected/removed
+      dissolvedSessionIdsRef.current.delete(newConv._id);
+      setDissolvedSessionIds(prev => {
+        const next = new Set(prev);
+        next.delete(newConv._id);
+        return next;
+      });
+      addConversation(newConv);
+    }
+
+    // Small delay before refresh to allow backend to finish DB transactions
+    setTimeout(() => {
+      refreshConversations(currentUserId);
+    }, 500);
+  }, [user, addConversation, refreshConversations]);
+
+  const handleKickedFromGroup = useCallback((payload: { conversationId?: string }) => {
+    const convId = String(payload?.conversationId || "");
+    if (!convId) return;
+
+    setConversations((prev) => prev.filter((item) => item.conversation._id !== convId));
+
+    window.dispatchEvent(
+      new CustomEvent("chat:kicked-from-group", {
+        detail: { conversationId: convId },
+      }),
+    );
+  }, []);
+
+  const handleMemberRemoved = useCallback((payload: {
+    conversationId?: string;
+    userId?: string;
+  }) => {
+    const convId = String(payload?.conversationId || "");
+    const removedUserId = String(payload?.userId || "");
+    if (!convId || !removedUserId) return;
+
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = String(
+      rawUser?.id || rawUser?.user_id || rawUser?._id || ""
+    );
+
+    if (removedUserId === currentUserId) {
+      setConversations((prev) =>
+        prev.filter((item) => item.conversation._id !== convId),
+      );
 
       window.dispatchEvent(
-        new CustomEvent("chat:conversation-dissolved", {
-          detail: { conversationId },
+        new CustomEvent("chat:kicked-from-group", {
+          detail: { conversationId: convId },
         }),
       );
-    };
+      return;
+    }
 
-    const handleNewConversation = async (newConv?: any) => {
-      const currentUserId = (user as { id?: string } | null);
-      const normalizedUserId = (currentUserId?.id || "").trim();
-      
-      if (!normalizedUserId) return;
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.conversation._id !== convId) return item;
+        if (!item.conversation.participants) return item;
 
-      if (newConv && newConv._id) {
-        // Surgical update: Add new conversation to list if not exists
-        setConversations((prev) => {
-          if (prev.some(c => c.conversation._id === newConv._id)) return prev;
-          
-          const newItem: ConversationWithParticipant = {
-            conversation: newConv,
-            participant: {
-              _id: "",
-              user_id: normalizedUserId,
-              conversation_id: newConv._id,
-              settings: { is_pinned: false, notification_status: "on" },
-              last_read_message_id: "0",
-              last_read_at: new Date().toISOString(),
-              deleted_msg_id: "0",
-              unread_count: 0,
-              joined_at: new Date().toISOString(),
-              roles: "user"
-            }
-          };
-          return [newItem, ...prev];
-        });
-        return;
-      }
+        const updatedParticipants = item.conversation.participants.filter(
+          (p) => String(p.user_id) !== removedUserId,
+        );
 
-      // Fallback for empty payload: ONLY fetch if we have to, but try to avoid list reloads
-      // In this app, tao_phong_moi usually sends the conversation object.
-    };
+        return {
+          ...item,
+          conversation: {
+            ...item.conversation,
+            participants: updatedParticipants,
+          },
+        };
+      }),
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("chat:member-removed", {
+        detail: { conversationId: convId, userId: removedUserId },
+      }),
+    );
+  }, [user]);
+
+
+  const handleMemberLeft = useCallback((payload: {
+    conversationId?: string;
+    userId?: string;
+  }) => {
+    const convId = String(payload?.conversationId || "");
+    const leftUserId = String(payload?.userId || "");
+    if (!convId || !leftUserId) return;
+
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = String(
+      rawUser?.id || rawUser?.user_id || rawUser?._id || ""
+    );
+
+    if (leftUserId === currentUserId) {
+      setConversations((prev) =>
+        prev.filter((item) => item.conversation._id !== convId),
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("chat:kicked-from-group", {
+          detail: { conversationId: convId },
+        }),
+      );
+      return;
+    }
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.conversation._id !== convId) return item;
+        if (!item.conversation.participants) return item;
+
+        const updatedParticipants = item.conversation.participants.filter(
+          (p) => String(p.user_id) !== leftUserId,
+        );
+
+        return {
+          ...item,
+          conversation: {
+            ...item.conversation,
+            participants: updatedParticipants,
+          },
+        };
+      }),
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("chat:member-left", {
+        detail: { conversationId: convId, userId: leftUserId },
+      }),
+    );
+  }, [user]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
     const handleRemoveConversation = (event: Event) => {
       const custom = event as CustomEvent<{ conversationId?: string }>;
       const convId = custom.detail?.conversationId;
       if (convId) {
+        dissolvedSessionIdsRef.current.add(convId);
         setDissolvedSessionIds((prev) => {
           const next = new Set(prev);
           next.add(convId);
@@ -470,131 +749,31 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     };
 
     socketService.onGroupDissolved(handleGroupDissolved);
-
-    window.addEventListener("chat:remove-conversation", handleRemoveConversation);
-
-    const handleKickedFromGroup = (payload: { conversationId?: string }) => {
-      const convId = String(payload?.conversationId || "");
-      if (!convId) return;
-
-      setConversations((prev) => prev.filter((item) => item.conversation._id !== convId));
-
-      window.dispatchEvent(
-        new CustomEvent("chat:kicked-from-group", {
-          detail: { conversationId: convId },
-        }),
-      );
-    };
-
-    const handleMemberRemoved = (payload: {
-      conversationId?: string;
-      userId?: string;
-    }) => {
-      const convId = String(payload?.conversationId || "");
-      const removedUserId = String(payload?.userId || "");
-      if (!convId || !removedUserId) return;
-
-      setConversations((prev) =>
-        prev.map((item) => {
-          if (item.conversation._id !== convId) return item;
-          if (!item.conversation.participants) return item;
-
-          const updatedParticipants = item.conversation.participants.filter(
-            (p) => String(p.user_id) !== removedUserId,
-          );
-
-          return {
-            ...item,
-            conversation: {
-              ...item.conversation,
-              participants: updatedParticipants,
-            },
-          };
-        }),
-      );
-
-      window.dispatchEvent(
-        new CustomEvent("chat:member-removed", {
-          detail: { conversationId: convId, userId: removedUserId },
-        }),
-      );
-    };
-
-    const handleMemberLeft = (payload: {
-      conversationId?: string;
-      userId?: string;
-    }) => {
-      const convId = String(payload?.conversationId || "");
-      const leftUserId = String(payload?.userId || "");
-      if (!convId || !leftUserId) return;
-
-      const currentUserId = String(
-        (user as { id?: string } | null)?.id ||
-        "",
-      );
-
-      if (leftUserId === currentUserId) {
-        setConversations((prev) =>
-          prev.filter((item) => item.conversation._id !== convId),
-        );
-
-        window.dispatchEvent(
-          new CustomEvent("chat:kicked-from-group", {
-            detail: { conversationId: convId },
-          }),
-        );
-        return;
-      }
-
-      setConversations((prev) =>
-        prev.map((item) => {
-          if (item.conversation._id !== convId) return item;
-          if (!item.conversation.participants) return item;
-
-          const updatedParticipants = item.conversation.participants.filter(
-            (p) => String(p.user_id) !== leftUserId,
-          );
-
-          return {
-            ...item,
-            conversation: {
-              ...item.conversation,
-              participants: updatedParticipants,
-            },
-          };
-        }),
-      );
-
-      window.dispatchEvent(
-        new CustomEvent("chat:member-left", {
-          detail: { conversationId: convId, userId: leftUserId },
-        }),
-      );
-    };
-
     socketService.onKickedFromGroup(handleKickedFromGroup);
     socketService.onMemberKicked(handleMemberRemoved);
     socketService.onMemberLeft(handleMemberLeft);
+    socketService.onMemberAdded(handleMemberAdded);
     socketService.onNewConversation(handleNewConversation);
 
-    return () => {
-      socketService.offNewMessage(handleIncomingMessage);
+    window.addEventListener("chat:remove-conversation", handleRemoveConversation);
 
-      const cleanupSocket = socketService.getSocket();
-      cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
-      cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
+    return () => {
       socketService.offGroupDissolved(handleGroupDissolved);
       socketService.offKickedFromGroup(handleKickedFromGroup);
       socketService.offMemberKicked(handleMemberRemoved);
       socketService.offMemberLeft(handleMemberLeft);
+      socketService.offMemberAdded(handleMemberAdded);
       socketService.offNewConversation(handleNewConversation);
+      window.removeEventListener("chat:remove-conversation", handleRemoveConversation);
     };
   }, [
-    handleCategoryUpdated,
-    handleIncomingMessage,
-    handleRevokedMessage,
+    handleGroupDissolved,
+    handleNewConversation,
+    handleKickedFromGroup,
+    handleMemberRemoved,
+    handleMemberLeft,
+    handleMemberAdded,
     isAuthenticated,
-    user,
   ]);
 
 
@@ -631,48 +810,6 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
-  // Refresh Conversations with Optimistic Consistency
-  const refreshConversations = useCallback(async (userId: string) => {
-    try {
-      const loadedConversations =
-        await ConversationService.getUserConversations(userId);
-
-      const currentUserId = userId;
-
-      setRawConversations((prev) => {
-        const baseFiltered = applyDissolutionLogic(loadedConversations, currentUserId, dissolvedSessionIds);
-
-        return baseFiltered.map((newItem) => {
-          const convId = newItem.conversation._id;
-          const dbId = newItem.participant.last_read_message_id || "0";
-          const existing = prev.find((p) => p.conversation._id === convId);
-          const inMemId = existing?.participant.last_read_message_id || "0";
-          const lsId = localStorage.getItem(`read_${convId}_${currentUserId}`) || "0";
-
-          const candidates = [dbId, inMemId, lsId].filter((id) => id !== "0");
-
-          if (candidates.length === 0) return newItem;
-
-          const bestId = candidates.reduce(
-            (max, id) => (BigInt(id) > BigInt(max) ? id : max),
-            "0",
-          );
-
-          return BigInt(bestId) > BigInt(dbId) ?
-            {
-              ...newItem,
-              participant: {
-                ...newItem.participant,
-                last_read_message_id: bestId,
-              },
-            }
-            : newItem;
-        });
-      });
-    } catch (error) {
-      console.error("Failed to refresh conversations:", error);
-    }
-  }, [dissolvedSessionIds, applyDissolutionLogic]);
 
   // Initial Load - Centralized source of truth
   useEffect(() => {
@@ -682,7 +819,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     if (isAuthenticated && currentUserId) {
       // Prevent redundant loads if already done for this user ID
       if (initialLoadDoneRef.current === currentUserId) return;
-      
+
       setLoading(true);
       setError(null);
 

@@ -22,7 +22,10 @@ const GroupMembersList: React.FC<GroupMembersListProps> = ({
   onRoleUpdated,
   onViewAll,
 }) => {
-  const validMembers = (members || []).filter(member => member && member.user_id);
+  // Only show joined members (not invited)
+  const validMembers = (members || []).filter(member => 
+    member && member.user_id && member.status !== "invited"
+  );
   const displayedMembers = validMembers.slice(0, 6);
   const hasMoreMembers = validMembers.length > 6;
 
@@ -44,10 +47,10 @@ const GroupMembersList: React.FC<GroupMembersListProps> = ({
       <div className="space-y-2 mb-3">
         {displayedMembers.map((member) => (
           <div key={member.user_id} className="flex items-center gap-3">
-            <Avatar 
-              src={member.avatar || ""} 
-              name={getDisplayName(member)} 
-              size={32} 
+            <Avatar
+              src={member.avatar || ""}
+              name={getDisplayName(member)}
+              size={32}
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

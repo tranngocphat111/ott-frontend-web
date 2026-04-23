@@ -7,7 +7,6 @@ const UserListSection: React.FC<UserListSectionProps> = ({
   filteredUsers,
   groupedUsers,
   sortedGroups,
-  recentUsers,
   selectedUserIds,
   searchTerm,
   onToggleUser,
@@ -42,24 +41,6 @@ const UserListSection: React.FC<UserListSectionProps> = ({
             </div>
           )}
           <div className="mt-6 border-b border-gray-100" />
-        </div>
-      )}
-      {/* Suggested Friends */}
-      {!searchTerm && recentUsers.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">
-            Gợi ý
-          </h3>
-          <div className="space-y-1">
-            {recentUsers.map((user) => (
-              <UserSelectCard
-                key={user.user_id}
-                user={user}
-                isSelected={selectedUserIds.has(user.user_id)}
-                onToggle={onToggleUser}
-              />
-            ))}
-          </div>
         </div>
       )}
 

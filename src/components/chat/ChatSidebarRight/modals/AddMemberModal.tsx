@@ -26,7 +26,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
     if (isOpen && currentUser?.id) {
       loadUsers();
     }
-  }, [isOpen, currentUser?.id]);
+  }, [isOpen, currentUser?.id, currentMembers]);
 
   // Phone search logic
   useEffect(() => {
@@ -227,11 +227,11 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
             </div>
           )}
 
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Gợi ý từ danh sách bạn bè</h3>
+          {/* <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Gợi ý từ danh sách bạn bè</h3>
           <div className="space-y-1">
             {filteredFriends.length > 0 ? (
               filteredFriends.map((user) => {
-                const userId = user._id || user.user_id;
+                const userId = user.user_id || user._id;
                 if (!userId) return null;
 
                 return (
@@ -258,7 +258,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 <p className="text-sm text-gray-500">Không tìm thấy bạn bè nào</p>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
 
         {/* Footer */}

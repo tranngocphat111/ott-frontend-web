@@ -31,6 +31,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [phoneSearchResult, setPhoneSearchResult] = useState<User | null>(null);
+  const [foundStrangers, setFoundStrangers] = useState<User[]>([]);
   const [isSearchingPhone, setIsSearchingPhone] = useState(false);
 
   // Initialize selectedUsers with preSelectedUserIds when modal opens
@@ -54,8 +55,16 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
         const user = await UserService.getUserByPhone(searchTerm.trim());
         if (user && user.user_id === currentUser?.id) {
           setPhoneSearchResult(null);
-        } else {
+        } else if (user) {
           setPhoneSearchResult(user);
+          setFoundStrangers(prev => {
+            if (!prev.some(u => u.user_id === user.user_id)) {
+              return [...prev, user];
+            }
+            return prev;
+          });
+        } else {
+          setPhoneSearchResult(null);
         }
       } catch (error) {
         console.error('Phone search failed', error);
@@ -100,17 +109,21 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
   const allPotentialUsers = useMemo(() => {
     const list = [...availableUsers];
-    if (phoneSearchResult && !list.some(u => u.user_id === phoneSearchResult.user_id)) {
-      list.push(phoneSearchResult);
-    }
+    foundStrangers.forEach(stranger => {
+      if (!list.some(u => u.user_id === stranger.user_id)) {
+        list.push(stranger);
+      }
+    });
     return list;
-  }, [availableUsers, phoneSearchResult]);
+  }, [availableUsers, foundStrangers]);
 
-  const filteredUsers = allPotentialUsers.filter(user => {
-    const name = user.display_name || user.name || '';
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredUsers = useMemo(() => {
+    return availableUsers.filter(user => {
+      const name = user.display_name || user.name || '';
+      const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    });
+  }, [availableUsers, searchTerm]);
 
   // Group users by first letter
   const groupedUsers = useMemo(() => 
@@ -124,13 +137,14 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     [filteredUsers]
   );
 
-  const sortedGroups = Object.keys(groupedUsers).sort((a, b) => {
-    if (a === '0-9') return 1;
-    if (b === '0-9') return -1;
-    return a.localeCompare(b);
-  });
-
-  const recentUsers = filteredUsers.slice(0, 6);
+  const sortedGroups = useMemo(() => 
+    Object.keys(groupedUsers).sort((a, b) => {
+      if (a === '0-9') return 1;
+      if (b === '0-9') return -1;
+      return a.localeCompare(b);
+    }),
+    [groupedUsers]
+  );
 
 
 
@@ -285,7 +299,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   filteredUsers={filteredUsers}
                   groupedUsers={groupedUsers}
                   sortedGroups={sortedGroups}
-                  recentUsers={recentUsers}
                   selectedUserIds={selectedUsers}
                   searchTerm={searchTerm}
                   onToggleUser={handleToggleUser}

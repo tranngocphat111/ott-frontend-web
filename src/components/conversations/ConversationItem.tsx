@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MessageCircle, Users, Pin } from "lucide-react";
+import { MessageCircle, Users, Pin, Check, X as XIcon } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
 import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
@@ -16,6 +16,7 @@ import {
   getConversationDisplayName,
 } from "../../utils";
 import { EmojiText } from "../chat/EmojiText";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   item,
@@ -24,7 +25,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations, updateParticipant } =
+  const { categories, refreshConversations, updateParticipant, removeConversation } =
     useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -35,6 +36,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const [isProcessingInvitation, setIsProcessingInvitation] = useState(false);
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
     // Find and set current category from participant settings
@@ -91,16 +94,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       lastMsg.sender_id === currentUserId ? "Bạn" : preferredSenderName;
 
     // Các loại tin nhắn hệ thống, bình chọn, cuộc gọi được coi là "thông báo"
-    const isNotification = 
-      msgType.startsWith("system") || 
-      msgType === "poll" || 
+    const isNotification =
+      msgType.startsWith("system") ||
+      msgType === "poll" ||
       msgType.startsWith("call_") ||
       // Fallback: Kiểm tra nội dung bằng regex để nhận diện thông báo hệ thống nếu type bị sai
       /được thêm vào nhóm|đã rời nhóm|đã trở thành bạn bè|đã được bạn thêm vào nhóm|đã đổi tên nhóm|đã xóa nhóm|đã giải tán nhóm/i.test(normalizedContent);
 
     if (isNotification) {
       let displayContent = lastMsg.content || "";
-      
+
       if (msgType === "poll" && !displayContent) {
         displayContent = "[Bình chọn]";
       } else if (msgType.startsWith("call_")) {
@@ -139,6 +142,41 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const unreadCount = Number(participant.unread_count || 0);
   const hasUnreadMessage = !isSelected && unreadCount > 0;
   const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+  const isInvited = participant.status === "invited" && conversation.type === "group";
+
+  const handleAcceptInvitation = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isProcessingInvitation) return;
+    const userId = authUser?.id || currentUserId;
+    if (!userId) return;
+    setIsProcessingInvitation(true);
+    try {
+      await ParticipantService.acceptGroupInvitation(conversation._id, userId);
+      await refreshConversations(userId);
+    } catch (error) {
+      console.error("Error accepting invitation:", error);
+    } finally {
+      setIsProcessingInvitation(false);
+    }
+  };
+
+  const handleRejectInvitation = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isProcessingInvitation) return;
+    const userId = authUser?.id || currentUserId;
+    if (!userId) return;
+    setIsProcessingInvitation(true);
+    try {
+      await ParticipantService.rejectGroupInvitation(conversation._id, userId);
+      // Remove locally so merge logic doesn't bring it back
+      removeConversation(conversation._id);
+      await refreshConversations(userId);
+    } catch (error) {
+      console.error("Error rejecting invitation:", error);
+    } finally {
+      setIsProcessingInvitation(false);
+    }
+  };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -251,8 +289,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     <>
       <div
         className={`
-          relative p-3 rounded-xl cursor-pointer transition-all duration-300
-          mx-2 
+          relative p-3 rounded-xl transition-all duration-300
+          mx-2 ${isInvited ? "cursor-default" : "cursor-pointer"}
           ${
             isSelected
               ? "bg-primary-500/10 shadow-md "
@@ -260,7 +298,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           }
           ${isHovered ? "shadow-lg" : ""}
         `}
-        onClick={onClick}
+        onClick={isInvited ? undefined : onClick}
         onContextMenu={handleContextMenu}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -324,32 +362,54 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {/* Category tag - before message */}
-              {currentCategory && (
-                <PiTagSimpleFill
-                  className="shrink-0"
-                  color={currentCategory.color}
-                />
-              )}
+            {isInvited ? (
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-orange-600 font-medium flex-1 truncate">Bạn được mời vào nhóm này</span>
+                <button
+                  onClick={handleAcceptInvitation}
+                  disabled={isProcessingInvitation}
+                  className="cursor-pointer flex items-center gap-1 px-2.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                >
+                  <Check size={12} />
+                  Đồng ý
+                </button>
+                <button
+                  onClick={handleRejectInvitation}
+                  disabled={isProcessingInvitation}
+                  className="cursor-pointer flex items-center gap-1 px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                >
+                  <XIcon size={12} />
+                  Từ chối
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                {/* Category tag - before message */}
+                {currentCategory && (
+                  <PiTagSimpleFill
+                    className="shrink-0"
+                    color={currentCategory.color}
+                  />
+                )}
 
-              <p
-                className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}
-              >
-                <EmojiText
-                  text={getLatestMessagePreview()}
-                  emojiSize={15}
-                  emojiClassName="inline-block align-[-0.2em] me-1"
-                />
-              </p>
+                <p
+                  className={`text-sm truncate flex-1 select-none ${hasUnreadMessage ? "text-gray-900 font-semibold" : "text-gray-600"}`}
+                >
+                  <EmojiText
+                    text={getLatestMessagePreview()}
+                    emojiSize={15}
+                    emojiClassName="inline-block align-[-0.2em] me-1"
+                  />
+                </p>
 
-              {/* Unread badge */}
-              {hasUnreadMessage && (
-                <div className="min-w-5 h-5 px-1 rounded-full bg-primary-500 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
-                  {unreadLabel}
-                </div>
-              )}
-            </div>
+                {/* Unread badge */}
+                {hasUnreadMessage && (
+                  <div className="min-w-5 h-5 px-1 rounded-full bg-primary-500 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
+                    {unreadLabel}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

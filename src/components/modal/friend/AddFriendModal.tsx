@@ -11,6 +11,7 @@ import {
   cancelFriendRequestViaChat
 } from '../../../services/social.service';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useConversations } from '../../../contexts/ConversationsContext';
 import { socketService } from '../../../services/socket.service';
 import { getFullUrl } from '../../../utils/fileUtils';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +24,7 @@ interface AddFriendModalProps {
 
 const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
   const { user: currentUser } = useAuth();
+  const { refreshConversations } = useConversations();
   const navigate = useNavigate();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchResult, setSearchResult] = useState<User | null>(null);
@@ -127,6 +129,12 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
       const result = await sendFriendRequestViaChat(currentUser.id, searchResult.user_id);
       if (result) {
         setRequestSent(true);
+        // Refresh conversations list so the new private chat appears
+        const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
+        const currentId = rawUser?.id || rawUser?.user_id || rawUser?._id;
+        if (currentId) {
+          refreshConversations(currentId);
+        }
         // Refresh relationship
         const rel = await fetchRelationshipStatusViaChat(currentUser.id, searchResult.user_id);
         setRelationship(rel);
@@ -150,6 +158,11 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
       if (success) {
         setIsAlreadyFriends(true);
         setIsIncomingRequest(false);
+        const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
+        const currentId = rawUser?.id || rawUser?.user_id || rawUser?._id;
+        if (currentId) {
+          refreshConversations(currentId);
+        }
         const rel = await fetchRelationshipStatusViaChat(currentUser!.id, searchResult!.user_id);
         setRelationship(rel);
       }

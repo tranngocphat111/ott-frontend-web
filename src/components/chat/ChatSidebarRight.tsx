@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   X,
   Users,
@@ -105,6 +105,8 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   } | null>(null);
   const [relationship, setRelationship] = useState<any>(null);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [pendingFriendRequestIds, setPendingFriendRequestIds] = useState<Set<string>>(new Set());
+  const [sentFriendRequestIds, setSentFriendRequestIds] = useState<Set<string>>(new Set());
 
   // Helper to safely filter valid messages
   const filterValidMessages = (messages: any[]): Message[] => {
@@ -138,6 +140,11 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         status: member.status || "joined",
       }));
   };
+
+  // Memo for joined members (those who have status "joined")
+  const joinedMembers = useMemo(() =>
+    members.filter(m => m.status === "joined"),
+    [members]);
 
   const filterValidLinkData = (items: any[]): LinkData[] => {
     if (!Array.isArray(items)) return [];
@@ -229,6 +236,30 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       if (currentUser?.id) {
         const friends = await fetchFriends(currentUser.id);
         setFriendIds(new Set(friends.map(f => f.id)));
+
+        // Check pending friend requests for non-friend members
+        const friendIdSet = new Set(friends.map(f => f.id));
+        const nonFriendMembers = mappedMembers.filter(
+          m => m.user_id !== currentUser.id && !friendIdSet.has(m.user_id)
+        );
+        const pendingIds = new Set<string>();
+        const sentIds = new Set<string>();
+        await Promise.all(
+          nonFriendMembers.map(async (m) => {
+            try {
+              const rel = await fetchRelationshipStatusViaChat(currentUser.id!, m.user_id);
+              if (rel && rel.status === 'PENDING') {
+                if (rel.receiver_id === currentUser.id) {
+                  pendingIds.add(m.user_id);
+                } else if (rel.requester_id === currentUser.id) {
+                  sentIds.add(m.user_id);
+                }
+              }
+            } catch { /* ignore */ }
+          })
+        );
+        setPendingFriendRequestIds(pendingIds);
+        setSentFriendRequestIds(sentIds);
       }
 
       // Fetch relationship for private chats
@@ -324,9 +355,28 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       );
     };
 
+    const handleSocketMessageRecalled = (payload: any) => {
+      handleSocketMessageRemoved(payload);
+    };
+
+    const handleSocketRelationshipUpdate = (payload: any) => {
+      if (!isOpen || !currentUser?.id) return;
+
+      // If the update involves the current user
+      if (String(payload.requester_id) === String(currentUser.id) ||
+        String(payload.receiver_id) === String(currentUser.id)) {
+        console.log("ChatSidebarRight: Relationship updated via socket, refreshing data...");
+        loadSidebarData();
+      }
+    };
+
     window.addEventListener(
       "chat:pinned-updated",
       handlePinnedUpdated as EventListener,
+    );
+    window.addEventListener(
+      "chat:member-added",
+      handleMemberUpdated as EventListener,
     );
     window.addEventListener(
       "chat:member-removed",
@@ -341,12 +391,17 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     socketService.onNewMessage(handleSocketNewMessage);
     socketService.onPollUpdate(handleSocketMessageUpdated);
     socketService.onMessageDestroyed(handleSocketMessageRemoved);
-    socketService.onMessageRecalled(handleSocketMessageRemoved);
+    socketService.onMessageRecalled(handleSocketMessageRecalled);
+    socketService.onRelationshipUpdate(handleSocketRelationshipUpdate);
 
     return () => {
       window.removeEventListener(
         "chat:pinned-updated",
         handlePinnedUpdated as EventListener,
+      );
+      window.removeEventListener(
+        "chat:member-added",
+        handleMemberUpdated as EventListener,
       );
       window.removeEventListener(
         "chat:member-removed",
@@ -360,7 +415,8 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       socketService.offNewMessage(handleSocketNewMessage);
       socketService.offPollUpdate(handleSocketMessageUpdated);
       socketService.offMessageDestroyed(handleSocketMessageRemoved);
-      socketService.offMessageRecalled(handleSocketMessageRemoved);
+      socketService.offMessageRecalled(handleSocketMessageRecalled);
+      socketService.offRelationshipUpdate(handleSocketRelationshipUpdate);
     };
   }, [conversation?._id, isOpen, loadSidebarData]);
 
@@ -574,7 +630,9 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   ) => {
     try {
       if (!currentUser?.id || !conversation?._id) return;
-      const userIds = selectedUsers.map((u: User) => u._id || u.user_id);
+      const userIds = selectedUsers
+        .map((u: User) => u.user_id || u._id)
+        .filter(Boolean) as string[];
       const newGroup = await ConversationService.createGroup(
         currentUser.id,
         groupName,
@@ -633,6 +691,30 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     } catch (error) {
       console.error("Error sending friend request:", error);
       showToast("Có lỗi xảy ra khi gửi lời mời kết bạn", "error");
+    }
+  };
+
+  const handleFriendAccepted = async (userId: string) => {
+    try {
+      if (!currentUser?.id) return;
+      // Find the relationship to get its ID
+      const rel = await fetchRelationshipStatusViaChat(currentUser.id, userId);
+      if (rel && rel._id) {
+        const { acceptFriendRequestViaChat } = await import("../../services/social.service");
+        const success = await acceptFriendRequestViaChat(rel._id);
+        if (success) {
+          // Update local state
+          setFriendIds(prev => new Set([...prev, userId]));
+          setPendingFriendRequestIds(prev => {
+            const next = new Set(prev);
+            next.delete(userId);
+            return next;
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error accepting friend request:", error);
+      throw error;
     }
   };
 
@@ -770,7 +852,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               <>
                 <GroupInfoHeader
                   conversation={conversation}
-                  memberCount={members.length}
+                  memberCount={joinedMembers.length}
                   onUpdate={(updates) => updateConversation?.(conversation._id, updates)}
                   isAdmin={isManager}
                   currentUserId={currentUser?.id}
@@ -787,7 +869,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 )}
 
                 {!isSelfConversation && conversation.type === "group" && (
-                  <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={members.length} onClick={handleViewMembers} showIndicator={false} />
+                  <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={joinedMembers.length} onClick={handleViewMembers} showIndicator={false} />
                 )}
 
                 {!isSelfConversation && (conversation.type === "group" || conversation.type === "private") && (
@@ -845,6 +927,9 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               onTransferOwnership={handleTransferOwnership}
               onAddMember={() => setShowAddMemberModal(true)}
               onAddFriend={handleAddFriend}
+              pendingFriendRequestIds={pendingFriendRequestIds}
+              sentFriendRequestIds={sentFriendRequestIds}
+              onFriendAccepted={handleFriendAccepted}
             />
           </div>
         )}

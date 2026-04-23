@@ -165,7 +165,8 @@ const CallPage: React.FC = () => {
   const [isRemoteAvatarBroken, setIsRemoteAvatarBroken] = useState(false);
   const [isMyAvatarBroken, setIsMyAvatarBroken] = useState(false);
 
-  const normalizedUserId = currentUser?.id || "";
+  const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
+  const normalizedUserId = rawUser?.id || rawUser?.user_id || rawUser?._id || "";
   const startedRef = useRef(false);
   const callConnectedAtRef = useRef<number | null>(null);
   const hasEverConnectedRef = useRef(false);

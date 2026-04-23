@@ -213,6 +213,18 @@ class SocketService {
     }
   }
 
+  onMemberAdded(callback: (payload: any) => void) {
+    this.socket?.on("them_nguoi_moi", callback);
+  }
+
+  offMemberAdded(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("them_nguoi_moi", callback);
+    } else {
+      this.socket?.removeAllListeners("them_nguoi_moi");
+    }
+  }
+
   startTyping(conversationId: string, userId: string) {
     this.emitWhenConnected("nguoi_dung_dang_soan_tin_nhan", {
       conversationId,

@@ -56,7 +56,6 @@ export interface UserListSectionProps {
   filteredUsers: User[];
   groupedUsers: Record<string, User[]>;
   sortedGroups: string[];
-  recentUsers: User[];
   selectedUserIds: Set<string>;
   searchTerm: string;
   onToggleUser: (userId: string) => void;
