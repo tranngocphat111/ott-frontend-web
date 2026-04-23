@@ -174,6 +174,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
   const selectedUsersList = allPotentialUsers.filter(u => selectedUsers.has(u.user_id));
 
+  const hasFriendSelected = useMemo(() => {
+    return selectedUsersList.some(u => availableUsers.some(f => f.user_id === u.user_id));
+  }, [selectedUsersList, availableUsers]);
+
   const dataURLtoFile = (dataurl: string, filename: string) => {
     const arr = dataurl.split(',');
     const mime = arr[0].match(/:(.*?);/)?.[1];
@@ -193,6 +197,11 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       return;
     }
     if (selectedUsers.size < 2) {
+      return;
+    }
+
+    if (!hasFriendSelected) {
+      alert('Nhóm phải có ít nhất 1 người là bạn bè');
       return;
     }
 
@@ -317,10 +326,16 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200">
               <div className="text-sm text-gray-500">
                 {selectedUsers.size > 0 && (
-                  <>
-                    {selectedUsers.size} thành viên được chọn
-                    {selectedUsers.size < 2 && <span> (cần tối thiểu 2)</span>}
-                  </>
+                  <div className="flex flex-col">
+                    <span>{selectedUsers.size} thành viên được chọn</span>
+                    <span className="text-xs">
+                      {selectedUsers.size < 2 ? (
+                        "(Cần tối thiểu 2 thành viên)"
+                      ) : !hasFriendSelected ? (
+                        <span className="text-amber-600">(Nhóm phải có ít nhất 1 bạn bè)</span>
+                      ) : null}
+                    </span>
+                  </div>
                 )}
               </div>
               <div className="flex gap-3">
@@ -336,7 +351,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleCreate}
-                  disabled={!groupName.trim() || selectedUsers.size < 2}
+                  disabled={!groupName.trim() || selectedUsers.size < 2 || !hasFriendSelected}
                   className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium
                            hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed
                            transition-colors"
