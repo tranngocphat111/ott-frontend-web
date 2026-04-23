@@ -239,7 +239,16 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const targetIndex = prev.findIndex(
         (item) => item.conversation._id === convId,
       );
-      if (targetIndex === -1) return prev;
+
+      if (targetIndex === -1) {
+        // If conversation not found, trigger a refresh to fetch it
+        const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+        const currentId = rawUser?.id || rawUser?.user_id || rawUser?._id;
+        if (currentId) {
+          refreshConversations(currentId);
+        }
+        return prev;
+      }
 
       const rawContent: string =
         Array.isArray(message.content) ?
@@ -422,8 +431,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     };
 
     const handleNewConversation = async (newConv?: any) => {
-      const currentUserId = (user as { id?: string } | null);
-      const normalizedUserId = (currentUserId?.id || "").trim();
+      const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+      const normalizedUserId = (rawUser?.id || rawUser?.user_id || rawUser?._id || "").trim();
       
       if (!normalizedUserId) return;
 
@@ -528,9 +537,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const leftUserId = String(payload?.userId || "");
       if (!convId || !leftUserId) return;
 
+      const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
       const currentUserId = String(
-        (user as { id?: string } | null)?.id ||
-        "",
+        rawUser?.id || rawUser?.user_id || rawUser?._id || ""
       );
 
       if (leftUserId === currentUserId) {

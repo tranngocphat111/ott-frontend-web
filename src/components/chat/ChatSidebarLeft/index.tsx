@@ -22,7 +22,8 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
   selectedConversationId,
 }) => {
   const { user: currentUser } = useAuth();
-  const normalizedUserId = currentUser?.id;
+  const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
+  const normalizedUserId = rawUser?.id || rawUser?.user_id || rawUser?._id;
   const {
     conversations,
     categories,
@@ -128,7 +129,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       }
     };
     loadUsers();
-  }, [normalizedUserId, currentUser?.id]);
+  }, [normalizedUserId]);
 
   useEffect(() => {
     let filtered = conversations;
