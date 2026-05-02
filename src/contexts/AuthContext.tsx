@@ -62,6 +62,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  useEffect(() => {
+    // Dynamically import to avoid circular dependency if any
+    import('../services/socket.service').then(({ socketService }) => {
+      const handleUserInfoUpdated = (payload: {
+        userId: string;
+        fullName?: string;
+        avatarUrl?: string;
+        coverUrl?: string;
+        bio?: string;
+      }) => {
+        setUser((prevUser) => {
+          if (prevUser && prevUser.id === payload.userId) {
+             return {
+                ...prevUser,
+                fullName: payload.fullName ?? prevUser.fullName,
+                avatarUrl: payload.avatarUrl ?? prevUser.avatarUrl,
+                coverUrl: payload.coverUrl ?? prevUser.coverUrl,
+                bio: payload.bio ?? prevUser.bio
+             };
+          }
+          return prevUser;
+        });
+      };
+
+      socketService.onUserInfoUpdated(handleUserInfoUpdated);
+
+      return () => {
+        socketService.offUserInfoUpdated(handleUserInfoUpdated);
+      };
+    });
+  }, []);
+
   const login = async (identifier: string, password: string, otpCode?: string) => {
     try {
       const response = await authApi.localLogin({ identifier, password, otpCode });

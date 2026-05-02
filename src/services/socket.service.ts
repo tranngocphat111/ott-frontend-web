@@ -573,6 +573,27 @@ class SocketService {
       this.socket?.removeAllListeners("tin_nhan_doc");
     }
   }
+
+  /** User Info Synchronization */
+  onUserInfoUpdated(
+    callback: (payload: {
+      userId: string;
+      fullName?: string;
+      avatarUrl?: string;
+      coverUrl?: string;
+      bio?: string;
+    }) => void,
+  ) {
+    this.socket?.on("cap_nhat_thong_tin_ca_nhan", callback);
+  }
+
+  offUserInfoUpdated(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_thong_tin_ca_nhan", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_thong_tin_ca_nhan");
+    }
+  }
 }
 
 console.log("🚀 SocketService V2.0.1 Loaded");

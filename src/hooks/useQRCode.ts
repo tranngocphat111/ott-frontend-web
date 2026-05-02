@@ -3,6 +3,7 @@ import { qrApi } from '../services/api/qr.api';
 import { QrCodeStatus } from '../types/enums';
 import type { ApiError, QrCodeResponse, QrStatusResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import { API_CONFIG } from '../config/api';
 
 export const useQRCode = () => {
   const { showToast } = useToast();
@@ -12,14 +13,12 @@ export const useQRCode = () => {
   const [qrCode, setQrCode] = useState<QrCodeResponse | null>(null);
   const [qrStatus, setQrStatus] = useState<QrStatusResponse | null>(null);
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isPollingRef = useRef<boolean>(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const stopPolling = useCallback(() => {
-    isPollingRef.current = false;
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+  const closeWebSocket = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
     }
   }, []);
 
@@ -32,14 +31,13 @@ export const useQRCode = () => {
         return response.result;
       }
     } catch (err) {
-      // Vẫn giữ nguyên: Không hiện Toast khi polling lỗi mạng để tránh spam
       console.error('Lỗi khi kiểm tra trạng thái QR:', err);
     }
     return null;
   }, []);
 
   const generateQRCode = useCallback(async () => {
-    stopPolling();
+    closeWebSocket();
     setLoading(true);
     setError('');
     setQrStatus(null);
@@ -58,63 +56,65 @@ export const useQRCode = () => {
       const errorMessage = apiError.message || 'Không thể tạo mã QR. Vui lòng kiểm tra lại kết nối.';
 
       setError(errorMessage);
-      showToast(errorMessage, 'error', 'Lỗi tạo QR'); // Sử dụng custom toast
+      showToast(errorMessage, 'error', 'Lỗi tạo QR'); 
 
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [stopPolling, showToast]);
+  }, [closeWebSocket, showToast]);
 
   const cancelQRCode = useCallback(async (qrId: string) => {
-    stopPolling();
+    closeWebSocket();
     try {
       await qrApi.cancelQrCode(qrId);
-      showToast('Đã hủy mã QR thành công', 'success'); // Sử dụng custom toast
+      showToast('Đã hủy mã QR thành công', 'success'); 
     } catch (err) {
       const apiError = err as ApiError;
       const errorMessage = apiError.message || 'Lỗi hệ thống: Không thể hủy mã QR lúc này.';
 
-      showToast(errorMessage, 'error', 'Hủy thất bại'); // Sử dụng custom toast
+      showToast(errorMessage, 'error', 'Hủy thất bại'); 
       console.error('Cancel QR code error:', err);
     } finally {
       setQrCode(null);
       setQrStatus(null);
     }
-  }, [stopPolling, showToast]);
+  }, [closeWebSocket, showToast]);
 
-  // Auto polling
   useEffect(() => {
     if (!qrCode?.qrId) return;
 
-    isPollingRef.current = true;
+    const wsUrl = API_CONFIG.BASE_URL.replace(/^http/, 'ws') + `/auth/ws/qr?qrId=${qrCode.qrId}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
-    const poll = async () => {
-      if (!isPollingRef.current) return;
+    ws.onmessage = (event) => {
+      try {
+        const status = JSON.parse(event.data) as QrStatusResponse;
+        setQrStatus(status);
 
-      const status = await checkQRStatus(qrCode.qrId);
-
-      if (status) {
         if (status.status === QrCodeStatus.CONFIRMED) {
           showToast('Giao dịch thành công!', 'success');
-          stopPolling();
+          closeWebSocket();
         } else if (status.status === QrCodeStatus.EXPIRED) {
           showToast('Mã QR đã hết hạn. Vui lòng tạo mã mới.', 'warning');
-          stopPolling();
+          closeWebSocket();
         } else if (status.status === QrCodeStatus.CANCELLED) {
-          stopPolling();
-        } else if (isPollingRef.current) {
-          timeoutRef.current = setTimeout(poll, 2000);
+          closeWebSocket();
         }
-      } else if (isPollingRef.current) {
-        timeoutRef.current = setTimeout(poll, 2000);
+      } catch (err) {
+        console.error('Lỗi khi phân tích dữ liệu WebSocket:', err);
       }
     };
 
-    poll();
+    ws.onerror = (error) => {
+      console.error('Lỗi WebSocket QR Code:', error);
+      // Fallback to polling or single check on error if needed
+      checkQRStatus(qrCode.qrId);
+    };
 
-    return () => stopPolling();
-  }, [qrCode?.qrId, checkQRStatus, stopPolling, showToast]);
+    return () => closeWebSocket();
+  }, [qrCode?.qrId, closeWebSocket, showToast, checkQRStatus]);
 
   return {
     qrCode,
