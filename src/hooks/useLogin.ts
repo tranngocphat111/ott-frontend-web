@@ -8,12 +8,12 @@ export type PhoneLoginStep = 'credentials' | '2fa';
 
 export interface UsePhoneLoginReturn {
   step: PhoneLoginStep;
-  phone: string;
+  identifier: string;
   password: string;
   otpCode: string;
   loading: boolean;
   tempToken: string;
-  setPhone: (v: string) => void;
+  setIdentifier: (v: string) => void;
   setPassword: (v: string) => void;
   setOtpCode: (v: string) => void;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
@@ -29,7 +29,7 @@ export const usePhoneLogin = (onSuccess: () => void): UsePhoneLoginReturn => {
   const { showToast } = useToast();
 
   const [step, setStep] = useState<PhoneLoginStep>('credentials');
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,14 +38,14 @@ export const usePhoneLogin = (onSuccess: () => void): UsePhoneLoginReturn => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !password) {
-      showToast('Vui lòng nhập đầy đủ số điện thoại và mật khẩu', 'warning', 'Thiếu thông tin');
+    if (!identifier || !password) {
+      showToast('Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu', 'warning', 'Thiếu thông tin');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await login(phone, password);
+      const result = await login(identifier, password);
       if (result.requires2FA && result.tempToken) {
         setTempToken(result.tempToken);
         setStep('2fa');
@@ -88,7 +88,7 @@ export const usePhoneLogin = (onSuccess: () => void): UsePhoneLoginReturn => {
   const handleResendOTP = async () => {
     setLoading(true);
     try {
-      await request2FAOtp(phone);
+      await request2FAOtp(identifier);
       showToast(SUCCESS_MESSAGES.OTP_RESENT, 'success', 'Đã gửi lại');
       setOtpCode('');
     } catch (err: unknown) {
@@ -105,8 +105,8 @@ export const usePhoneLogin = (onSuccess: () => void): UsePhoneLoginReturn => {
   };
 
   return {
-    step, phone, password, otpCode, loading, tempToken,
-    setPhone, setPassword, setOtpCode, handleSubmit,
+    step, identifier, password, otpCode, loading, tempToken,
+    setIdentifier, setPassword, setOtpCode, handleSubmit,
     handleVerify2FA, handleResendOTP, backToCredentials,
     use2FABackupCode, setUse2FABackupCode,
   };

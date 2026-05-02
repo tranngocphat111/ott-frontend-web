@@ -27,8 +27,6 @@ export const useSessions = () => {
         }
       }
     } catch (err: unknown) {
-      // Chỉ hiển thị lỗi tải nếu thực sự là lỗi từ server/mạng, 
-      // không phải do danh sách trống
       showToast(getErrorMessage(err), 'error', 'Lỗi kết nối');
     } finally {
       setIsLoading(false);
@@ -41,6 +39,7 @@ export const useSessions = () => {
       await sessionApi.revokeSession(sessionId);
       showToast('Đã đăng xuất thiết bị thành công', 'success');
       await fetchSessions();
+      
       return true;
     } catch (err: unknown) {
       showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất thiết bị');

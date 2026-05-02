@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Phone, Lock, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, ShieldCheck } from 'lucide-react';
 import { SubmitBtn, OtpInput, BackBtn } from './LoginFormParts';
 import { usePhoneLogin } from '../../hooks/useLogin';
 
@@ -8,7 +8,7 @@ interface Props { onSuccess: () => void; }
 export const PhoneLoginForm: React.FC<Props> = ({ onSuccess }) => {
   const {
     step,
-    phone, setPhone,
+    identifier, setIdentifier,
     password, setPassword,
     otpCode, setOtpCode,
     loading,
@@ -114,10 +114,10 @@ export const PhoneLoginForm: React.FC<Props> = ({ onSuccess }) => {
   /* ── Credentials step ── */
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <FormField label="Số điện thoại" icon={<Phone size={15} />}>
+      <FormField label="Số điện thoại hoặc Email" icon={<User size={15} />}>
         <input
-          type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-          placeholder="0123 456 789" required
+          type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
+          placeholder="0123 456 789 hoặc email@example.com" required
           className="focus-ring transition-base" style={inputStyle}
         />
       </FormField>

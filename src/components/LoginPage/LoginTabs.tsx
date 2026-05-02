@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, Mail, QrCode } from 'lucide-react';
+import { User, Mail, QrCode } from 'lucide-react';
 
 interface LoginTabsProps {
   activeTab: 'phone' | 'email' | 'qr';
@@ -7,7 +7,7 @@ interface LoginTabsProps {
 }
 
 const TABS = [
-  { id: 'phone' as const, label: 'Số điện thoại', icon: Phone },
+  { id: 'phone' as const, label: 'Tài khoản',  icon: User },
   { id: 'email' as const, label: 'Email OTP',     icon: Mail  },
   { id: 'qr'    as const, label: 'QR Code',        icon: QrCode },
 ];

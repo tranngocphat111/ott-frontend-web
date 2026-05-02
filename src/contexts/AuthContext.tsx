@@ -7,9 +7,9 @@ interface AuthContextType {
   user: UserProfileResponse | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (phone: string, password: string, otpCode?: string) => Promise<{ requires2FA?: boolean; tempToken?: string; requiresPhoneSetup?: boolean; authenticated?: boolean }>;
+  login: (identifier: string, password: string, otpCode?: string) => Promise<{ requires2FA?: boolean; tempToken?: string; requiresPhoneSetup?: boolean; authenticated?: boolean }>;
   verify2FA: (tempToken: string, otpCode: string, isBackupCode: boolean) => Promise<{ authenticated: boolean }>;
-  request2FAOtp: (phone: string) => Promise<void>;
+  request2FAOtp: (identifier: string) => Promise<void>;
   loginWithToken: (token: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (phone: string, email: string, password: string, fullName: string, otp: string) => Promise<void>;
@@ -62,9 +62,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const login = async (phone: string, password: string, otpCode?: string) => {
+  const login = async (identifier: string, password: string, otpCode?: string) => {
     try {
-      const response = await authApi.localLogin({ phone, password, otpCode });
+      const response = await authApi.localLogin({ identifier, password, otpCode });
       if (response.result) {
         if (response.result.requires2FA && response.result.tempToken) {
           return { requires2FA: true, tempToken: response.result.tempToken, authenticated: false };
@@ -99,11 +99,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const request2FAOtp = async (phone: string) => {
+  const request2FAOtp = async (identifier: string) => {
     console.log('AuthContext: Requesting 2FA OTP resend');
 
     const response = await authApi.request2FAOtp({
-      phone,
+      identifier,
     });
 
     if (!response.result) {
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (response.result) {
       console.log('AuthContext: Registration successful, auto-logging in');
-      await login(phone, password);
+      await login(phone, password); // Dùng phone khi đăng ký vì đăng ký yêu cầu phone
     }
   };
 
