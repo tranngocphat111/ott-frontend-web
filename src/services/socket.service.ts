@@ -141,6 +141,18 @@ class SocketService {
     }
   }
 
+  onForceLogout(callback: (payload: { action: string; deviceId?: string; revokedDeviceIds?: string[] }) => void) {
+    this.socket?.on("buoc_dang_xuat", callback);
+  }
+
+  offForceLogout(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("buoc_dang_xuat", callback);
+    } else {
+      this.socket?.removeAllListeners("buoc_dang_xuat");
+    }
+  }
+
   onMessageDestroyed(callback: (payload: { msg_id: string; conversation_id: string }) => void) {
     this.socket?.on("tin_nhan_da_xoa", callback);
   }

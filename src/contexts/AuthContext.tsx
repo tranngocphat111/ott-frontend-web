@@ -63,36 +63,79 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Dynamically import to avoid circular dependency if any
+    if (!isAuthenticated || !user?.id) return;
+
+    let socketServiceRef: any = null;
+
+    const handleUserInfoUpdated = (payload: {
+      userId: string;
+      fullName?: string;
+      avatarUrl?: string;
+      coverUrl?: string;
+      bio?: string;
+    }) => {
+      setUser((prevUser) => {
+        if (prevUser && prevUser.id === payload.userId) {
+           return {
+              ...prevUser,
+              fullName: payload.fullName ?? prevUser.fullName,
+              avatarUrl: payload.avatarUrl ?? prevUser.avatarUrl,
+              coverUrl: payload.coverUrl ?? prevUser.coverUrl,
+              bio: payload.bio ?? prevUser.bio
+           };
+        }
+        return prevUser;
+      });
+    };
+
+    const handleForceLogout = (payload: { action: string; deviceId?: string; revokedDeviceIds?: string[] }) => {
+      console.log('AuthContext: Received buoc_dang_xuat event', payload);
+      const { action } = payload;
+      const myDeviceId = localStorage.getItem('deviceId');
+
+      if (action === 'ALL') {
+         clearLocalSession();
+         window.dispatchEvent(new Event('auth:logout'));
+         window.location.href = '/login';
+      } else if (action === 'SPECIFIC' && payload.deviceId && myDeviceId === payload.deviceId) {
+         clearLocalSession();
+         window.dispatchEvent(new Event('auth:logout'));
+         window.location.href = '/login';
+      } else if (action === 'OTHERS' && myDeviceId && payload.revokedDeviceIds?.includes(myDeviceId)) {
+         clearLocalSession();
+         window.dispatchEvent(new Event('auth:logout'));
+         window.location.href = '/login';
+      } else if (action === 'SPECIFIC' || action === 'OTHERS') {
+         fetchUser().catch(() => {
+            window.dispatchEvent(new Event('auth:logout'));
+            window.location.href = '/login';
+         });
+      }
+    };
+
     import('../services/socket.service').then(({ socketService }) => {
-      const handleUserInfoUpdated = (payload: {
-        userId: string;
-        fullName?: string;
-        avatarUrl?: string;
-        coverUrl?: string;
-        bio?: string;
-      }) => {
-        setUser((prevUser) => {
-          if (prevUser && prevUser.id === payload.userId) {
-             return {
-                ...prevUser,
-                fullName: payload.fullName ?? prevUser.fullName,
-                avatarUrl: payload.avatarUrl ?? prevUser.avatarUrl,
-                coverUrl: payload.coverUrl ?? prevUser.coverUrl,
-                bio: payload.bio ?? prevUser.bio
-             };
-          }
-          return prevUser;
-        });
-      };
+      socketServiceRef = socketService;
+      
+      socketService.connect();
+      socketService.joinUserRoom(user.id);
 
       socketService.onUserInfoUpdated(handleUserInfoUpdated);
-
-      return () => {
-        socketService.offUserInfoUpdated(handleUserInfoUpdated);
-      };
+      socketService.onForceLogout(handleForceLogout);
     });
-  }, []);
+
+    return () => {
+      if (socketServiceRef) {
+        socketServiceRef.offUserInfoUpdated(handleUserInfoUpdated);
+        socketServiceRef.offForceLogout(handleForceLogout);
+      }
+    };
+  }, [isAuthenticated, user?.id]);
+
+  const clearLocalSession = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    setUser(null);
+  };
 
   const login = async (identifier: string, password: string, otpCode?: string) => {
     try {
@@ -192,9 +235,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('AuthContext: Logout error:', error);
     } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setUser(null);
+      clearLocalSession();
       console.log('AuthContext: Logout completed, tokens cleared');
     }
   };

@@ -85,35 +85,60 @@ export const useQRCode = () => {
     if (!qrCode?.qrId) return;
 
     const wsUrl = API_CONFIG.BASE_URL.replace(/^http/, 'ws') + `/auth/ws/qr?qrId=${qrCode.qrId}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let isFinished = false;
+    let reconnectTimeout: ReturnType<typeof setTimeout>;
 
-    ws.onmessage = (event) => {
-      try {
-        const status = JSON.parse(event.data) as QrStatusResponse;
-        setQrStatus(status);
+    const connectWebSocket = () => {
+      if (isFinished) return;
 
-        if (status.status === QrCodeStatus.CONFIRMED) {
-          showToast('Giao dịch thành công!', 'success');
-          closeWebSocket();
-        } else if (status.status === QrCodeStatus.EXPIRED) {
-          showToast('Mã QR đã hết hạn. Vui lòng tạo mã mới.', 'warning');
-          closeWebSocket();
-        } else if (status.status === QrCodeStatus.CANCELLED) {
-          closeWebSocket();
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        if (isFinished) return;
+        try {
+          const status = JSON.parse(event.data) as QrStatusResponse;
+          setQrStatus(status);
+
+          if (status.status === QrCodeStatus.CONFIRMED) {
+            isFinished = true;
+            showToast('Giao dịch thành công!', 'success');
+            closeWebSocket();
+          } else if (status.status === QrCodeStatus.EXPIRED) {
+            isFinished = true;
+            showToast('Mã QR đã hết hạn. Vui lòng tạo mã mới.', 'warning');
+            closeWebSocket();
+          } else if (status.status === QrCodeStatus.CANCELLED) {
+            isFinished = true;
+            closeWebSocket();
+          }
+        } catch (err) {
+          console.error('Lỗi khi phân tích dữ liệu WebSocket:', err);
         }
-      } catch (err) {
-        console.error('Lỗi khi phân tích dữ liệu WebSocket:', err);
-      }
+      };
+
+      ws.onclose = () => {
+        if (!isFinished) {
+          // Reconnect logic if dropped unexpectedly
+          reconnectTimeout = setTimeout(() => {
+            checkQRStatus(qrCode.qrId); // Check status in case we missed it while disconnected
+            connectWebSocket();
+          }, 2000);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('Lỗi WebSocket QR Code:', error);
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error('Lỗi WebSocket QR Code:', error);
-      // Fallback to polling or single check on error if needed
-      checkQRStatus(qrCode.qrId);
-    };
+    connectWebSocket();
 
-    return () => closeWebSocket();
+    return () => {
+      isFinished = true;
+      clearTimeout(reconnectTimeout);
+      closeWebSocket();
+    };
   }, [qrCode?.qrId, closeWebSocket, showToast, checkQRStatus]);
 
   return {
