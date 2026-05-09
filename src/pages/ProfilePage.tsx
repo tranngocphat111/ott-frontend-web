@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSessions } from '../hooks/useSessions';
+import { useProfile } from '../hooks/useProfile';
 import { ProfileHeader } from '../components/ProfilePage/ProfileHeader';
 import { EditProfileForm } from '../components/ProfilePage/EditProfileForm';
 import { SecuritySettings } from '../components/ProfilePage/SecuritySettings';
@@ -20,7 +21,8 @@ type TabId = typeof TABS[number]['id'];
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile: updateProfileLocal } = useAuth();
+  const { updateProfile: updateProfileApi } = useProfile();
   const { sessions, revokeSession, revokeAllOtherSessions, revokeAllSessions } = useSessions();
   const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('info');
@@ -34,8 +36,12 @@ const ProfilePage: React.FC = () => {
   if (!user) return null;
 
   const handleUpdateProfile = async (data: UpdateProfileRequest) => {
-    try { await updateProfile(data); setShowEdit(false); }
-    catch (e) { console.error(e); }
+    try {
+      const ok = await updateProfileApi(data);
+      if (ok) setShowEdit(false);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   if (!minLoadDone) return <LoadingScreen message="Đang tải" />;
@@ -72,8 +78,7 @@ const ProfilePage: React.FC = () => {
         <ProfileHeader
           user={user}
           onProfileUpdate={(updatedProfile) => {
-
-            updateProfile(updatedProfile); 
+            updateProfileLocal(updatedProfile);
           }}
         />
 
@@ -136,6 +141,9 @@ const ProfilePage: React.FC = () => {
                   <InfoRow label="Số điện thoại" value={user.phone} verified={user.isPhoneVerified} />
                   <InfoRow label="Email" value={user.email} verified={user.isEmailVerified} />
                   <InfoRow label="Giới thiệu" value={user.bio || undefined} />
+                  <InfoRow label="Công việc" value={user.work || undefined} />
+                  <InfoRow label="Địa điểm" value={user.location || undefined} />
+                  <InfoRow label="Tình trạng quan hệ" value={user.relationshipStatus || undefined} />
                   <InfoRow label="Ngày sinh" value={user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN') : undefined} />
                   <InfoRow label="Giới tính" value={user.gender === 'MALE' ? 'Nam' : user.gender === 'FEMALE' ? 'Nữ' : 'Khác'} />
                   <InfoRow label="Ngày tham gia" value={new Date(user.createdAt).toLocaleDateString('vi-VN')} />

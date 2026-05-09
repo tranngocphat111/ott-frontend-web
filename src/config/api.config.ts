@@ -6,11 +6,11 @@
 const AWS_S3_BUCKET_NAME = "riff-storage-iuh";
 const AWS_REGION = "ap-southeast-1";
 
-const BASE_GATEWAY_URL = import.meta.env.VITE_API_URL || "http://192.168.5.124:8080/riff/api";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://192.168.5.124:8080/riff/api";
 
-export const API_CHAT_SERVER_URL = `${BASE_GATEWAY_URL}/chat`;
-export const SOCKET_CHAT_SERVER_URL = BASE_GATEWAY_URL.replace("/riff/api", "");
-export const API_MEDIA_SERVER_URL = `${BASE_GATEWAY_URL}/media`;
+export const API_CHAT_SERVER_URL = `${API_BASE_URL}/chat`;
+export const SOCKET_CHAT_SERVER_URL = API_BASE_URL.replace("/riff/api", "");
+export const API_MEDIA_SERVER_URL = `${API_BASE_URL}/media`;
 export const SOCKET_RELATIONSHIP_SERVER_URL = import.meta.env.VITE_RELATIONSHIP_SOCKET_URL;
 export const SOCKET_MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SOCKET_URL;
 

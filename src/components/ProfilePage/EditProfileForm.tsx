@@ -4,7 +4,15 @@ import type { UserProfileResponse, Gender } from '../../types';
 
 interface Props {
   user: UserProfileResponse;
-  onSave: (data: { fullName?: string; bio?: string; dateOfBirth?: string; gender?: Gender }) => Promise<void>;
+  onSave: (data: {
+    fullName?: string;
+    bio?: string;
+    work?: string;
+    location?: string;
+    relationshipStatus?: string;
+    dateOfBirth?: string;
+    gender?: Gender;
+  }) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -19,6 +27,9 @@ export const EditProfileForm: React.FC<Props> = ({ user, onSave, onCancel }) => 
   const [form, setForm] = useState({
     fullName: user.fullName || '',
     bio: user.bio || '',
+    work: user.work || '',
+    location: user.location || '',
+    relationshipStatus: user.relationshipStatus || '',
     dateOfBirth: user.dateOfBirth || '',
     gender: (user.gender || 'OTHER') as Gender,
   });
@@ -89,6 +100,43 @@ export const EditProfileForm: React.FC<Props> = ({ user, onSave, onCancel }) => 
                 placeholder="Viết vài dòng về bạn..."
                 className="focus-ring transition-base"
                 style={{ ...fieldStyle, resize: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, color: 'var(--color-primary-700)' }}>Công việc</label>
+                <input
+                  type="text"
+                  value={form.work}
+                  onChange={e => setForm(f => ({ ...f, work: e.target.value }))}
+                  placeholder="VD: Kỹ sư phần mềm"
+                  className="focus-ring transition-base"
+                  style={fieldStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, color: 'var(--color-primary-700)' }}>Địa điểm</label>
+                <input
+                  type="text"
+                  value={form.location}
+                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                  placeholder="VD: TP. HCM"
+                  className="focus-ring transition-base"
+                  style={fieldStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, color: 'var(--color-primary-700)' }}>Tình trạng quan hệ</label>
+              <input
+                type="text"
+                value={form.relationshipStatus}
+                onChange={e => setForm(f => ({ ...f, relationshipStatus: e.target.value }))}
+                placeholder="VD: Độc thân"
+                className="focus-ring transition-base"
+                style={fieldStyle}
               />
             </div>
 

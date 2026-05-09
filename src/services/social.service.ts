@@ -4,7 +4,7 @@
  * Bài post → xem post.service.ts
  */
 
-import { API_MEDIA_SERVER_URL, API_CHAT_SERVER_URL } from "../config/api.config";
+import { API_MEDIA_SERVER_URL, API_CHAT_SERVER_URL, API_BASE_URL } from "../config/api.config";
 import { authFetch } from "./api/fetchClient";
 
 /* ─── Raw shape trả về từ backend ────────────────────── */
@@ -20,6 +20,30 @@ export interface ApiUser {
     location: string | null;
     relationshipStatus: string | null;
 }
+
+type ApiEnvelope<T> = { result?: T; message?: string };
+
+type UserServiceProfile = {
+    bio?: string | null;
+    work?: string | null;
+    location?: string | null;
+    relationshipStatus?: string | null;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+};
+
+type PresignedUrlResponse = {
+    uploadUrl: string;
+    fileUrl: string;
+    s3Key: string;
+    contentType?: string | null;
+};
+
+const unwrapApiResult = <T,>(payload: unknown): T | null => {
+    if (!payload || typeof payload !== "object") return null;
+    if ("result" in payload) return (payload as ApiEnvelope<T>).result ?? null;
+    return payload as T;
+};
 export interface RelationshipResponse {
     id: string;
     requesterId: string;
@@ -316,11 +340,11 @@ export async function unfriendViaChat(
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/unfriend`,
-            { 
-                method: "POST", 
+            {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId, friendId }),
-                signal: AbortSignal.timeout(5_000) 
+                signal: AbortSignal.timeout(5_000)
             },
         );
         return res.ok;
@@ -370,11 +394,11 @@ export async function sendFriendRequestViaChat(
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/send`,
-            { 
-                method: "POST", 
+            {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ requesterId, receiverId }),
-                signal: AbortSignal.timeout(5_000) 
+                signal: AbortSignal.timeout(5_000)
             },
         );
         if (!res.ok) throw new Error("Gửi kết bạn qua Chat thất bại.")
@@ -393,6 +417,64 @@ export interface UserProfile {
     relationship: string;
 }
 
+export interface UserProfileUpdateResult {
+    bio: string | null;
+    work: string | null;
+    location: string | null;
+    relationshipStatus: string | null;
+}
+
+const requestPresignedUrl = async (
+    filename: string,
+    type: "AVATAR" | "COVER",
+): Promise<PresignedUrlResponse | null> => {
+    const res = await authFetch(
+        `${API_BASE_URL}/users/photos/presigned-url?filename=${encodeURIComponent(filename)}&type=${type}`,
+        { signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return unwrapApiResult<PresignedUrlResponse>(json);
+};
+
+const uploadToS3 = async (uploadUrl: string, file: File, contentType?: string | null) => {
+    const resolvedType = contentType || file.type || "application/octet-stream";
+    const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": resolvedType },
+        body: file,
+    });
+    if (!putRes.ok) {
+        throw new Error(`Upload failed (${putRes.status})`);
+    }
+};
+
+const updateUserPhoto = async (
+    type: "AVATAR" | "COVER",
+    file: File,
+): Promise<UserServiceProfile | null> => {
+    const presigned = await requestPresignedUrl(file.name, type);
+    if (!presigned) return null;
+
+    await uploadToS3(presigned.uploadUrl, file, presigned.contentType);
+
+    const endpoint = type === "AVATAR" ? "avatar" : "cover";
+    const res = await authFetch(`${API_BASE_URL}/users/photos/${endpoint}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            fileUrl: presigned.fileUrl,
+            s3Key: presigned.s3Key,
+            photoType: type,
+        }),
+        signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!res.ok) return null;
+    const json = await res.json();
+    return unwrapApiResult<UserServiceProfile>(json);
+};
+
 /**
  * Upload avatar via multipart PATCH /users/{id}/avatar.
  * Falls back silently if the backend endpoint is not yet available.
@@ -402,17 +484,10 @@ export async function uploadUserAvatar(
     userId: string,
     file: File,
 ): Promise<string | null> {
+    if (!userId) return null;
     try {
-        const form = new FormData();
-        form.append("avatar", file);
-        const res = await authFetch(`${API_MEDIA_SERVER_URL}/users/${userId}/avatar`, {
-            method: "PATCH",
-            body: form,
-            signal: AbortSignal.timeout(30_000),
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        return (json as { avatarUrl?: string }).avatarUrl ?? null;
+        const profile = await updateUserPhoto("AVATAR", file);
+        return profile?.avatarUrl ?? null;
     } catch {
         return null;
     }
@@ -427,17 +502,10 @@ export async function uploadUserCover(
     userId: string,
     file: File,
 ): Promise<string | null> {
+    if (!userId) return null;
     try {
-        const form = new FormData();
-        form.append("cover", file);
-        const res = await authFetch(`${API_MEDIA_SERVER_URL}/users/${userId}/cover`, {
-            method: "PATCH",
-            body: form,
-            signal: AbortSignal.timeout(30_000),
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        return (json as { coverUrl?: string }).coverUrl ?? null;
+        const profile = await updateUserPhoto("COVER", file);
+        return profile?.coverUrl ?? null;
     } catch {
         return null;
     }
@@ -451,22 +519,37 @@ export async function uploadUserCover(
 export async function updateUserProfile(
     userId: string,
     fields: UserProfile,
-): Promise<ApiUser> {
+): Promise<UserProfileUpdateResult> {
+    if (!userId) {
+        throw new Error("Thiếu userId");
+    }
+
     const body = {
         bio: fields.bio,
         work: fields.work,
         location: fields.location,
         relationshipStatus: fields.relationship,
     };
-    const res = await authFetch(`${API_MEDIA_SERVER_URL}/users/${userId}`, {
-        method: "PATCH",
+
+    const res = await authFetch(`${API_BASE_URL}/users/profile/me`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(10_000),
     });
+
     if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
         throw new Error(`Lưu thất bại (${res.status}): ${text}`);
     }
-    return (await res.json()) as ApiUser;
+
+    const json = await res.json();
+    const result = unwrapApiResult<UserServiceProfile>(json);
+
+    return {
+        bio: result?.bio ?? null,
+        work: result?.work ?? null,
+        location: result?.location ?? null,
+        relationshipStatus: result?.relationshipStatus ?? null,
+    };
 }
