@@ -11,8 +11,10 @@ import {
   fetchReplies,
   addComment,
   deleteComment,
+  mapComment,
 } from "../../services/post.service";
-import type { Comment } from "../../services/post.service";
+import type { Comment, ApiComment } from "../../services/post.service";
+import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
 import type { PostUser } from "./types";
 
 const ROOT_PAGE_SIZE = 20;
@@ -82,6 +84,123 @@ const CommentSection: React.FC<Props> = ({
       cancelled = true;
     };
   }, [postId]);
+
+  /* ── Socket Realtime Updates ──────────────────────── */
+  useEffect(() => {
+    const handleActivity = (payload: PostActivityPayload) => {
+      if (payload.postId !== postId) return;
+      if (payload.activityType !== "COMMENT") return;
+
+      const data = payload.data;
+      if (!data) return;
+
+      // Skip current user because we already update optimistically
+      if (data.accountId === currentUser.id) return;
+
+      if (payload.action === "CREATE") {
+        const newComment = mapComment(data as ApiComment);
+        if (newComment.parentId) {
+          // If it's a reply
+          setRepliesMap((prev) => {
+            const existing = prev[newComment.parentId!];
+            if (!existing) return prev; // If not expanded, ignore
+            return {
+              ...prev,
+              [newComment.parentId!]: {
+                ...existing,
+                comments: [...existing.comments, newComment],
+              },
+            };
+          });
+          // Update totalReplies for parent in roots OR any nested repliesMap level
+          setRoots((prev) =>
+            prev.map((c) =>
+              c.id === newComment.parentId ?
+                { ...c, totalReplies: c.totalReplies + 1 }
+              : c,
+            ),
+          );
+          setRepliesMap((prev) => {
+            const updated: Record<string, ReplyState> = {};
+            for (const key of Object.keys(prev)) {
+              updated[key] = {
+                ...prev[key],
+                comments: prev[key].comments.map((r) =>
+                  r.id === newComment.parentId ?
+                    { ...r, totalReplies: r.totalReplies + 1 }
+                  : r,
+                ),
+              };
+            }
+            return updated;
+          });
+        } else {
+          // If it's a root comment
+          setRoots((prev) => [newComment, ...prev]);
+        }
+      } else if (payload.action === "DELETE") {
+        const deletedCommentId = data.id;
+        const parentId = data.parentCommentId; // Need parentId to update counts
+        
+        if (parentId) {
+          setRepliesMap((prev) => {
+            const s = prev[parentId];
+            if (!s) return prev;
+            return {
+              ...prev,
+              [parentId]: {
+                ...s,
+                comments: s.comments.filter((r) => r.id !== deletedCommentId),
+              },
+            };
+          });
+          setRoots((prev) =>
+            prev.map((r) =>
+              r.id === parentId ?
+                { ...r, totalReplies: Math.max(0, r.totalReplies - 1) }
+              : r,
+            ),
+          );
+          setRepliesMap((prev) => {
+            const updated: Record<string, ReplyState> = {};
+            for (const key of Object.keys(prev)) {
+              updated[key] = {
+                ...prev[key],
+                comments: prev[key].comments.map((r) =>
+                  r.id === parentId ?
+                    { ...r, totalReplies: Math.max(0, r.totalReplies - 1) }
+                  : r,
+                ),
+              };
+            }
+            return updated;
+          });
+        } else {
+          setRoots((prev) => prev.filter((r) => r.id !== deletedCommentId));
+        }
+      } else if (payload.action === "UPDATE") {
+        const updatedComment = mapComment(data as ApiComment);
+        const updateInList = (list: Comment[]) =>
+          list.map(c => c.id === updatedComment.id ? updatedComment : c);
+          
+        if (updatedComment.parentId) {
+          setRepliesMap(prev => {
+             const s = prev[updatedComment.parentId!];
+             if (!s) return prev;
+             return {
+                 ...prev,
+                 [updatedComment.parentId!]: { ...s, comments: updateInList(s.comments) }
+             };
+          });
+        } else {
+          setRoots(prev => updateInList(prev));
+        }
+      }
+    };
+
+    mediaSocketService.onPostActivity(handleActivity);
+    return () => mediaSocketService.offPostActivity(handleActivity);
+  }, [postId, currentUser.id]);
 
   /* ── Load more root comments ──────────────────────── */
   const loadMoreRoots = useCallback(async () => {

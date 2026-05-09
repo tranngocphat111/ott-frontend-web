@@ -488,6 +488,9 @@ export async function toggleLike(
 export interface ApiReaction {
     id: string;
     accountId: string;
+    accountUsername?: string;
+    accountDisplayName?: string;
+    accountAvatarUrl?: string;
     targetId: string;   // postId
     targetType: string;
     reactionType: string; // "LIKE" | "LOVE" | "HAHA" | "WOW" | "SAD" | "ANGRY"
@@ -533,6 +536,21 @@ export async function fetchPostReactions(postId: string): Promise<Record<string,
     }
 }
 
+/**
+ * Lấy danh sách chi tiết reactions của một bài post (bao gồm thông tin user).
+ */
+export async function fetchPostReactionDetails(postId: string): Promise<ApiReaction[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/posts/${postId}/reactions`, {
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) return [];
+        return await res.json() as ApiReaction[];
+    } catch {
+        return [];
+    }
+}
+
 /* ═══════════════════════════════════════════════════════
    Comment API
 ═══════════════════════════════════════════════════════ */
@@ -567,7 +585,7 @@ export interface Comment {
     totalReplies: number;
 }
 
-function mapComment(c: ApiComment): Comment {
+export function mapComment(c: ApiComment): Comment {
     return {
         id: c.id,
         authorId: c.accountId,

@@ -33,6 +33,7 @@ export const useProfileData = (
     work: "",
     location: "",
     relationship: "",
+    phone: "",
   });
   const [posts, setPosts] = useState<Post[]>([]);
   const [userReactionMap, setUserReactionMap] = useState<Record<string, string>>({});
@@ -66,6 +67,7 @@ export const useProfileData = (
           work: full?.work ?? "",
           location: full?.location ?? "",
           relationship: full?.relationshipStatus ?? "",
+          phone: full?.phoneNumber ?? "",
         });
         setProfileUser({
           displayName: full?.displayName || chatUser?.name || full?.username || "",

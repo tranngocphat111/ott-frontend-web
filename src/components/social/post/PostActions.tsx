@@ -50,20 +50,21 @@ const PostActions: React.FC<Props> = ({
 
       <button
         onClick={onLikeClick}
-        className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${
-          reactionColor
-        }`}>
+        className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${reactionColor
+          }`}>
         {reactionEmoji ?
           <span className="text-lg leading-none">{reactionEmoji}</span>
-        : <ThumbsUp className="size-5" />}
+          : <ThumbsUp className="size-5" />}
         <span>{reactionLabel}</span>
       </button>
     </div>
     <button
-      onClick={onToggleComments}
-      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${
-        showComments ? "text-primary-500" : "text-primary-700"
-      }`}>
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleComments();
+      }}
+      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${showComments ? "text-primary-500" : "text-primary-700"
+        }`}>
       <MessageCircle
         className={`size-5 ${showComments ? "fill-primary-100" : ""}`}
       />

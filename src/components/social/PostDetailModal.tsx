@@ -29,6 +29,7 @@ interface Props {
   showComments: boolean;
   onClose: () => void;
   onToggleComments: () => void;
+  onShowReactionsList: () => void;
   onLikeClick: () => void;
   onSelectReaction: (key: ReactionKey) => void;
   onLikeMouseEnter: () => void;
@@ -58,6 +59,7 @@ const PostDetailModal: React.FC<Props> = ({
   showComments,
   onClose,
   onToggleComments,
+  onShowReactionsList,
   onLikeClick,
   onSelectReaction,
   onLikeMouseEnter,
@@ -118,6 +120,7 @@ const PostDetailModal: React.FC<Props> = ({
               commentCount={commentCount}
               shares={post.shares}
               onToggleComments={onToggleComments}
+              onShowReactionsList={onShowReactionsList}
             />
 
             <PostActions

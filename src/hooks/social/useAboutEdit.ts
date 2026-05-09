@@ -7,6 +7,7 @@ const DEFAULT_PROFILE: UserProfile = {
   work: "",
   location: "",
   relationship: "",
+  phone: "",
 };
 
 export const useAboutEdit = (initialProfile: UserProfile) => {
@@ -40,6 +41,7 @@ export const useAboutEdit = (initialProfile: UserProfile) => {
         work: updated.work ?? "",
         location: updated.location ?? "",
         relationship: updated.relationshipStatus ?? "",
+        phone: updated.phoneNumber ?? "",
       });
       setEditingAbout(false);
     } catch (err) {

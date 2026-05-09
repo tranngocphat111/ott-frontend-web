@@ -18,6 +18,13 @@ export type MediaRealtimePayload = {
     timestamp?: string;
 };
 
+export type PostActivityPayload = {
+    postId: string;
+    activityType: "COMMENT" | "REACTION" | "SHARE";
+    action: "CREATE" | "UPDATE" | "DELETE";
+    data?: any; // Contains Comment or Reaction object depending on activityType
+};
+
 class MediaSocketService {
     private socket: Socket | null = null;
     private readonly endpoint = SOCKET_MEDIA_SERVER_URL;
@@ -68,6 +75,18 @@ class MediaSocketService {
             this.socket?.off("media_content_updated", callback);
         } else {
             this.socket?.removeAllListeners("media_content_updated");
+        }
+    }
+
+    onPostActivity(callback: (payload: PostActivityPayload) => void) {
+        this.ensureSocket()?.on("post_activity_updated", callback);
+    }
+
+    offPostActivity(callback?: (payload: PostActivityPayload) => void) {
+        if (callback) {
+            this.socket?.off("post_activity_updated", callback);
+        } else {
+            this.socket?.removeAllListeners("post_activity_updated");
         }
     }
 }

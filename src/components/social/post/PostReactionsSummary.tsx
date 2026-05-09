@@ -9,6 +9,7 @@ interface Props {
   commentCount: number;
   shares: number;
   onToggleComments: () => void;
+  onShowReactionsList?: () => void;
 }
 
 const PostReactionsSummary: React.FC<Props> = ({
@@ -16,6 +17,7 @@ const PostReactionsSummary: React.FC<Props> = ({
   commentCount,
   shares,
   onToggleComments,
+  onShowReactionsList,
 }) => {
   const topReactions = REACTIONS.filter((r) => reactionCounts[r.key] > 0).sort(
     (a, b) => reactionCounts[b.key] - reactionCounts[a.key],
@@ -31,7 +33,10 @@ const PostReactionsSummary: React.FC<Props> = ({
 
   return (
     <div className="px-4 py-2 flex items-center justify-between text-primary-400 text-sm border-t border-primary-100">
-      <div className="flex items-center gap-1.5">
+      <div
+        className={`flex items-center gap-1.5 ${onShowReactionsList ? "cursor-pointer hover:underline" : ""}`}
+        onClick={(e) => { e.stopPropagation(); onShowReactionsList?.(); }}
+      >
         {topReactions.length > 0 && (
           <>
             <div className="flex -space-x-1">

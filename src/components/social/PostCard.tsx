@@ -5,9 +5,11 @@ import PostBody from "./post/PostBody";
 import PostReactionsSummary from "./post/PostReactionsSummary";
 import PostActions from "./post/PostActions";
 import PostDetailModal from "./PostDetailModal";
+import PostReactionsListModal from "./post/PostReactionsListModal";
 import { useNavigate } from "react-router-dom";
 import { getReactionByKey, type ReactionKey } from "./post/reactions";
 import PostHeader from "./post/PostHeader";
+import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
 
 interface Props {
   post: Post;
@@ -53,7 +55,7 @@ const PostCard: React.FC<Props> = ({
         sad: initialReactionCounts.sad ?? 0,
         angry: initialReactionCounts.angry ?? 0,
       }
-    : { like: post.likes, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
+      : { like: post.likes, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
   );
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +63,8 @@ const PostCard: React.FC<Props> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalShowComments, setModalShowComments] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [isReactionsListModalOpen, setIsReactionsListModalOpen] = useState(false);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -85,12 +89,56 @@ const PostCard: React.FC<Props> = ({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const handleActivity = (payload: PostActivityPayload) => {
+      if (payload.postId !== post.id) return;
+
+      if (payload.activityType === "REACTION") {
+        const data = payload.data || {};
+        // Bỏ qua action của chính user hiện tại để tránh duplicate
+        if (data.accountId && data.accountId === currentUser.id) return;
+
+        const reactionTypeStr = (data.reactionType?.toLowerCase() || "like") as ReactionKey;
+
+        setReactionCounts((c) => {
+          const next = { ...c };
+          if (payload.action === "CREATE") {
+            next[reactionTypeStr] = (next[reactionTypeStr] || 0) + 1;
+          } else if (payload.action === "DELETE") {
+            next[reactionTypeStr] = Math.max(0, (next[reactionTypeStr] || 0) - 1);
+          }
+          return next;
+        });
+      } else if (payload.activityType === "COMMENT") {
+        const data = payload.data;
+        if (!data) return;
+        if (data.accountId === currentUser.id) return;
+
+        if (payload.action === "CREATE") {
+          setCommentCount((prev) => prev + 1);
+        } else if (payload.action === "DELETE") {
+          setCommentCount((prev) => Math.max(0, prev - 1));
+        }
+      } else if (payload.activityType === "SHARE") {
+        // Tương lai nếu có share real-time
+      }
+    };
+
+    mediaSocketService.onPostActivity(handleActivity);
+    return () => mediaSocketService.offPostActivity(handleActivity);
+  }, [post.id, currentUser.id]);
+
   const handleReactionClick = (key: ReactionKey) => {
+    if (isLiking) return;
+    setIsLiking(true);
+
     const prev = reaction;
     const wasReacted = prev === key;
     const newReaction = wasReacted ? null : key;
     setReaction(newReaction);
     setShowPicker(false);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+
     setReactionCounts((c) => {
       const next = { ...c };
       if (prev) next[prev] = Math.max(0, next[prev] - 1);
@@ -98,9 +146,18 @@ const PostCard: React.FC<Props> = ({
       return next;
     });
     onToggleLike(newReaction);
+
+    // Khóa bấm trong 500ms để tránh spam API
+    setTimeout(() => setIsLiking(false), 500);
   };
 
   const handleLikeButtonClick = () => {
+    if (isLiking) return;
+    setIsLiking(true);
+
+    setShowPicker(false);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+
     if (reaction) {
       setReactionCounts((c) => ({
         ...c,
@@ -113,6 +170,9 @@ const PostCard: React.FC<Props> = ({
       setReaction("like");
       onToggleLike("like");
     }
+
+    // Khóa bấm trong 500ms để tránh spam API
+    setTimeout(() => setIsLiking(false), 500);
   };
 
   const onMouseEnterLike = () => {
@@ -193,6 +253,7 @@ const PostCard: React.FC<Props> = ({
             commentCount={commentCount}
             shares={post.shares}
             onToggleComments={() => openModal(true)}
+            onShowReactionsList={() => setIsReactionsListModalOpen(true)}
           />
         </div>
 
@@ -254,6 +315,13 @@ const PostCard: React.FC<Props> = ({
         onPickerMouseEnter={onMouseEnterPicker}
         onPickerMouseLeave={onMouseLeavePicker}
         onCountChange={(delta) => setCommentCount((prev) => prev + delta)}
+        onShowReactionsList={() => setIsReactionsListModalOpen(true)}
+      />
+
+      <PostReactionsListModal
+        isOpen={isReactionsListModalOpen}
+        onClose={() => setIsReactionsListModalOpen(false)}
+        postId={post.id}
       />
     </>
   );

@@ -19,6 +19,7 @@ export interface ApiUser {
     work: string | null;
     location: string | null;
     relationshipStatus: string | null;
+    phoneNumber: string | null;
 }
 
 type ApiEnvelope<T> = { result?: T; message?: string };
@@ -61,9 +62,11 @@ export interface ApiRelationshipResponse {
     id: string;
     requesterId: string;
     requesterUsername: string;
+    requesterDisplayName: string | null;
     requesterAvatarUrl: string | null;
     receiverId: string;
     receiverUsername: string;
+    receiverDisplayName: string | null;
     receiverAvatarUrl: string | null;
 }
 
@@ -147,9 +150,9 @@ export async function fetchFriends(userId: string): Promise<FriendOption[]> {
         console.log(`fetchFriends raw data:`, raw);
         if (!Array.isArray(raw)) return [];
         const mapped = raw.map((user) => ({
-            id: user.user_id,
-            name: user.name,
-            avatarUrl: user.avatar || undefined,
+            id: user.user_id || user.userId || user.id,
+            name: user.displayName || user.name || user.username || "Người dùng",
+            avatarUrl: user.avatar || user.avatarUrl || user.user_avatar || undefined,
         }));
         console.log(`fetchFriends mapped data:`, mapped);
         return mapped;
@@ -228,7 +231,7 @@ export async function fetchPendingRequests(
         return raw.map((rel) => ({
             id: rel.id,
             userId: rel.requesterId,
-            name: rel.requesterUsername,
+            name: rel.requesterDisplayName || rel.requesterUsername,
             avatarUrl: rel.requesterAvatarUrl ?? undefined,
         }));
     } catch {
@@ -415,6 +418,7 @@ export interface UserProfile {
     work: string;
     location: string;
     relationship: string;
+    phone: string;
 }
 
 export interface UserProfileUpdateResult {
@@ -529,6 +533,7 @@ export async function updateUserProfile(
         work: fields.work,
         location: fields.location,
         relationshipStatus: fields.relationship,
+        phoneNumber: fields.phone,
     };
 
     const res = await authFetch(`${API_BASE_URL}/users/profile/me`, {

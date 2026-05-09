@@ -10,9 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.10",
     "axios": "^1.13.2",
     "browser-image-compression": "^2.0.2",
-    "expo-auth-session": "^7.0.10",
+    "expo-auth-session": "^55.0.15",
     "expo-web-browser": "^15.0.10",
     "framer-motion": "^12.26.2",
     "lucide-react": "^0.562.0",
