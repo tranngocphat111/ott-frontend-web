@@ -34,9 +34,14 @@ const LiveKitGroupCall: React.FC<LiveKitGroupCallProps> = ({
     <LiveKitRoom
       video={video}
       audio={true}
-      token={token}
-      serverUrl={serverUrl}
+      token={token?.trim()}
+      serverUrl={serverUrl?.trim()}
       onDisconnected={onLeave}
+      onError={(e) => {
+        console.error("LiveKit Room Error:", e);
+        alert(`Lỗi kết nối cuộc gọi: ${e.message}`);
+        onLeave();
+      }}
       className="h-screen w-screen bg-[#0f172a] text-white overflow-hidden flex flex-col font-sans"
     >
       <div className="flex-1 relative flex flex-col overflow-hidden">

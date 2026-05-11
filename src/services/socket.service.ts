@@ -390,6 +390,25 @@ class SocketService {
     });
   }
 
+  onStartCallSuccess(
+    callback: (payload: {
+      conversationId: string;
+      callType: CallType;
+      isGroup?: boolean;
+      livekitToken?: string;
+    }) => void,
+  ) {
+    this.socket?.on("bat_dau_goi_thanh_cong", callback);
+  }
+
+  offStartCallSuccess(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("bat_dau_goi_thanh_cong", callback);
+    } else {
+      this.socket?.removeAllListeners("bat_dau_goi_thanh_cong");
+    }
+  }
+
   onIncomingCall(
     callback: (payload: {
       conversationId: string;
