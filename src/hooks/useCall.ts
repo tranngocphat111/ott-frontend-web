@@ -665,7 +665,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       setParticipants(payload.participants);
       setCallType(payload.callType);
       setIsGroup(!!payload.isGroup);
-      if (payload.livekitToken) {
+      if (payload.livekitToken && String(payload.userId) === String(userId)) {
         setLivekitToken(payload.livekitToken);
       }
 
@@ -858,7 +858,23 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       }));
     };
 
+    const handleStartCallSuccess = (payload: {
+      conversationId: string;
+      callType: CallType;
+      isGroup?: boolean;
+      livekitToken?: string;
+    }) => {
+      if (payload.conversationId !== activeConversationRef.current) return;
+      if (payload.livekitToken) {
+        setLivekitToken(payload.livekitToken);
+      }
+      if (payload.isGroup) {
+        setIsGroup(true);
+      }
+    };
+
     socketService.onIncomingCall(handleIncomingCall);
+    socketService.onStartCallSuccess(handleStartCallSuccess);
     socketService.onCallJoined(handleCallJoined);
     socketService.onOffer(handleOffer);
     socketService.onAnswer(handleAnswer);
@@ -871,6 +887,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
 
     return () => {
       socketService.offIncomingCall(handleIncomingCall);
+      socketService.offStartCallSuccess(handleStartCallSuccess);
       socketService.offCallJoined(handleCallJoined);
       socketService.offOffer(handleOffer);
       socketService.offAnswer(handleAnswer);
