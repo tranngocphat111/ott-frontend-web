@@ -307,8 +307,13 @@ const CallPage: React.FC = () => {
     }) => {
       if (payload.conversationId !== conversationId) return;
 
-      isClosingByCancelRef.current = true;
-      endCall();
+      console.log(`Cuộc gọi bị từ chối bởi: ${payload.userId}`);
+      
+      // Nếu là cuộc gọi nhóm, không được kết thúc cuộc gọi của mình khi người khác từ chối
+      if (!isGroup) {
+        isClosingByCancelRef.current = true;
+        endCall();
+      }
     };
 
     const onCallEnded = (payload: {

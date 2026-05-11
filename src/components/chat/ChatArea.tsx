@@ -1114,6 +1114,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   ) => {
     if (!activeConversation?._id) return;
 
+    // Nếu cuộc gọi đang diễn ra -> Chuyển sang join luôn, không hiện modal chọn người
+    if (activeConversation.is_calling && activeConversation.type === "group") {
+      const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
+      const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
+      doOpenCallWindow(type, "join", displayName, displayAvatar);
+      return;
+    }
+
     // Nếu là bắt đầu gọi nhóm -> hiện modal chọn thành viên trước
     if (action === "start" && activeConversation.type === "group") {
       setInitialCallTypeForGroup(type);
