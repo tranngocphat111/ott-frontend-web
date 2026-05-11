@@ -7,8 +7,8 @@ import {
   FileText,
   Link as LinkIcon,
   UserRoundPen,
-  Info,
-  Clock3,
+  QrCode,
+  Copy,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useConversations } from "../../contexts/ConversationsContext";
@@ -46,6 +46,7 @@ import GroupActions from "./ChatSidebarRight/components/GroupActions";
 import GroupBulletinBoard from "./ChatSidebarRight/components/GroupBulletinBoard";
 import AddMemberModal from "./ChatSidebarRight/modals/AddMemberModal";
 import NicknameManagementModal from "./ChatSidebarRight/modals/NicknameManagementModal";
+import GroupInviteLinkModal from "./ChatSidebarRight/modals/GroupInviteLinkModal";
 import CreateGroupModal from "../modal/group/CreateGroupModal";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import { MediaViewer } from "./ChatMessage/MediaViewer";
@@ -96,6 +97,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showInviteLinkModal, setShowInviteLinkModal] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerMessageId, setViewerMessageId] = useState<string | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState(0);
@@ -869,7 +871,34 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                 )}
 
                 {!isSelfConversation && conversation.type === "group" && (
-                  <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={joinedMembers.length} onClick={handleViewMembers} showIndicator={false} />
+                  <>
+                    <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={joinedMembers.length} onClick={handleViewMembers} showIndicator={false} />
+                    {/* Link tham gia nhóm – Zalo style */}
+                    <div className="border-t border-gray-100 px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[15px] font-medium text-gray-700">
+                          <LinkIcon size={16} className="text-gray-500" />
+                          <span>Link tham gia nhóm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setShowInviteLinkModal(true)}
+                            title="Xem QR và link"
+                            className="cursor-pointer p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-primary-600"
+                          >
+                            <QrCode size={16} />
+                          </button>
+                          <button
+                            onClick={() => setShowInviteLinkModal(true)}
+                            title="Sao chép link"
+                            className="cursor-pointer p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-primary-600"
+                          >
+                            <Copy size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {!isSelfConversation && (conversation.type === "group" || conversation.type === "private") && (
@@ -968,6 +997,16 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         initialImageIndex={viewerImageIndex}
         seedMessages={allMediaMessages}
       />
+
+      {conversation._id && showInviteLinkModal && (
+        <GroupInviteLinkModal
+          isOpen={showInviteLinkModal}
+          onClose={() => setShowInviteLinkModal(false)}
+          conversationId={conversation._id}
+          conversationName={activeConversation?.name || "Nhóm"}
+          currentUserId={currentUser?.id || ""}
+        />
+      )}
 
       {conversation._id && showAddMemberModal && (
         <AddMemberModal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} conversationId={conversation._id} currentMembers={members} onMembersAdded={handleMembersAdded} />

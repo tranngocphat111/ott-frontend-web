@@ -7,7 +7,16 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'phone' | 'email' | 'qr'>('phone');
 
-  const handleLoginSuccess = () => navigate('/chat', { replace: true });
+  const handleLoginSuccess = () => {
+    // Kiểm tra nếu có pending group invite từ trước khi đăng nhập
+    const pendingToken = sessionStorage.getItem("pendingGroupToken");
+    if (pendingToken) {
+      sessionStorage.removeItem("pendingGroupToken");
+      navigate(`/join?token=${pendingToken}`, { replace: true });
+    } else {
+      navigate('/chat', { replace: true });
+    }
+  };
 
 
   return (

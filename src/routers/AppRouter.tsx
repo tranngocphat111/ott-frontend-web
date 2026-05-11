@@ -25,6 +25,7 @@ import DeleteAccountPage from "../pages/DeleteAccountPage";
 // Layout
 import MainLayout from "../layouts/MainLayout";
 import { ChatPage } from "../pages";
+import JoinGroupPage from "../pages/JoinGroupPage";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -172,6 +173,9 @@ export const AppRouter: React.FC = () => {
           </PrivateRoute>
         }
       />
+
+      {/* Join group by invite link – accessible when logged in OR not */}
+      <Route path="/join" element={<JoinGroupPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

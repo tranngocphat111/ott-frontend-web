@@ -232,4 +232,44 @@ export class ConversationService {
       throw error;
     }
   }
+
+  /**
+   * Lấy invite link của nhóm (tạo mới nếu chưa có)
+   */
+  static async getInviteLink(conversationId: string, requesterId: string): Promise<string> {
+    const response = await authFetch(
+      `${API_CHAT_SERVER_URL}/conversations/${conversationId}/invite-link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId }),
+      }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to get invite link");
+    }
+    const data = await response.json();
+    // Backend trả về { inviteLink } hoặc { invite_link }
+    return data.inviteLink || data.invite_link || "";
+  }
+
+  /**
+   * Tham gia nhóm bằng invite link/token
+   */
+  static async joinByInviteLink(token: string, userId: string): Promise<Conversation> {
+    const response = await authFetch(
+      `${API_CHAT_SERVER_URL}/conversations/join-by-link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, userId }),
+      }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to join group");
+    }
+    return await response.json();
+  }
 }
