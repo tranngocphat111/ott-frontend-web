@@ -1078,6 +1078,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       avatar: displayAvatar.startsWith("data:") ? "" : displayAvatar,
     });
 
+    if (activeConversation?.type === "group") {
+      params.append("isGroup", "true");
+    }
+
     if (invitedUserIds && invitedUserIds.length > 0) {
       params.append("invitedUserIds", invitedUserIds.join(","));
     }

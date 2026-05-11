@@ -39,8 +39,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   };
 
   return (
-    <div className="px-6 py-3 bg-white border-b border-gray-100 shadow-sm flex-none z-10">
-      <div className="flex items-center justify-between">
+    <div className="relative flex-none z-10">
+      <div className="px-6 py-3 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between">
         {/* Left Section: Avatar & Info */}
         <div className="flex items-center gap-4">
           <Avatar
@@ -106,6 +106,29 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Active Call Banner (Group Call) */}
+      {conversation.type === "group" && conversation.is_calling && (
+        <div className="px-6 py-2 bg-emerald-50/80 backdrop-blur-md border-b border-emerald-100 flex items-center justify-between animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-200">
+              <Video size={16} fill="currentColor" />
+            </div>
+            <div className="flex flex-col">
+              <p className="text-[13px] font-bold text-emerald-700">Cuộc gọi video nhóm</p>
+              <p className="text-[11px] text-emerald-600/80 font-medium">
+                {conversation.call_participant_count || 1} người đang tham gia
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onStartVideoCall}
+            className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[13px] font-bold rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            Tham gia
+          </button>
+        </div>
+      )}
     </div>
   );
 };

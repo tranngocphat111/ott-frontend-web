@@ -117,6 +117,18 @@ class SocketService {
     }
   }
 
+  onGroupCallUpdated(callback: (payload: any) => void) {
+    this.socket?.on("cap_nhat_trang_thai_goi_nhom", callback);
+  }
+
+  offGroupCallUpdated(callback?: (payload: any) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_trang_thai_goi_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_trang_thai_goi_nhom");
+    }
+  }
+
   onPollUpdate(callback: (payload: any) => void) {
     this.socket?.on("tin_nhan_cap_nhat", callback);
   }

@@ -383,13 +383,16 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   );
 
   const startCall = useCallback(
-    async (mode: CallType, invitedUserIds?: string[]) => {
+    async (mode: CallType, invitedUserIds?: string[], isGroupCall?: boolean) => {
       if (!canHandleCall || !conversationId || !userId) return;
 
       try {
         setIsConnecting(true);
         setBusyUserIds([]);
-        await ensureLocalStream(mode);
+        
+        if (!isGroupCall) {
+          await ensureLocalStream(mode);
+        }
 
         activeConversationRef.current = conversationId;
         setCallType(mode);
@@ -416,13 +419,16 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   );
 
   const joinExistingCall = useCallback(
-    async (mode: CallType) => {
+    async (mode: CallType, isGroupCall?: boolean) => {
       if (!canHandleCall || !conversationId || !userId) return;
 
       try {
         setIsConnecting(true);
         setBusyUserIds([]);
-        await ensureLocalStream(mode);
+        
+        if (!isGroupCall) {
+          await ensureLocalStream(mode);
+        }
 
         activeConversationRef.current = conversationId;
         setCallType(mode);
@@ -430,10 +436,9 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
 
         socketService.joinCall(conversationId, userId, mode);
       } catch (error) {
-        console.error("Khong the tham gia cuoc goi:", error);
+        console.error("Không thể tham gia cuộc gọi:", error);
         resetCallState();
         stopLocalStream();
-        throw error;
       } finally {
         setIsConnecting(false);
       }
@@ -948,6 +953,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       toggleMic,
       toggleCamera,
       toggleScreenShare,
+      stopLocalStream,
     }),
     [
       acceptIncomingCall,
@@ -972,6 +978,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       toggleScreenShare,
       isGroup,
       livekitToken,
+      stopLocalStream,
     ],
   );
 };

@@ -160,31 +160,17 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
 
         {/* Footer Actions */}
         <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3">
-          <div className="flex p-1 bg-gray-200 rounded-xl">
-            <button
-              onClick={() => setCallType("voice")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                callType === "voice" ? "bg-white text-primary-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Phone size={18} />
-              <span className="text-sm font-semibold">Gọi thoại</span>
-            </button>
-            <button
-              onClick={() => setCallType("video")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                callType === "video" ? "bg-white text-primary-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
+          <div className="flex-1 text-center py-2 bg-primary-50 rounded-xl border border-primary-100">
+            <span className="text-sm font-bold text-primary-700 flex items-center justify-center gap-2">
               <Video size={18} />
-              <span className="text-sm font-semibold">Gọi video</span>
-            </button>
+              Chế độ gọi video nhóm
+            </span>
           </div>
 
           <button
-            onClick={() => onStart(selectedIds, callType)}
+            onClick={() => onStart(selectedIds, "video")}
             disabled={selectedIds.length === 0}
-            className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/20 active:scale-95"
+            className="flex-[2] py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/20 active:scale-95"
           >
             Bắt đầu cuộc gọi
           </button>

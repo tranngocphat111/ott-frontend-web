@@ -194,10 +194,19 @@ const CallPage: React.FC = () => {
     toggleMic,
     toggleCamera,
     toggleScreenShare,
+    stopLocalStream,
   } = useCall({
     conversationId,
     userId: normalizedUserId,
   });
+
+  // Release camera/mic for LiveKit when entering group mode
+  useEffect(() => {
+    if (isGroup && livekitToken && localStream) {
+      console.log("Releasing local stream for group call transition...");
+      stopLocalStream();
+    }
+  }, [isGroup, livekitToken, localStream, stopLocalStream]);
 
   // Khi người nhận đang bận: thông báo về parent window rồi đóng tab này
   useEffect(() => {
@@ -232,8 +241,10 @@ const CallPage: React.FC = () => {
 
     startedRef.current = true;
 
+    const isGroupUrl = searchParams.get("isGroup") === "true";
+
     if (action === "join") {
-      joinExistingCall(callType).catch((error) => {
+      joinExistingCall(callType, isGroupUrl).catch((error) => {
         console.error("Khong the tham gia cuoc goi:", error);
       });
       return;
@@ -242,7 +253,7 @@ const CallPage: React.FC = () => {
     const invitedUserIdsStr = searchParams.get("invitedUserIds");
     const invitedUserIds = invitedUserIdsStr ? invitedUserIdsStr.split(",") : undefined;
 
-    startCall(callType, invitedUserIds).catch((error) => {
+    startCall(callType, invitedUserIds, isGroupUrl).catch((error) => {
       console.error("Khong the bat dau cuoc goi:", error);
     });
   }, [

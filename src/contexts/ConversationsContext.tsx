@@ -487,6 +487,16 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
+  const handleGroupCallUpdated = useCallback((payload: any) => {
+    const convId = String(payload?.conversationId || "");
+    if (!convId) return;
+
+    updateConversation(convId, {
+      is_calling: payload.isCalling,
+      call_participant_count: payload.participantCount,
+    });
+  }, [updateConversation]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -499,6 +509,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     const socket = socketService.getSocket();
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
     socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
+    socketService.onGroupCallUpdated(handleGroupCallUpdated);
 
     return () => {
       socketService.offNewMessage(handleIncomingMessage);
@@ -506,6 +517,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
       cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
       cleanupSocket?.off("them_nguoi_moi", handleMemberAdded);
+      socketService.offGroupCallUpdated(handleGroupCallUpdated);
     };
   }, [handleIncomingMessage, handleRevokedMessage, handleCategoryUpdated, handleMemberAdded, isAuthenticated]);
 
