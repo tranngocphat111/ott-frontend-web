@@ -465,6 +465,10 @@ const CallPage: React.FC = () => {
         serverUrl={import.meta.env.VITE_LIVEKIT_URL || "ws://localhost:7880"}
         onLeave={handleExit}
         video={callType === "video"}
+        name={remoteDisplayName}
+        avatar={remoteAvatarSrc}
+        conversationId={conversationId}
+        userId={normalizedUserId}
       />
     );
   }

@@ -10,6 +10,10 @@ class SocketService {
     return this.socket ?? this.connect();
   }
 
+  public emit(event: string, payload: unknown) {
+    this.emitWhenConnected(event, payload);
+  }
+
   private emitWhenConnected(event: string, payload: unknown) {
     const socket = this.ensureSocket();
 
