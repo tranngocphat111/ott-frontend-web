@@ -307,12 +307,18 @@ const CallPage: React.FC = () => {
     }) => {
       if (payload.conversationId !== conversationId) return;
 
-      console.log(`Cuộc gọi bị từ chối bởi: ${payload.userId}`);
+      const isGroupFromUrl = searchParams.get("isGroup") === "true";
+      const actualIsGroup = isGroup || isGroupFromUrl;
+
+      console.log(`[CALL] Received decline from ${payload.userId}. isGroup(state): ${isGroup}, isGroup(url): ${isGroupFromUrl}`);
       
       // Nếu là cuộc gọi nhóm, không được kết thúc cuộc gọi của mình khi người khác từ chối
-      if (!isGroup) {
+      if (!actualIsGroup) {
+        console.log("[CALL] 1:1 call declined, ending...");
         isClosingByCancelRef.current = true;
         endCall();
+      } else {
+        console.log(`[CALL] Group member ${payload.userId} declined, staying in call.`);
       }
     };
 
@@ -321,6 +327,7 @@ const CallPage: React.FC = () => {
       endedBy?: string | null;
     }) => {
       if (payload.conversationId !== conversationId) return;
+      console.log(`[CALL] Received onCallEnded (ket_thuc_phong_goi) event from server. EndedBy: ${payload.endedBy}`);
 
       if (!hasRemoteAnsweredRef.current) {
         isClosingByNoAnswerRef.current = true;
@@ -335,7 +342,7 @@ const CallPage: React.FC = () => {
       socketService.offCallDeclined(onDeclined);
       socketService.offCallEnded(onCallEnded);
     };
-  }, [conversationId, endCall, normalizedUserId]);
+  }, [conversationId, endCall, normalizedUserId, isGroup]);
 
   const handleExit = () => {
     endCall();

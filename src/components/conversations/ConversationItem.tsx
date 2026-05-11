@@ -291,10 +291,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         className={`
           relative p-3 rounded-xl transition-all duration-300
           mx-2 ${isInvited ? "cursor-default" : "cursor-pointer"}
-          ${
-            isSelected
-              ? "bg-primary-500/10 shadow-md "
-              : "hover:bg-gray-50 hover:shadow-sm"
+          ${isSelected
+            ? "bg-primary-500/10 shadow-md "
+            : "hover:bg-gray-50 hover:shadow-sm"
           }
           ${isHovered ? "shadow-lg" : ""}
         `}
