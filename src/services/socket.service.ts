@@ -287,11 +287,12 @@ class SocketService {
     return this.socket;
   }
 
-  startCall(conversationId: string, callerId: string, callType: CallType) {
+  startCall(conversationId: string, callerId: string, callType: CallType, invitedUserIds?: string[]) {
     this.emitWhenConnected("bat_dau_goi", {
       conversationId,
       callerId,
       callType,
+      invitedUserIds,
     });
   }
 
@@ -395,6 +396,8 @@ class SocketService {
       callerId: string;
       callType: CallType;
       startedAt?: string;
+      isGroup?: boolean;
+      livekitToken?: string;
     }) => void,
   ) {
     this.socket?.on("cuoc_goi_den", callback);
@@ -414,6 +417,8 @@ class SocketService {
       userId: string;
       participants: string[];
       callType: CallType;
+      isGroup?: boolean;
+      livekitToken?: string;
     }) => void,
   ) {
     this.socket?.on("nguoi_dung_tham_gia_goi", callback);

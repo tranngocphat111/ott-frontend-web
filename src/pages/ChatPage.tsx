@@ -172,7 +172,7 @@ const ChatContent: React.FC = () => {
     };
 
     // nguoi_dung_ban_goi: người nhận đang bận → hiện modal ngay
-    const onCallBusy = (payload: { conversationId: string; targetUserId: string }) => {
+    const onCallBusy = (payload: { conversationId: string; targetUserId: string; reason?: string }) => {
       pendingCallParamsRef.current = null;
 
       let displayName = pendingCallNameRef.current;

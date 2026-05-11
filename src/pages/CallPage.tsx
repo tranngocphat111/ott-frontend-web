@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import LiveKitGroupCall from "../components/chat/LiveKitGroupCall";
 
 interface StreamVideoProps {
   stream: MediaStream;
@@ -185,6 +186,8 @@ const CallPage: React.FC = () => {
     isScreenSharing,
     remoteCameraStates,
     busyUserIds,
+    isGroup,
+    livekitToken,
     startCall,
     joinExistingCall,
     endCall,
@@ -236,7 +239,10 @@ const CallPage: React.FC = () => {
       return;
     }
 
-    startCall(callType).catch((error) => {
+    const invitedUserIdsStr = searchParams.get("invitedUserIds");
+    const invitedUserIds = invitedUserIdsStr ? invitedUserIdsStr.split(",") : undefined;
+
+    startCall(callType, invitedUserIds).catch((error) => {
       console.error("Khong the bat dau cuoc goi:", error);
     });
   }, [
@@ -412,6 +418,17 @@ const CallPage: React.FC = () => {
     };
   }, [callType, primaryRemote, remoteCameraStates]);
 
+  if (isGroup && livekitToken) {
+    return (
+      <LiveKitGroupCall
+        token={livekitToken}
+        serverUrl={import.meta.env.VITE_LIVEKIT_URL || "ws://localhost:7880"}
+        onLeave={handleExit}
+        video={callType === "video"}
+      />
+    );
+  }
+
   if (!conversationId) {
     return (
       <div className="h-screen w-screen bg-slate-950 text-white flex items-center justify-center">
@@ -581,8 +598,8 @@ const CallPage: React.FC = () => {
         <button
           onClick={toggleMic}
           className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${isMuted
-              ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
-              : "bg-white/10 hover:bg-white/20 text-white"
+            ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
+            : "bg-white/10 hover:bg-white/20 text-white"
             }`}
         >
           {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
@@ -594,8 +611,8 @@ const CallPage: React.FC = () => {
             onClick={toggleCamera}
             disabled={isScreenSharing}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 ${isCameraOff
-                ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
-                : "bg-white/10 hover:bg-white/20 text-white"
+              ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
+              : "bg-white/10 hover:bg-white/20 text-white"
               } ${isScreenSharing ? "opacity-20" : ""}`}
           >
             {isCameraOff ? <VideoOff size={18} /> : <Video size={18} />}
@@ -616,8 +633,8 @@ const CallPage: React.FC = () => {
             onClick={toggleScreenShare}
             disabled={!hasRemoteAnswered}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${isScreenSharing
-                ? "bg-primary-400 text-black"
-                : "bg-white/10 hover:bg-white/20 text-white"
+              ? "bg-primary-400 text-black"
+              : "bg-white/10 hover:bg-white/20 text-white"
               } ${!hasRemoteAnswered ? "opacity-20" : ""}`}
           >
             <MonitorUp size={18} />

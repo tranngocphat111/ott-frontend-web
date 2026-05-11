@@ -52,6 +52,7 @@ import { ReplacePinnedModal } from "../modal/ReplacePinnedModal";
 import { ForwardMessageModal } from "../modal/ForwardMessageModal";
 import { FriendRequestBar } from "./FriendRequestBar";
 import { GroupInvitationBar } from "./GroupInvitationBar";
+import GroupCallModal from "./Modal/GroupCallModal";
 
 // Utils
 import {
@@ -187,6 +188,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     title: "",
     message: "",
   });
+
+  const [isGroupCallModalOpen, setIsGroupCallModalOpen] = useState(false);
+  const [initialCallTypeForGroup, setInitialCallTypeForGroup] = useState<"voice" | "video">("voice");
 
   const [relationshipStatus, setRelationshipStatus] = useState<any>(null);
   const [isRelationshipLoading, setIsRelationshipLoading] = useState(false);
@@ -1063,6 +1067,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     action: "start" | "join",
     displayName: string,
     displayAvatar: string,
+    invitedUserIds?: string[]
   ) => {
     const params = new URLSearchParams({
       conversationId: activeConversation!._id,
@@ -1072,6 +1077,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       // Tránh truyền base64 quá dài gây lỗi HTTP 431 (Request Header Fields Too Large)
       avatar: displayAvatar.startsWith("data:") ? "" : displayAvatar,
     });
+
+    if (invitedUserIds && invitedUserIds.length > 0) {
+      params.append("invitedUserIds", invitedUserIds.join(","));
+    }
 
     setIsOpeningCall(true);
     const callWindow = window.open(
@@ -1086,11 +1095,27 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     setTimeout(() => setIsOpeningCall(false), 500);
   };
 
+  const handleGroupCallStart = (selectedUserIds: string[], callType: "voice" | "video") => {
+    setIsGroupCallModalOpen(false);
+    
+    const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
+    const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
+
+    doOpenCallWindow(callType, "start", displayName, displayAvatar, selectedUserIds);
+  };
+
   const openCallWindow = (
     type: "voice" | "video",
     action: "start" | "join" = "start",
   ) => {
     if (!activeConversation?._id) return;
+
+    // Nếu là bắt đầu gọi nhóm -> hiện modal chọn thành viên trước
+    if (action === "start" && activeConversation.type === "group") {
+      setInitialCallTypeForGroup(type);
+      setIsGroupCallModalOpen(true);
+      return;
+    }
 
     const blockReason = getCallOpenBlockReason(activeConversation._id);
     if (blockReason === "other") {
@@ -2948,6 +2973,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         onConfirm={() => setCallBlockModal(null)}
         onCancel={() => setCallBlockModal(null)}
       />
+
+      {activeConversation?._id && normalizedUserId && (
+        <GroupCallModal
+          isOpen={isGroupCallModalOpen}
+          onClose={() => setIsGroupCallModalOpen(false)}
+          onStart={handleGroupCallStart}
+          conversationId={activeConversation._id}
+          initialCallType={initialCallTypeForGroup}
+          currentUserId={normalizedUserId}
+        />
+      )}
     </div>
   );
 };

@@ -7,6 +7,7 @@ interface IncomingCall {
   conversationId: string;
   callerId: string;
   callType: CallType;
+  isGroup?: boolean;
 }
 
 interface UseCallOptions {
@@ -74,6 +75,8 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   const [remoteCameraStates, setRemoteCameraStates] = useState<
     Record<string, boolean>
   >({});
+  const [isGroup, setIsGroup] = useState(false);
+  const [livekitToken, setLivekitToken] = useState<string | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -99,6 +102,8 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     setIsCameraOff(false);
     setIsScreenSharing(false);
     setRemoteCameraStates({});
+    setIsGroup(false);
+    setLivekitToken(null);
     remoteMediaStreamRef.current.clear();
     pendingIceCandidatesRef.current.clear();
     activeConversationRef.current = null;
@@ -144,6 +149,62 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     });
   }, [cleanupPeer]);
 
+  const createFakeStream = useCallback((name: string, mode: CallType): MediaStream => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      // Vẽ nền gradient tối
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "#1e293b");
+      gradient.addColorStop(1, "#0f172a");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Vẽ text tên người dùng
+      ctx.fillStyle = "#38bdf8";
+      ctx.font = "bold 40px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(name || "User", canvas.width / 2, canvas.height / 2);
+      ctx.font = "20px sans-serif";
+      ctx.fillText("(Camera Simulation)", canvas.width / 2, canvas.height / 2 + 50);
+
+      // Animation đơn giản
+      let offset = 0;
+      const animate = () => {
+        if (mode === "video") {
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#38bdf8";
+          ctx.font = "bold 40px sans-serif";
+          ctx.fillText(name || "User", canvas.width / 2, canvas.height / 2 + Math.sin(offset) * 10);
+          ctx.font = "20px sans-serif";
+          ctx.fillText("(Camera Simulation)", canvas.width / 2, canvas.height / 2 + 50);
+          offset += 0.1;
+          requestAnimationFrame(animate);
+        }
+      };
+      if (mode === "video") requestAnimationFrame(animate);
+    }
+
+    const stream = canvas.captureStream(30);
+    
+    // Tạo silent audio track
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const dst = oscillator.connect(audioCtx.createMediaStreamDestination()) as any;
+    oscillator.start();
+    const silentAudioTrack = dst.stream.getAudioTracks()[0];
+    
+    if (mode === "voice") {
+      return new MediaStream([silentAudioTrack]);
+    }
+    
+    return new MediaStream([stream.getVideoTracks()[0], silentAudioTrack]);
+  }, []);
+
   const ensureLocalStream = useCallback(async (mode: CallType) => {
     const existing = localStreamRef.current;
     if (existing) {
@@ -158,16 +219,26 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       localStreamRef.current = null;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: mode === "video",
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: mode === "video",
+      });
 
-    localStreamRef.current = stream;
-    setIsMuted(false);
-    setIsCameraOff(mode === "voice");
-    return stream;
-  }, []);
+      localStreamRef.current = stream;
+      setIsMuted(false);
+      setIsCameraOff(mode === "voice");
+      return stream;
+    } catch (error) {
+      console.warn("Không thể truy cập camera/mic thật, sử dụng luồng giả lập để tránh ngắt cuộc gọi:", error);
+      // Fallback sang luồng giả lập
+      const fakeStream = createFakeStream(userId || "User", mode);
+      localStreamRef.current = fakeStream;
+      setIsMuted(false);
+      setIsCameraOff(mode === "voice");
+      return fakeStream;
+    }
+  }, [createFakeStream, userId]);
 
   const getOrCreatePeer = useCallback(
     (targetUserId: string, mode: CallType) => {
@@ -312,7 +383,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   );
 
   const startCall = useCallback(
-    async (mode: CallType) => {
+    async (mode: CallType, invitedUserIds?: string[]) => {
       if (!canHandleCall || !conversationId || !userId) return;
 
       try {
@@ -325,7 +396,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
         setIsInCall(true);
 
         socketService.joinCall(conversationId, userId, mode);
-        socketService.startCall(conversationId, userId, mode);
+        socketService.startCall(conversationId, userId, mode, invitedUserIds);
       } catch (error) {
         console.error("Không thể bắt đầu cuộc gọi:", error);
         resetCallState();
@@ -386,6 +457,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
 
       activeConversationRef.current = incomingCall.conversationId;
       setCallType(incomingCall.callType);
+      setIsGroup(!!incomingCall.isGroup);
       setIsInCall(true);
 
       socketService.joinCall(
@@ -584,12 +656,24 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       userId: string;
       participants: string[];
       callType: CallType;
+      isGroup?: boolean;
+      livekitToken?: string;
     }) => {
       if (!userId || payload.conversationId !== activeConversationRef.current)
         return;
 
       setParticipants(payload.participants);
       setCallType(payload.callType);
+      setIsGroup(!!payload.isGroup);
+      if (payload.livekitToken) {
+        setLivekitToken(payload.livekitToken);
+      }
+
+      if (payload.isGroup) {
+        // SFU mode: do not create peer connections
+        return;
+      }
+
       if (!localStreamRef.current) return;
 
       // Full-mesh strategy for group call: every existing participant creates
@@ -837,6 +921,8 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       isCameraOff,
       isScreenSharing,
       remoteCameraStates,
+      isGroup,
+      livekitToken,
       startCall,
       joinExistingCall,
       acceptIncomingCall,
@@ -867,6 +953,8 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       toggleCamera,
       toggleMic,
       toggleScreenShare,
+      isGroup,
+      livekitToken,
     ],
   );
 };
