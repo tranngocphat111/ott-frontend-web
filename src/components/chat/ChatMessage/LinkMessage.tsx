@@ -103,7 +103,10 @@ export const LinkMessage = ({
           className={`group relative shadow-sm transition-all border overflow-hidden ${isMe
               ? "bg-chat-me text-chat-me-text border-white/10"
               : "bg-chat-other text-chat-other-text border-black/5"
-            } ${borderRadius} ${isGroupInviteLink ? "max-w-[320px] bg-white border-blue-100" : "max-w-[320px]"}`}
+            } ${borderRadius} ${isGroupInviteLink
+              ? "max-w-[320px] bg-white border-stone-200"
+              : "max-w-[320px]"
+            }`}
         >
           {safeLink ? (
             isGroupInviteLink ? (
@@ -113,18 +116,19 @@ export const LinkMessage = ({
                 rel="noopener noreferrer"
                 className="block no-underline group/link"
               >
-                <div className="px-3 pt-3 pb-2 break-all text-[13px] text-primary-600 underline">
+                <div className="px-3 pt-3 pb-2 break-all text-[13px] text-stone-600 underline">
                   {safeLink}
                 </div>
-                <div className="mx-3 mb-3 border border-gray-200 rounded-xl overflow-hidden bg-white hover:shadow-md transition-shadow">
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 px-4 py-6 flex items-center gap-4 text-white relative overflow-hidden">
+                <div className="mx-3 mb-3 border border-stone-100 rounded-xl overflow-hidden bg-white hover:shadow-md transition-shadow">
+                  {/* Header Gradient: Chuyển sang tông nâu đậm (Brown/Stone) */}
+                  <div className="bg-gradient-to-br from-[#78350f] to-[#451a03] px-4 py-6 flex items-center gap-4 text-white relative overflow-hidden">
                     {/* Circle decorations */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3"></div>
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/3 -translate-x-1/4"></div>
 
                     <div className="w-14 h-14 bg-white flex items-center justify-center shrink-0 rounded-full shadow-sm z-10">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                      <div className="w-12 h-12 bg-stone-50 rounded-full flex items-center justify-center">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-500">
                           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
                           <circle cx="9" cy="7" r="4"></circle>
                           <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -133,13 +137,13 @@ export const LinkMessage = ({
                       </div>
                     </div>
                     <div className="z-10">
-                      <div className="text-white/90 text-[13px] font-medium mb-0.5">Nhóm</div>
+                      <div className="text-white/80 text-[13px] font-medium mb-0.5">Nhóm</div>
                       <div className="font-bold text-base leading-tight">Link tham gia nhóm</div>
                     </div>
                   </div>
                   <div className="px-3 py-2 bg-white">
-                    <div className="text-[14px] font-semibold text-gray-900 mb-0.5">Tham gia nhóm chat</div>
-                    <div className="text-[12px] text-gray-500">Bấm vào đây để tham gia nhóm</div>
+                    <div className="text-[14px] font-semibold text-stone-900 mb-0.5">Tham gia nhóm chat</div>
+                    <div className="text-[12px] text-stone-500">Bấm vào đây để tham gia nhóm</div>
                   </div>
                 </div>
               </a>

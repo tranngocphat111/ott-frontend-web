@@ -257,7 +257,7 @@ export class ConversationService {
   /**
    * Tham gia nhóm bằng invite link/token
    */
-  static async joinByInviteLink(token: string, userId: string): Promise<Conversation> {
+  static async joinByInviteLink(token: string, userId: string): Promise<{ conversation: Conversation; isNewJoin: boolean }> {
     const response = await authFetch(
       `${API_CHAT_SERVER_URL}/conversations/join-by-link`,
       {

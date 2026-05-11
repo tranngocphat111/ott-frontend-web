@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { ConversationService } from "../services/conversation.service";
 import { Users, Loader2, CheckCircle2, XCircle, LogIn } from "lucide-react";
 
-type JoinState = "loading" | "joining" | "success" | "error" | "need_login";
+type JoinState = "loading" | "joining" | "success" | "error" | "need_login" | "already_joined";
 
 const JoinGroupPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -45,9 +45,9 @@ const JoinGroupPage: React.FC = () => {
     setJoinState("joining");
 
     try {
-      const conversation = await ConversationService.joinByInviteLink(token, currentUser.id);
+      const { conversation, isNewJoin } = await ConversationService.joinByInviteLink(token, currentUser.id);
       setGroupName(conversation.name || "Nhóm");
-      setJoinState("success");
+      setJoinState(isNewJoin ? "success" : "already_joined");
 
       // Sau 1.5s → chuyển sang /chat và mở đúng conversation
       setTimeout(() => {
@@ -102,6 +102,20 @@ const JoinGroupPage: React.FC = () => {
             <h1 className="text-lg font-bold text-gray-900 mb-1">Tham gia thành công!</h1>
             <p className="text-sm text-gray-500 mb-4">
               Bạn đã tham gia nhóm <span className="font-semibold text-gray-800">"{groupName}"</span>.
+              Đang chuyển đến chat...
+            </p>
+            <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">
+              <div className="bg-primary-500 h-full rounded-full animate-[grow_1.5s_linear_forwards]" />
+            </div>
+          </>
+        )}
+
+        {joinState === "already_joined" && (
+          <>
+            <CheckCircle2 size={48} className="text-primary-500 mb-3" />
+            <h1 className="text-lg font-bold text-gray-900 mb-1">Đã tham gia nhóm</h1>
+            <p className="text-sm text-gray-500 mb-4">
+              Bạn đã ở trong nhóm <span className="font-semibold text-gray-800">"{groupName}"</span> rồi.
               Đang chuyển đến chat...
             </p>
             <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden">

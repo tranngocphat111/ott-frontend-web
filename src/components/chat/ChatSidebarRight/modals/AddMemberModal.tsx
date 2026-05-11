@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Search, Loader2, Copy, Check, Link2 } from "lucide-react";
 import { useAuth } from "../../../../contexts/AuthContext";
-import { ConversationService, fetchFriends } from "../../../../services";
+import { ConversationService, fetchFriends, MessageService } from "../../../../services";
 import Avatar from "../../../common/Avatar";
 import type { User } from "../../../../types";
 import { UserService } from "../../../../services/user.service";
@@ -118,15 +118,45 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
     if (selectedUsers.size === 0) return;
     setLoading(true);
     try {
-      const userIds = Array.from(selectedUsers);
-      const result = await ConversationService.addMembers(conversationId, userIds, currentUser?.id || "");
-      onMembersAdded(result.members || []);
+      const allSelectedIds = Array.from(selectedUsers);
+      const friendIds = allSelectedIds.filter(id => availableUsers.some(u => (u.user_id || u._id) === id));
+      const strangerIds = allSelectedIds.filter(id => !availableUsers.some(u => (u.user_id || u._id) === id));
+
+      if (friendIds.length > 0) {
+        const result = await ConversationService.addMembers(conversationId, friendIds, currentUser?.id || "");
+        onMembersAdded(result.members || []);
+      }
+
+      if (strangerIds.length > 0) {
+        let currentLink = inviteLink;
+        if (!currentLink) {
+          currentLink = await ConversationService.getInviteLink(conversationId, currentUser?.id || "");
+          setInviteLink(currentLink);
+        }
+        const linkToSend = currentLink || `${window.location.origin}/join?token=${conversationId}`;
+
+        for (const strangerId of strangerIds) {
+          const directConv = await ConversationService.getOrCreatePrivateConversation(currentUser!.id, strangerId);
+          await MessageService.sendMessage(
+            directConv.conversation._id,
+            currentUser!.id,
+            linkToSend,
+            "link"
+          );
+        }
+      }
+
       onClose();
       setSelectedUsers(new Set());
       setSearchTerm("");
-      showToast(`Đã thêm ${userIds.length} thành viên vào nhóm`, "success");
+      setPhoneSearchUser(null);
+      if (strangerIds.length > 0 && friendIds.length === 0) {
+        showToast(`Đã gửi link mời tham gia nhóm`, "success");
+      } else {
+        showToast(`Đã thêm thành viên thành công`, "success");
+      }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Không thể thêm thành viên", "error");
+      showToast(error instanceof Error ? error.message : "Có lỗi xảy ra", "error");
     } finally {
       setLoading(false);
     }
@@ -170,8 +200,8 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <button
             onClick={() => setActiveTab("friends")}
             className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${activeTab === "friends"
-                ? "text-primary-600 border-b-2 border-primary-500"
-                : "text-gray-500 hover:text-gray-700"
+              ? "text-primary-600 border-b-2 border-primary-500"
+              : "text-gray-500 hover:text-gray-700"
               }`}
           >
             Từ danh sách bạn bè
@@ -179,8 +209,8 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <button
             onClick={() => setActiveTab("link")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors cursor-pointer ${activeTab === "link"
-                ? "text-primary-600 border-b-2 border-primary-500"
-                : "text-gray-500 hover:text-gray-700"
+              ? "text-primary-600 border-b-2 border-primary-500"
+              : "text-gray-500 hover:text-gray-700"
               }`}
           >
             <Link2 size={14} />
@@ -313,7 +343,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   className="cursor-pointer flex items-center gap-2 px-6 py-2 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 shadow-md shadow-primary-500/20 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                 >
                   {loading && <Loader2 size={16} className="animate-spin" />}
-                  {loading ? "Đang xử lý..." : "Thêm vào nhóm"}
+                  {loading ? "Đang xử lý..." : (Array.from(selectedUsers).some(id => !availableUsers.some(u => (u.user_id || u._id) === id)) ? "Gửi link mời" : "Thêm vào nhóm")}
                 </button>
               </div>
             </div>
