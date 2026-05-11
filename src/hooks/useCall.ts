@@ -502,8 +502,11 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
   const endCall = useCallback(() => {
     const activeConversationId = activeConversationRef.current;
     if (activeConversationId && userId) {
-      socketService.endCall(activeConversationId, userId);
-      socketService.leaveCall(activeConversationId, userId);
+      if (isGroup) {
+        socketService.leaveCall(activeConversationId, userId);
+      } else {
+        socketService.endCall(activeConversationId, userId);
+      }
     }
 
     cleanupAllPeers();
