@@ -889,7 +889,16 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                             <QrCode size={16} />
                           </button>
                           <button
-                            onClick={() => setShowInviteLinkModal(true)}
+                            onClick={async () => {
+                              try {
+                                if (!currentUser?.id || !conversation._id) return;
+                                const link = await ConversationService.getInviteLink(conversation._id, currentUser.id);
+                                await navigator.clipboard.writeText(link);
+                                showToast("Đã sao chép link tham gia nhóm!", "success");
+                              } catch (err) {
+                                showToast("Không thể sao chép link", "error");
+                              }
+                            }}
                             title="Sao chép link"
                             className="cursor-pointer p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-primary-600"
                           >
