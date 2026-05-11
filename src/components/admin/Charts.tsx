@@ -16,6 +16,7 @@ import {
 import EmptyState from "./EmptyState";
 import type {
   DailyActivityPoint,
+  DailyUserTrendPoint,
   EventReport,
 } from "../../interfaces/admin.interface";
 
@@ -27,8 +28,15 @@ type PieChartsProps = {
 
 type AreaChartsProps = {
   title: string;
-  data: DailyActivityPoint[];
+  data: Array<DailyActivityPoint | DailyUserTrendPoint>;
   variant: "area";
+  series?: Array<{
+    key: string;
+    label: string;
+    stroke: string;
+    fillId: string;
+    gradientStop: string;
+  }>;
 };
 
 type ChartsProps = PieChartsProps | AreaChartsProps;
@@ -39,6 +47,27 @@ const formatNumber = new Intl.NumberFormat("vi-VN");
 
 const Charts: React.FC<ChartsProps> = (props) => {
   const { title, variant, data } = props;
+  const areaSeries =
+    variant === "area" && props.series
+      ? props.series
+      : variant === "area"
+        ? [
+            {
+              key: "posts",
+              label: "Bài viết",
+              stroke: "#6366f1",
+              fillId: "fillPosts",
+              gradientStop: "#6366f1",
+            },
+            {
+              key: "messages",
+              label: "Tin nhắn",
+              stroke: "#0ea5e9",
+              fillId: "fillMessages",
+              gradientStop: "#0ea5e9",
+            },
+          ]
+        : [];
 
   const isEmpty =
     data.length === 0 ||
@@ -63,7 +92,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
     >
       <h3 className="text-sm font-semibold text-slate-700 mb-4">{title}</h3>
       {variant === "pie" ? (
-        <div className="h-[320px]">
+        <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -94,21 +123,34 @@ const Charts: React.FC<ChartsProps> = (props) => {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="h-[320px]">
+        <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={data as DailyActivityPoint[]}
+              data={data as Array<DailyActivityPoint | DailyUserTrendPoint>}
               margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
             >
               <defs>
-                <linearGradient id="fillPosts" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="fillMessages" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.02} />
-                </linearGradient>
+                {areaSeries.map((series) => (
+                  <linearGradient
+                    key={series.fillId}
+                    id={series.fillId}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor={series.gradientStop}
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={series.gradientStop}
+                      stopOpacity={0.02}
+                    />
+                  </linearGradient>
+                ))}
               </defs>
               <CartesianGrid strokeDasharray="4 4" vertical={false} />
               <XAxis dataKey="date" tick={{ fill: "#64748b", fontSize: 12 }} />
@@ -119,29 +161,27 @@ const Charts: React.FC<ChartsProps> = (props) => {
               <Tooltip
                 formatter={(value, name) => [
                   formatNumber.format(Number(value ?? 0)),
-                  name === "posts" ? "Bài viết" : "Tin nhắn",
+                  areaSeries.find((series) => series.key === name)?.label ??
+                    String(name),
                 ]}
                 labelFormatter={(label) => `Ngày ${label}`}
               />
               <Legend
                 formatter={(value) =>
-                  value === "posts" ? "Bài viết" : "Tin nhắn"
+                  areaSeries.find((series) => series.key === value)?.label ??
+                  String(value)
                 }
               />
-              <Area
-                type="monotone"
-                dataKey="posts"
-                stroke="#6366f1"
-                fill="url(#fillPosts)"
-                strokeWidth={3}
-              />
-              <Area
-                type="monotone"
-                dataKey="messages"
-                stroke="#0ea5e9"
-                fill="url(#fillMessages)"
-                strokeWidth={3}
-              />
+              {areaSeries.map((series) => (
+                <Area
+                  key={series.key}
+                  type="monotone"
+                  dataKey={series.key}
+                  stroke={series.stroke}
+                  fill={`url(#${series.fillId})`}
+                  strokeWidth={3}
+                />
+              ))}
             </AreaChart>
           </ResponsiveContainer>
         </div>

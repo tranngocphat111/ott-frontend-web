@@ -1,6 +1,8 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import AdminRoute from "./AdminRoute";
+import type { AdminRole } from "../types";
 
 import LandingPage from "../pages/LandingPage";
 import LoginPage from "../pages/LoginPage";
@@ -22,6 +24,11 @@ import ChangeEmailPage from "../pages/ChangeEmailPage";
 import ChangePhonePage from "../pages/ChangePhonePage";
 import TwoFactorAuthPage from "../pages/TwoFactorAuthPage";
 import DeleteAccountPage from "../pages/DeleteAccountPage";
+import Dashboard from "../pages/admin/Dashboard";
+import ContentModeration from "../pages/admin/ContentModeration";
+import UserManagement from "../pages/admin/UserManagement";
+import AuditLogs from "../pages/admin/AuditLogs";
+import AdminLayout from "../components/admin/AdminLayout";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
@@ -172,6 +179,52 @@ export const AppRouter: React.FC = () => {
           <PrivateRoute>
             <TwoFactorAuthPage />
           </PrivateRoute>
+        }
+      />
+
+      {/* Admin routes */}
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute allowedRoles={["SUPER_ADMIN", "ANALYST"] as AdminRole[]}>
+            <AdminLayout>
+              <Dashboard />
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/moderation"
+        element={
+          <AdminRoute
+            allowedRoles={["SUPER_ADMIN", "MODERATOR"] as AdminRole[]}
+          >
+            <AdminLayout>
+              <ContentModeration />
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <AdminRoute
+            allowedRoles={["SUPER_ADMIN", "MODERATOR"] as AdminRole[]}
+          >
+            <AdminLayout>
+              <UserManagement />
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/audit-logs"
+        element={
+          <AdminRoute allowedRoles={["SUPER_ADMIN"] as AdminRole[]}>
+            <AdminLayout>
+              <AuditLogs />
+            </AdminLayout>
+          </AdminRoute>
         }
       />
 

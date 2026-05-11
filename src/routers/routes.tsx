@@ -13,6 +13,7 @@ import { SocialProfile } from "../pages/social";
 import Dashboard from "../pages/admin/Dashboard";
 import ContentModeration from "../pages/admin/ContentModeration";
 import UserManagement from "../pages/admin/UserManagement";
+import AuditLogs from "../pages/admin/AuditLogs";
 import AdminLayout from "../components/admin/AdminLayout";
 
 /**
@@ -87,6 +88,16 @@ export const routes: RouteObject[] = [
         <UserManagement />
       </AdminLayout>
     ),
+  },
+  {
+    path: "/admin/audit-logs",
+    element: (
+      <AdminLayout>
+        <AuditLogs />
+      </AdminLayout>
+    ),
+  },
+  {
     path: "/call",
     element: <CallPage />,
   },
@@ -107,8 +118,11 @@ export const ROUTE_PATHS = {
   SOCIAL: "/social",
   ADMIN: "/admin",
   ADMIN_MODERATION: "/admin/moderation",
+  ADMIN_USERS: "/admin/users",
+  ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   CALL: "/call",
   SOCIAL_PROFILE: (userId?: string) =>
+    userId ? `/social/profile/${userId}` : "/social/profile/:userId",
 } as const;
 
 export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];

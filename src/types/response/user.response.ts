@@ -1,4 +1,4 @@
-import { AccountType, Gender, DeviceType, LoginMethod } from '../enums';
+import { AccountType, Gender, DeviceType, LoginMethod } from "../enums";
 
 export interface UserResponse {
   id: string;

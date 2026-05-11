@@ -1,13 +1,18 @@
 import type {
   DailyActivityPoint,
   DailyPostPoint,
+  DailyUserTrendPoint,
+  LoginMethodCount,
   MessageTypesResponse,
+  PaginatedAuditLogsResponse,
   OverviewResponse,
+  PaginatedRecentUsersResponse,
   TimeRange,
   UserSummary,
 } from "../interfaces/admin.interface";
 
-const ADMIN_ANALYTIC_BASE_URL = "http://localhost:8090";
+const ADMIN_ANALYTIC_BASE_URL =
+  import.meta.env.VITE_ADMIN_ANALYTIC_BASE_URL || "http://localhost:8092";
 
 class AdminApiError extends Error {
   status: number;
@@ -20,7 +25,10 @@ class AdminApiError extends Error {
 }
 
 function buildUrl(path: string, timeRange?: TimeRange) {
-  const url = new URL(`${ADMIN_ANALYTIC_BASE_URL}${path}`);
+  const baseUrl = ADMIN_ANALYTIC_BASE_URL.endsWith("/")
+    ? ADMIN_ANALYTIC_BASE_URL.slice(0, -1)
+    : ADMIN_ANALYTIC_BASE_URL;
+  const url = new URL(`${baseUrl}${path}`);
 
   if (timeRange) {
     url.searchParams.set("timeRange", timeRange);
@@ -29,8 +37,26 @@ function buildUrl(path: string, timeRange?: TimeRange) {
   return url.toString();
 }
 
-async function getJson<T>(path: string, timeRange?: TimeRange): Promise<T> {
-  const response = await fetch(buildUrl(path, timeRange), {
+function buildUrlWithParams(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+) {
+  const baseUrl = ADMIN_ANALYTIC_BASE_URL.endsWith("/")
+    ? ADMIN_ANALYTIC_BASE_URL.slice(0, -1)
+    : ADMIN_ANALYTIC_BASE_URL;
+  const url = new URL(`${baseUrl}${path}`);
+
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).length > 0) {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -53,22 +79,47 @@ function isNotFoundError(error: unknown): error is AdminApiError {
 
 export const adminService = {
   getOverview: (timeRange: TimeRange = "allTime") =>
-    getJson<OverviewResponse>("/api/v1/admin/analytics/overview", timeRange),
+    getJson<OverviewResponse>(
+      buildUrl("/api/v1/admin/analytics/overview", timeRange),
+    ),
 
   getRecentUsers: (timeRange: TimeRange = "allTime") =>
-    getJson<UserSummary[]>("/api/v1/admin/analytics/users/recent", timeRange),
+    getJson<UserSummary[]>(
+      buildUrl("/api/v1/admin/analytics/users/recent", timeRange),
+    ),
 
   getMessageTypes: (timeRange: TimeRange = "allTime") =>
     getJson<MessageTypesResponse>(
-      "/api/v1/admin/analytics/messages/types",
-      timeRange,
+      buildUrl("/api/v1/admin/analytics/messages/types", timeRange),
+    ),
+
+  getLoginMethods: (timeRange: TimeRange = "allTime") =>
+    getJson<LoginMethodCount[]>(
+      buildUrl("/api/v1/admin/analytics/logins/methods", timeRange),
+    ),
+
+  getRecentUsersPage: (
+    timeRange: TimeRange = "allTime",
+    params?: { query?: string; page?: number; size?: number },
+  ) =>
+    getJson<PaginatedRecentUsersResponse>(
+      buildUrlWithParams("/api/v1/admin/analytics/users/recent", {
+        timeRange,
+        query: params?.query,
+        page: params?.page ?? 0,
+        size: params?.size ?? 10,
+      }),
+    ),
+
+  getUserDailyTrend: (timeRange: TimeRange = "allTime") =>
+    getJson<DailyUserTrendPoint[]>(
+      buildUrl("/api/v1/admin/analytics/users/daily-trend", timeRange),
     ),
 
   getDailyActivity: async (timeRange: TimeRange = "allTime") => {
     try {
       return await getJson<DailyActivityPoint[]>(
-        "/api/v1/admin/analytics/social/activity/daily",
-        timeRange,
+        buildUrl("/api/v1/admin/analytics/social/activity/daily", timeRange),
       );
     } catch (error) {
       if (!isNotFoundError(error)) {
@@ -76,8 +127,7 @@ export const adminService = {
       }
 
       const legacyPosts = await getJson<DailyPostPoint[]>(
-        "/api/v1/admin/analytics/social/posts/daily",
-        timeRange,
+        buildUrl("/api/v1/admin/analytics/social/posts/daily", timeRange),
       );
 
       return legacyPosts.map((item) => ({
@@ -90,7 +140,14 @@ export const adminService = {
 
   getDailyPosts: (timeRange: TimeRange = "allTime") =>
     getJson<DailyPostPoint[]>(
-      "/api/v1/admin/analytics/social/posts/daily",
-      timeRange,
+      buildUrl("/api/v1/admin/analytics/social/posts/daily", timeRange),
+    ),
+
+  getAuditLogsPage: (params?: { page?: number; size?: number }) =>
+    getJson<PaginatedAuditLogsResponse>(
+      buildUrlWithParams("/api/v1/admin/analytics/audit-logs", {
+        page: params?.page ?? 0,
+        size: params?.size ?? 10,
+      }),
     ),
 };
