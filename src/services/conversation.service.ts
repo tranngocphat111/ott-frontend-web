@@ -272,4 +272,23 @@ export class ConversationService {
     }
     return await response.json();
   }
+
+  /**
+   * Lấy thông tin nhóm từ token mà không tham gia
+   */
+  static async getInviteLinkInfo(token: string, userId?: string): Promise<{ conversation: Conversation; isMember: boolean }> {
+    const url = userId 
+      ? `${API_CHAT_SERVER_URL}/conversations/invite-link/${token}?userId=${encodeURIComponent(userId)}`
+      : `${API_CHAT_SERVER_URL}/conversations/invite-link/${token}`;
+      
+    const response = await authFetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to get invite link info");
+    }
+    return await response.json();
+  }
 }

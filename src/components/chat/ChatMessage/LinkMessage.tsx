@@ -1,8 +1,10 @@
 // src/components/Chat/ChatMessage/LinkMessage.tsx
-import { useMemo } from "react";
-import { Globe, ArrowUpRight, Link as LinkIcon } from "lucide-react";
-import type { Message } from "../../../types";
+import { useMemo, useState, useEffect } from "react";
+import { Globe, ArrowUpRight, Link as LinkIcon, Loader2 } from "lucide-react";
+import type { Message, Conversation } from "../../../types";
 import { MessageLayout } from "./MessageLayout";
+import { ConversationService } from "../../../services/conversation.service";
+import { useToast } from "../../../contexts/ToastContext";
 
 const getSafeLink = (rawValue: string): string | null => {
   const trimmed = rawValue.trim();
@@ -82,7 +84,79 @@ export const LinkMessage = ({
     }
   }, [safeLink]);
 
+  const inviteToken = useMemo(() => {
+    if (!isGroupInviteLink || !safeLink) return null;
+    const url = new URL(safeLink);
+    return url.searchParams.get("token");
+  }, [isGroupInviteLink, safeLink]);
+
+  const [groupInfo, setGroupInfo] = useState<{ conversation: Conversation; isMember: boolean } | null>(null);
+  const [loadingGroup, setLoadingGroup] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (inviteToken && isGroupInviteLink) {
+      setLoadingGroup(true);
+      ConversationService.getInviteLinkInfo(inviteToken, currentUserId)
+        .then((data) => setGroupInfo(data))
+        .catch(() => {}) // Ignore errors (e.g. invalid link)
+        .finally(() => setLoadingGroup(false));
+    }
+  }, [inviteToken, isGroupInviteLink, currentUserId]);
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (isGroupInviteLink) {
+      e.preventDefault();
+      if (!groupInfo) {
+         showToast("Link mời không hợp lệ hoặc đã hết hạn", "error");
+         return;
+      }
+      if (groupInfo.isMember) {
+        // Already in group, navigate directly
+        window.dispatchEvent(
+          new CustomEvent("chat:open-conversation", {
+            detail: {
+              conversationId: groupInfo.conversation._id,
+              conversation: groupInfo.conversation,
+            },
+          })
+        );
+      } else {
+        // Show confirm modal
+        setShowConfirm(true);
+      }
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!inviteToken || !currentUserId || !groupInfo) return;
+    setJoining(true);
+    try {
+      const { conversation } = await ConversationService.joinByInviteLink(inviteToken, currentUserId);
+      setShowConfirm(false);
+      showToast("Tham gia nhóm thành công!", "success");
+      // Cập nhật state nội bộ
+      setGroupInfo({ conversation, isMember: true });
+      // Điều hướng tới nhóm
+      window.dispatchEvent(
+        new CustomEvent("chat:open-conversation", {
+          detail: {
+            conversationId: conversation._id,
+            conversation,
+          },
+        })
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Không thể tham gia nhóm", "error");
+    } finally {
+      setJoining(false);
+    }
+  };
+
   return (
+    <>
     <MessageLayout
       msg={msg}
       isMe={isMe}
@@ -112,9 +186,8 @@ export const LinkMessage = ({
             isGroupInviteLink ? (
               <a
                 href={safeLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block no-underline group/link"
+                onClick={handleLinkClick}
+                className="block no-underline group/link cursor-pointer"
               >
                 {/* Dùng màu primary-700 cho text link trên nền trắng */}
                 <div className="px-3 pt-3 pb-2 break-all text-[13px] text-primary-700 underline opacity-80">
@@ -126,24 +199,35 @@ export const LinkMessage = ({
                   <div className="bg-primary-500 px-4 py-6 flex items-center gap-4 text-white relative overflow-hidden">
                     <div className="w-14 h-14 bg-white flex items-center justify-center shrink-0 rounded-full shadow-sm z-10">
                       <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-500">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                          <circle cx="9" cy="7" r="4"></circle>
-                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
+                        {loadingGroup ? (
+                           <Loader2 size={24} className="text-primary-500 animate-spin" />
+                        ) : (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-500">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                          </svg>
+                        )}
                       </div>
                     </div>
-                    <div className="z-10">
+                    <div className="z-10 flex-1 min-w-0">
                       <div className="text-white/80 text-[13px] font-medium mb-0.5">Nhóm</div>
-                      <div className="font-bold text-base leading-tight font-display">Link tham gia nhóm</div>
+                      <div className="font-bold text-base leading-tight font-display truncate">
+                        {loadingGroup ? "Đang tải..." : (groupInfo?.conversation?.name || "Link tham gia nhóm")}
+                      </div>
                     </div>
                   </div>
 
                   {/* Footer Card: Text dùng tone primary đậm */}
-                  <div className="px-3 py-2 bg-surface">
-                    <div className="text-[14px] font-semibold text-primary-900 mb-0.5 font-body">Tham gia nhóm chat</div>
-                    <div className="text-[12px] text-primary-600 opacity-70">Bấm vào đây để tham gia nhóm</div>
+                  <div className="px-3 py-2 bg-surface flex justify-between items-center">
+                    <div>
+                      <div className="text-[14px] font-semibold text-primary-900 mb-0.5 font-body">Tham gia nhóm chat</div>
+                      <div className="text-[12px] text-primary-600 opacity-70">Bấm vào đây để tham gia nhóm</div>
+                    </div>
+                    {groupInfo?.isMember && (
+                       <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full whitespace-nowrap">Đã tham gia</span>
+                    )}
                   </div>
                 </div>
               </a>
@@ -219,5 +303,32 @@ export const LinkMessage = ({
         </div>
       )}
     </MessageLayout>
+    {showConfirm && (
+      <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Tham gia nhóm</h3>
+          <p className="text-gray-600 mb-6 text-sm">
+            Bạn có muốn tham gia nhóm <span className="font-bold text-gray-900">{groupInfo?.conversation?.name}</span> không?
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={handleJoinGroup}
+              disabled={joining}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              {joining ? <Loader2 size={16} className="animate-spin" /> : null}
+              Tham gia
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
