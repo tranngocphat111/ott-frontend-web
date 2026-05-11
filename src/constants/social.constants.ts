@@ -13,6 +13,7 @@ export const AVATAR_COLORS = [
 export const DEFAULT_USER: User = {
     id: "",
     name: "Người dùng",
+    displayName: "Người dùng",
     color: "bg-primary-500",
 };
 

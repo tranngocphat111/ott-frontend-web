@@ -19,6 +19,7 @@ export interface ApiSuggestedUser {
     id: string;
     username: string;
     displayName: string | null;
+    avatarUrl: string | null;
 }
 
 export interface ApiStoryReel {
@@ -74,11 +75,34 @@ export interface StoryUploadResponse {
     fileKey: string;
 }
 
+function unwrapApiResult<T>(payload: unknown): T | null {
+    if (!payload) return null;
+
+    // Handle Jackson Polymorphic Array: ["className", { ...data }]
+    if (
+        Array.isArray(payload) &&
+        payload.length === 2 &&
+        typeof payload[0] === "string"
+    ) {
+        return payload[1] as T;
+    }
+
+    if (typeof payload !== "object") return null;
+    if ("result" in (payload as any)) return (payload as any).result ?? null;
+    return payload as T;
+}
+
 function unwrapList<T>(json: unknown): T[] {
-    if (Array.isArray(json)) return json as T[];
-    const obj = json as Record<string, unknown>;
-    if (Array.isArray(obj.value)) return obj.value as T[];
-    return [];
+    const data = unwrapApiResult<T[]>(json);
+    if (!Array.isArray(data)) {
+        const obj = data as any;
+        if (obj && Array.isArray(obj.value)) return obj.value;
+        return [];
+    }
+    // Each element might be ["className", {data}]
+    return data
+        .map((item) => unwrapApiResult<T>(item))
+        .filter((item) => item !== null) as T[];
 }
 
 function groupStories(raw: ApiStory[]): StoryUserGroup[] {
@@ -167,7 +191,8 @@ function mapStoryGroups(raw: ApiStoryGroup[]): StoryUserGroup[] {
 function mapSuggestedUsers(raw: ApiSuggestedUser[]): StorySuggestedUser[] {
     return raw.map((user) => ({
         id: user.id,
-        name: user.displayName ?? user.username,
+        name: user.displayName || user.username || "Người dùng",
+        avatarUrl: user.avatarUrl ?? undefined,
     }));
 }
 
@@ -180,9 +205,13 @@ export async function fetchStoryGroups(accountId: string): Promise<StoryUserGrou
         );
 
         if (reelRes.ok) {
-            const reel = (await reelRes.json()) as ApiStoryReel;
-            if (Array.isArray(reel.storyGroups) && reel.storyGroups.length > 0) {
-                return mapStoryGroups(reel.storyGroups);
+            const json = await reelRes.json();
+            const reel = unwrapApiResult<ApiStoryReel>(json);
+            if (!reel) return [];
+            
+            const storyGroups = unwrapList<ApiStoryGroup>(reel.storyGroups);
+            if (storyGroups.length > 0) {
+                return mapStoryGroups(storyGroups);
             }
             if (Array.isArray(reel.stories) && reel.stories.length > 0) {
                 return groupStories(reel.stories);
@@ -207,9 +236,12 @@ export async function fetchSuggestedUsers(accountId: string, limit = 8): Promise
         );
 
         if (!reelRes.ok) return [];
-        const reel = (await reelRes.json()) as ApiStoryReel;
-        if (!Array.isArray(reel.suggestedUsers)) return [];
-        return mapSuggestedUsers(reel.suggestedUsers);
+        const json = await reelRes.json();
+        const reel = unwrapApiResult<ApiStoryReel>(json);
+        if (!reel) return [];
+        
+        const suggestedUsers = unwrapList<ApiSuggestedUser>(reel.suggestedUsers);
+        return mapSuggestedUsers(suggestedUsers);
     } catch {
         return [];
     }
@@ -229,7 +261,8 @@ export async function createStory(request: StoryCreateRequest): Promise<ApiStory
             signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) return null;
-        return (await res.json()) as ApiStory;
+        const json = await res.json();
+        return unwrapApiResult<ApiStory>(json);
     } catch {
         return null;
     }
@@ -249,7 +282,8 @@ export async function uploadStoryMedia(file: File, storyItemId?: string): Promis
             signal: AbortSignal.timeout(15_000),
         });
         if (!res.ok) return null;
-        return (await res.json()) as StoryUploadResponse;
+        const json = await res.json();
+        return unwrapApiResult<StoryUploadResponse>(json);
     } catch {
         return null;
     }

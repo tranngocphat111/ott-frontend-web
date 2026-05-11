@@ -15,7 +15,7 @@ const UserAvatar: React.FC<Props> = ({ user, size = "size-10" }) =>
     />
   : <div
       className={`${size} rounded-full ${user.color} flex items-center justify-center text-white font-bold text-sm shrink-0`}>
-      {user.name.split(" ").pop()?.charAt(0)}
+      {(user.name || "?").split(" ").pop()?.charAt(0) ?? "?"}
     </div>;
 
 export default UserAvatar;

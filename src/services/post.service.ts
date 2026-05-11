@@ -74,8 +74,11 @@ export function relativeTime(iso: string | null | undefined): string {
 
 /** ApiMedia[] → PostMediaItem[] */
 export function mapMedia(medias: ApiMedia[] | null): PostMediaItem[] {
-    if (!medias?.length) return [];
-    return [...medias]
+    if (!medias) return [];
+    const list = unwrapList<ApiMedia>(medias);
+    if (!list.length) return [];
+
+    return list
         .sort((a, b) => a.orderIndex - b.orderIndex)
         .map((m) => ({
             type: m.type === "VIDEO_MEDIA" ? "video" : "image",
@@ -89,8 +92,8 @@ export function mapMedia(medias: ApiMedia[] | null): PostMediaItem[] {
 export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string): Post {
     const author: PostUser = {
         id: p.accountId,
-        name: p.accountDisplayName ?? p.accountUsername,
-        displayName: p.accountDisplayName ?? p.accountUsername,
+        name: p.accountDisplayName || p.accountUsername || "Người dùng",
+        displayName: p.accountDisplayName || p.accountUsername || "Người dùng",
         avatar: p.accountAvatarUrl ?? undefined,
         color: colorFor(colorIndex),
     };
@@ -109,12 +112,35 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
     };
 }
 
-/** Unwrap response: backend có thể trả array thẳng hoặc { value: [...] } */
+/** Unwrap response: backend có thể trả array thẳng hoặc { value: [...] } hoặc Jackson Polymorphic ["class", data] */
+function unwrapApiResult<T>(payload: unknown): T | null {
+    if (!payload) return null;
+
+    // Handle Jackson Polymorphic Array: ["className", { ...data }]
+    if (
+        Array.isArray(payload) &&
+        payload.length === 2 &&
+        typeof payload[0] === "string"
+    ) {
+        return payload[1] as T;
+    }
+
+    if (typeof payload !== "object") return null;
+    if ("result" in (payload as any)) return (payload as any).result ?? null;
+    return payload as T;
+}
+
 function unwrapList<T>(json: unknown): T[] {
-    if (Array.isArray(json)) return json as T[];
-    const obj = json as Record<string, unknown>;
-    if (Array.isArray(obj.value)) return obj.value as T[];
-    return [];
+    const data = unwrapApiResult<T[]>(json);
+    if (!Array.isArray(data)) {
+        const obj = data as any;
+        if (obj && Array.isArray(obj.value)) return obj.value;
+        return [];
+    }
+    // Each element might be ["className", {data}]
+    return data
+        .map((item) => unwrapApiResult<T>(item))
+        .filter((item) => item !== null) as T[];
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -177,11 +203,16 @@ export async function fetchPostsWithPage(
         );
         if (!res.ok) return null;
 
-        const data: SpringPage<ApiPost> = await res.json();
+        const json = await res.json();
+        const data = unwrapApiResult<SpringPage<ApiPost>>(json);
+        if (!data) return null;
+
         const colorMap = new Map<string, number>();
         let colorIdx = 0;
 
-        const posts = (data.content ?? []).map((p) => {
+        const unwrappedContent = unwrapList<ApiPost>(data.content ?? []);
+
+        const posts = unwrappedContent.map((p) => {
             if (!colorMap.has(p.accountId)) colorMap.set(p.accountId, colorIdx++);
             return mapPost(p, colorMap.get(p.accountId)!, currentUserId);
         });
@@ -210,11 +241,16 @@ export async function findPostsWithAuthorized(
         );
         if (!res.ok) return null;
 
-        const data: SpringPage<ApiPost> = await res.json();
+        const json = await res.json();
+        const data = unwrapApiResult<SpringPage<ApiPost>>(json);
+        if (!data) return null;
+
         const colorMap = new Map<string, number>();
         let colorIdx = 0;
 
-        const posts = (data.content ?? []).map((p) => {
+        const unwrappedContent = unwrapList<ApiPost>(data.content ?? []);
+
+        const posts = unwrappedContent.map((p) => {
             if (!colorMap.has(p.accountId)) colorMap.set(p.accountId, colorIdx++);
             return mapPost(p, colorMap.get(p.accountId)!, currentUserId);
         });
@@ -262,7 +298,9 @@ export async function fetchPostById(postId: string, currentUserId?: string): Pro
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return null;
-        const p: ApiPost = await res.json();
+        const json = await res.json();
+        const p = unwrapApiResult<ApiPost>(json);
+        if (!p) return null;
         return mapPost(p, 0, currentUserId);
     } catch {
         return null;
@@ -340,7 +378,9 @@ export async function createPost(
             };
         }
 
-        const p: ApiPost = await res.json();
+        const json = await res.json();
+        const p = unwrapApiResult<ApiPost>(json);
+        if (!p) return { post: null, error: "Dữ liệu trả về không hợp lệ" };
         return { post: mapPost(p, 0, accountId) };
     } catch (err) {
         console.error("[createPost] Network/timeout error:", err);
@@ -417,7 +457,9 @@ export async function updatePost(
                 ),
             };
         }
-        const p: ApiPost = await res.json();
+        const json = await res.json();
+        const p = unwrapApiResult<ApiPost>(json);
+        if (!p) return { post: null, error: "Dữ liệu trả về không hợp lệ" };
         return { post: mapPost(p, 0, accountId) };
     } catch (err) {
         console.error("[updatePost] Network/timeout error:", err);
@@ -473,7 +515,9 @@ export async function toggleLike(
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return null;
-        const data = await res.json();
+        const json = await res.json();
+        const data = unwrapApiResult<any>(json);
+        if (!data) return null;
         return {
             liked: data.liked as boolean,
             totalReactions: data.totalReactions as number,
@@ -507,8 +551,8 @@ export async function fetchUserReactions(accountId: string): Promise<ApiReaction
             { signal: AbortSignal.timeout(5_000) },
         );
         if (!res.ok) return [];
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
+        const json = await res.json();
+        return unwrapList<ApiReaction>(json);
     } catch {
         return [];
     }
@@ -524,7 +568,8 @@ export async function fetchPostReactions(postId: string): Promise<Record<string,
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return {};
-        const data: ApiReaction[] = await res.json();
+        const json = await res.json();
+        const data = unwrapList<ApiReaction>(json);
         const counts: Record<string, number> = {};
         for (const r of data) {
             const key = r.reactionType.toLowerCase();
@@ -545,7 +590,8 @@ export async function fetchPostReactionDetails(postId: string): Promise<ApiReact
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return [];
-        return await res.json() as ApiReaction[];
+        const json = await res.json();
+        return unwrapList<ApiReaction>(json);
     } catch {
         return [];
     }
@@ -589,7 +635,7 @@ export function mapComment(c: ApiComment): Comment {
     return {
         id: c.id,
         authorId: c.accountId,
-        authorName: c.accountDisplayName ?? c.accountUsername,
+        authorName: c.accountDisplayName || c.accountUsername || "Người dùng",
         authorAvatar: c.accountAvatarUrl ?? undefined,
         text: c.text,
         parentId: c.parentCommentId ?? undefined,
@@ -639,9 +685,11 @@ export async function fetchRootComments(
             return fetchRootCommentsFallback(postId, page, size);
         }
 
-        const data: SpringPage<ApiComment> = await res.json();
-        const content: ApiComment[] = Array.isArray(data.content) ? data.content : [];
-        console.debug(`[fetchRootComments] Got ${content.length} root comments from paginated endpoint`);
+        const json = await res.json();
+        const data = unwrapApiResult<SpringPage<ApiComment>>(json);
+        if (!data) return fetchRootCommentsFallback(postId, page, size);
+
+        const content = unwrapList<ApiComment>(data.content ?? []);
         return {
             comments: content.filter((c) => !c.deleted).map(mapComment),
             totalElements: data.totalElements ?? 0,
@@ -715,7 +763,10 @@ export async function fetchReplies(
             { signal: AbortSignal.timeout(8_000) },
         );
         if (!res.ok) return { comments: [], totalElements: 0, totalPages: 0, page, hasMore: false };
-        const data: SpringPage<ApiComment> = await res.json();
+        const json = await res.json();
+        const data = unwrapApiResult<SpringPage<ApiComment>>(json);
+        if (!data) return { comments: [], totalElements: 0, totalPages: 0, page, hasMore: false };
+
         const content: ApiComment[] = Array.isArray(data.content) ? data.content : [];
         return {
             comments: content.filter((c) => !c.deleted).map(mapComment),
@@ -765,7 +816,10 @@ export async function addComment(
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return null;
-        return mapComment(await res.json() as ApiComment);
+        const json = await res.json();
+        const c = unwrapApiResult<ApiComment>(json);
+        if (!c) return null;
+        return mapComment(c);
     } catch {
         return null;
     }

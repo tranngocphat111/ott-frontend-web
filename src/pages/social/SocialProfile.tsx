@@ -123,7 +123,7 @@ const SocialProfile: React.FC = () => {
     userId ||
     "Người dùng";
 
-  const shownAvatar = getFullUrl(localAvatar || profileUser?.avatarUrl || fallbackUser?.avatarUrl);
+  const shownAvatar = getFullUrl(localAvatar || profileUser?.avatarUrl);
   const shownCover = getFullUrl(localCover || profileUser?.coverUrl);
 
   return (

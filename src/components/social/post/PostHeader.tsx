@@ -1,5 +1,5 @@
 import React from "react";
-import { Globe, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
+import { Globe, Lock, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
 import type { PostUser } from "../types";
 import UserAvatar from "../UserAvatar";
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Film } from "lucide-react";
 import type { PostMediaItem } from "./types";
 
@@ -8,7 +8,20 @@ interface Props {
   isInView?: boolean;
 }
 
-const PostMediaGrid: React.FC<Props> = ({ media }) => {
+const PostMediaGrid: React.FC<Props> = ({ media, isInView }) => {
+  const videoRefs = useRef<Array<HTMLVideoElement | null>>([]);
+
+  useEffect(() => {
+    videoRefs.current.forEach((video) => {
+      if (!video) return;
+      if (isInView) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }, [isInView]);
+
   if (media.length === 0) return null;
 
   const visibleMedia = media.slice(0, 4);
@@ -18,8 +31,8 @@ const PostMediaGrid: React.FC<Props> = ({ media }) => {
 
   return (
     <div
-      className={`grid gap-1 bg-gray-900 overflow-hidden max-h-125 ${
-        isSingle ? "grid-cols-1" : "grid-cols-2"
+      className={`grid gap-1 bg-gray-900 overflow-hidden ${
+        isSingle ? "grid-cols-1" : "grid-cols-2 max-h-[600px]"
       }`}>
       {visibleMedia.map((item, index) => {
         const isSpanTwo = isThree && index === 2;
@@ -27,20 +40,23 @@ const PostMediaGrid: React.FC<Props> = ({ media }) => {
           <div
             key={index}
             className={`relative overflow-hidden ${
-              isSingle ? "h-100%" : "aspect-square"
+              isSingle ? "w-full" : "aspect-square"
             } ${isSpanTwo ? "col-span-2" : ""}`}>
             {item.type === "image" ?
               <img
                 src={item.url}
-                alt=""
-                className={`w-full h-full ${isSingle ? "object-contain" : "object-cover"}`}
+                alt={item.caption || "Post image"}
+                loading="lazy"
+                className={`w-full h-full ${isSingle ? "max-h-[70vh] object-contain" : "object-cover"}`}
               />
-            : <div className="relative w-full h-full">
+            : <div className={`relative w-full h-full ${isSingle ? "max-h-[70vh]" : ""}`}>
                 <video
+                  ref={(el) => (videoRefs.current[index] = el)}
                   src={item.url}
                   className="w-full h-full object-cover"
                   muted
                   playsInline
+                  loop
                   preload="metadata"
                   controls={isSingle}
                 />

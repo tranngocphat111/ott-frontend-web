@@ -118,19 +118,21 @@ const PostMediaCarousel: React.FC<Props> = ({ media, isInView }) => {
         {media.map((m, index) => (
           <div
             key={index}
-            className="min-w-full max-h-125 flex items-center justify-center">
+            className="min-w-full max-h-[70vh] flex items-center justify-center bg-gray-900">
             {m.type === "image" ?
               <img
                 src={m.url}
-                alt=""
-                className="w-full max-h-125 object-contain"
+                alt={m.caption || "Post image"}
+                loading="lazy"
+                className="w-full h-full max-h-[70vh] object-contain"
               />
             : <video
                 ref={(el) => (videoRefs.current[index] = el)}
                 src={m.url}
-                className="w-full max-h-125"
+                className="w-full h-full max-h-[70vh] object-contain"
                 muted
                 playsInline
+                loop
                 preload="metadata"
                 controls
               />

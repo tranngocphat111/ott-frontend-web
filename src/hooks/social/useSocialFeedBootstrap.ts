@@ -53,8 +53,8 @@ export const useSocialFeedBootstrap = ({
                     me ?
                         {
                             id: me.id,
-                            name: me.displayName ?? me.username,
-                            displayName: me.displayName ?? me.username,
+                            name: me.displayName || me.username || "Người dùng",
+                            displayName: me.displayName || me.username || "Người dùng",
                             avatar: me.avatarUrl ?? undefined,
                             color: AVATAR_COLORS[0],
                         }

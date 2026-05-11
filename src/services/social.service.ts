@@ -41,10 +41,34 @@ type PresignedUrlResponse = {
 };
 
 const unwrapApiResult = <T,>(payload: unknown): T | null => {
-    if (!payload || typeof payload !== "object") return null;
-    if ("result" in payload) return (payload as ApiEnvelope<T>).result ?? null;
+    if (!payload) return null;
+
+    // Handle Jackson Polymorphic Array: ["className", { ...data }]
+    if (
+        Array.isArray(payload) &&
+        payload.length === 2 &&
+        typeof payload[0] === "string"
+    ) {
+        return payload[1] as T;
+    }
+
+    if (typeof payload !== "object") return null;
+    if ("result" in (payload as any)) return (payload as any).result ?? null;
     return payload as T;
 };
+
+function unwrapList<T>(json: unknown): T[] {
+    const data = unwrapApiResult<T[]>(json);
+    if (!Array.isArray(data)) {
+        const obj = data as any;
+        if (obj && Array.isArray(obj.value)) return obj.value;
+        return [];
+    }
+    // Each element might be ["className", {data}]
+    return data
+        .map((item) => unwrapApiResult<T>(item))
+        .filter((item) => item !== null) as T[];
+}
 export interface RelationshipResponse {
     id: string;
     requesterId: string;
@@ -81,6 +105,7 @@ export interface FriendRequestOption {
     userId: string;
     name: string;
     avatarUrl?: string;
+    createdAt?: string;
 }
 
 /* ─── Public API ──────────────────────────────────────── */
@@ -96,7 +121,8 @@ export async function fetchUsers(): Promise<ApiUser[]> {
         });
         if (!res.ok) return [];
         const json = await res.json();
-        return Array.isArray(json) ? json : ((json.value ?? []) as ApiUser[]);
+        const data = unwrapList<ApiUser>(json);
+        return data;
     } catch {
         return [];
     }
@@ -113,11 +139,13 @@ export async function fetchUserByUsername(username: string): Promise<ApiUser | n
             { signal: AbortSignal.timeout(5_000) },
         );
         if (!res.ok) return null;
-        return (await res.json()) as ApiUser;
+        const json = await res.json();
+        return unwrapApiResult<ApiUser>(json);
     } catch {
         return null;
     }
 }
+
 
 /**
  * Lấy user theo ID từ DB – trả về full profile gồm bio, work, location, relationshipStatus.
@@ -128,36 +156,44 @@ export async function fetchUserById(id: string): Promise<ApiUser | null> {
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return null;
-        return (await res.json()) as ApiUser;
-    } catch {
+        const json = await res.json();
+        console.log(`[fetchUserById] Raw response for ${id}:`, json);
+        return unwrapApiResult<ApiUser>(json);
+    } catch (error) {
+        console.error(`[fetchUserById] Error fetching user ${id}:`, error);
         return null;
     }
 }
 
 export async function fetchFriends(userId: string): Promise<FriendOption[]> {
     try {
-        console.log(`fetchFriends called for userId: ${userId}`);
-        const url = `${API_CHAT_SERVER_URL}/relationships/${userId}/friends`;
-        console.log(`fetchFriends URL: ${url}`);
+        const url = `${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`;
         const res = await authFetch(url, {
             signal: AbortSignal.timeout(5_000),
         });
-        if (!res.ok) {
-            console.error(`fetchFriends failed with status: ${res.status}`);
-            return [];
-        }
-        const raw = (await res.json()) as any[];
-        console.log(`fetchFriends raw data:`, raw);
+        if (!res.ok) return [];
+        
+        const json = await res.json();
+        const raw = unwrapList<any>(json);
         if (!Array.isArray(raw)) return [];
-        const mapped = raw.map((user) => ({
-            id: user.user_id || user.userId || user.id,
-            name: user.displayName || user.name || user.username || "Người dùng",
-            avatarUrl: user.avatar || user.avatarUrl || user.user_avatar || undefined,
-        }));
-        console.log(`fetchFriends mapped data:`, mapped);
-        return mapped;
+        
+        return raw.map((rel: any) => {
+            const isRequester = rel.requesterId === userId;
+            const friendId = isRequester ? rel.receiverId : rel.requesterId;
+            const friendName = isRequester
+                ? (rel.receiverDisplayName || rel.receiverUsername)
+                : (rel.requesterDisplayName || rel.requesterUsername);
+            const friendAvatar = isRequester
+                ? rel.receiverAvatarUrl
+                : rel.requesterAvatarUrl;
+
+            return {
+                id: friendId,
+                name: friendName || "Người dùng",
+                avatarUrl: friendAvatar || undefined,
+            };
+        });
     } catch (error) {
-        console.error("fetchFriends catch error:", error);
         return [];
     }
 }
@@ -177,7 +213,8 @@ export async function fetchRelationshipOf(
 
         if (!res.ok) return null;
 
-        return (await res.json()) as RelationshipResponse;
+        const json = await res.json();
+        return unwrapApiResult<RelationshipResponse>(json);
     } catch {
         return null;
     }
@@ -226,13 +263,15 @@ export async function fetchPendingRequests(
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return [];
-        const raw = (await res.json()) as ApiRelationshipResponse[];
+        const json = await res.json();
+        const raw = unwrapList<ApiRelationshipResponse>(json);
         if (!Array.isArray(raw)) return [];
-        return raw.map((rel) => ({
+        return raw.map((rel: any) => ({
             id: rel.id,
-            userId: rel.requesterId,
-            name: rel.requesterDisplayName || rel.requesterUsername,
-            avatarUrl: rel.requesterAvatarUrl ?? undefined,
+            userId: rel.requesterId || rel.userId || rel.id,
+            name: rel.requesterDisplayName || rel.requesterUsername || "Người dùng",
+            avatarUrl: rel.requesterAvatarUrl || rel.avatarUrl || rel.avatar || undefined,
+            createdAt: rel.createdAt,
         }));
     } catch {
         return [];
@@ -380,7 +419,8 @@ export async function sendFriendRequest(
             { method: "POST", signal: AbortSignal.timeout(5_000) },
         );
         if (!res.ok) throw new Error("Gửi kết bạn thất bại.")
-        return await res.json();
+        const json = await res.json();
+        return unwrapApiResult<any>(json);
     } catch (error) {
         console.error(error)
         return null;
