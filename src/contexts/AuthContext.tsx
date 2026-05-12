@@ -245,6 +245,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('AuthContext: Logout error:', error);
     } finally {
+      // Ngắt kết nối socket ngay lập tức để backend ghi nhận trạng thái offline
+      import('../services/socket.service').then(({ socketService }) => {
+        socketService.disconnect();
+      }).catch(err => console.error("Could not disconnect socket:", err));
+      
       clearLocalSession();
       console.log('AuthContext: Logout completed, tokens cleared');
     }
