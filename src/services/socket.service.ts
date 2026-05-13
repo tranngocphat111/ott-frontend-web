@@ -5,6 +5,9 @@ type CallType = "voice" | "video";
 
 class SocketService {
   private socket: Socket | null = null;
+  private userRoomId: string | null = null;
+  private joinedUserRoomKey: string | null = null;
+  private joinedConversationIds = new Set<string>();
 
   private ensureSocket(): Socket {
     return this.socket ?? this.connect();
@@ -27,7 +30,12 @@ class SocketService {
   }
 
   connect(): Socket {
-    if (this.socket) return this.socket;
+    if (this.socket) {
+      if (!this.socket.connected && this.socket.disconnected) {
+        this.socket.connect();
+      }
+      return this.socket;
+    }
 
     const token = localStorage.getItem("accessToken");
     const socket = io(SOCKET_CHAT_SERVER_URL, {
@@ -39,8 +47,22 @@ class SocketService {
       },
     });
 
-    socket.on("connect", () => console.log("Socket connection:", socket.id));
-    socket.on("disconnect", () => console.log("Socket disconnected"));
+    socket.on("connect", () => {
+      console.log("Socket connection:", socket.id);
+      this.joinedUserRoomKey = null;
+
+      if (this.userRoomId) {
+        this.emitJoinUserRoom(socket, this.userRoomId);
+      }
+
+      this.joinedConversationIds.forEach((conversationId) => {
+        socket.emit("tham_gia_nhom", conversationId);
+      });
+    });
+    socket.on("disconnect", () => {
+      this.joinedUserRoomKey = null;
+      console.log("Socket disconnected");
+    });
     socket.on("connect_error", (err) =>
       console.error("Socket Error:", err.message),
     );
@@ -51,26 +73,41 @@ class SocketService {
   disconnect() {
     this.socket?.disconnect();
     this.socket = null;
+    this.userRoomId = null;
+    this.joinedUserRoomKey = null;
+    this.joinedConversationIds.clear();
     console.log("Socket disconnected manually");
+  }
+
+  private emitJoinUserRoom(socket: Socket, userId: string) {
+    const joinKey = `${socket.id || "pending"}:${userId}`;
+    if (this.joinedUserRoomKey === joinKey) return;
+
+    socket.emit("tham_gia_user_room", userId);
+    this.joinedUserRoomKey = joinKey;
+    console.log(`Đã vào user room: user:${userId}`);
   }
 
   joinUserRoom(userId: string) {
     const socket = this.ensureSocket();
-
-    const join = () => {
-      socket.emit("tham_gia_user_room", userId);
-      console.log(`Đã vào user room: user:${userId}`);
-    };
+    this.userRoomId = userId;
 
     if (socket.connected) {
-      join();
-    } else {
-      socket.once("connect", join);
+      this.emitJoinUserRoom(socket, userId);
     }
+  }
+
+  refreshPresence(userId?: string) {
+    const activeUserId = userId || this.userRoomId;
+    if (!activeUserId) return;
+
+    this.userRoomId = activeUserId;
+    this.emitWhenConnected("presence_heartbeat", { userId: activeUserId });
   }
 
   joinConversation(conversationId: string) {
     const socket = this.ensureSocket();
+    this.joinedConversationIds.add(conversationId);
 
     const join = () => {
       socket.emit("tham_gia_nhom", conversationId);

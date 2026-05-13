@@ -319,7 +319,9 @@ export const ChatMessage = memo(
       prevReplyTo === nextReplyTo &&
       prev.translatedText === next.translatedText &&
       prev.isFirstInSequence === next.isFirstInSequence &&
-      prev.isLastInSequence === next.isLastInSequence
+      prev.isLastInSequence === next.isLastInSequence &&
+      participantCursorsEqual &&
+      conversationTypeEqual
     );
   },
 );

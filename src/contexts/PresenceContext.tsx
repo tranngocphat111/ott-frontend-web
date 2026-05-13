@@ -100,9 +100,31 @@ export const PresenceProvider: React.FC<PresenceProviderProps> = ({ children }) 
     socketService.onPresenceResult(onPresenceResult);
     socketService.onPresenceChanged(onPresenceChanged);
 
+    const refreshWatchedPresence = () => {
+      if (document.visibilityState === "hidden") return;
+
+      const watchedUserIds = Array.from(watchedRef.current);
+      if (watchedUserIds.length > 0) {
+        socketService.queryPresence(watchedUserIds);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshWatchedPresence();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", refreshWatchedPresence);
+    window.addEventListener("online", refreshWatchedPresence);
+
     return () => {
       socketService.offPresenceResult(onPresenceResult);
       socketService.offPresenceChanged(onPresenceChanged);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", refreshWatchedPresence);
+      window.removeEventListener("online", refreshWatchedPresence);
     };
   }, [isAuthenticated, updateEntry]);
 

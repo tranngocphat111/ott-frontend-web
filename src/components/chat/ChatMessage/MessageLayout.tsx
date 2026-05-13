@@ -209,9 +209,22 @@ const getMessageDeliverySummary = ({
   const seenParticipants = recipients.filter((participant) =>
     isMessageCursorAtLeast(participant.last_read_message_id, currentMsgId),
   );
+  const deliveredParticipants = recipients.filter(
+    (participant) =>
+      isMessageCursorAtLeast(
+        participant.last_delivered_message_id,
+        currentMsgId,
+      ) &&
+      !isMessageCursorAtLeast(participant.last_read_message_id, currentMsgId),
+  );
 
   if (recipientCount === 0) {
-    return { label: "Đã gửi", isSeen: false, seenParticipants };
+    return {
+      label: "Đã gửi",
+      isSeen: false,
+      seenParticipants,
+      deliveredParticipants,
+    };
   }
 
   if (!isGroupConversation && recipientCount <= 1) {
@@ -224,11 +237,17 @@ const getMessageDeliverySummary = ({
             : "Đã gửi",
       isSeen: seenCount === 1,
       seenParticipants,
+      deliveredParticipants,
     };
   }
 
   if (seenCount === recipientCount) {
-    return { label: "Tất cả đã xem", isSeen: true, seenParticipants };
+    return {
+      label: "Tất cả đã xem",
+      isSeen: true,
+      seenParticipants,
+      deliveredParticipants,
+    };
   }
 
   if (seenCount > 0) {
@@ -236,11 +255,102 @@ const getMessageDeliverySummary = ({
       label: `Đã xem ${seenCount}/${recipientCount}`,
       isSeen: true,
       seenParticipants,
+      deliveredParticipants,
     };
   }
 
-  return { label: "Đã gửi", isSeen: false, seenParticipants };
+  if (deliveredCount > 0) {
+    return {
+      label: isGroupConversation
+        ? `Đã nhận ${deliveredCount}/${recipientCount}`
+        : "Đã nhận",
+      isSeen: false,
+      seenParticipants,
+      deliveredParticipants,
+    };
+  }
+
+  return {
+    label: "Đã gửi",
+    isSeen: false,
+    seenParticipants,
+    deliveredParticipants,
+  };
 };
+
+const getMessageContentPreview = (msg: any) => {
+  const rawContent = Array.isArray(msg?.content)
+    ? msg.content[0]
+    : msg?.content;
+  const textContent =
+    typeof rawContent === "string"
+      ? rawContent
+      : String(rawContent?.text || rawContent || "");
+
+  switch (String(msg?.type || "").toLowerCase()) {
+    case "image":
+      return "[Hình ảnh]";
+    case "video":
+      return "[Video]";
+    case "audio":
+      return "[Âm thanh]";
+    case "file":
+      return msg?.fileName || getFileNameFromUrl(textContent, "Tệp tin");
+    case "poll":
+      return msg?.poll_question || "[Bình chọn]";
+    default:
+      return convertDisplayShortcodeToEmoji(
+        convertEmojiImageMarkupToText(textContent || ""),
+      );
+  }
+};
+
+const ParticipantAvatar = ({
+  participant,
+  sizeClass = "h-8 w-8",
+  textClass = "text-[10px]",
+}: {
+  participant: any;
+  sizeClass?: string;
+  textClass?: string;
+}) => {
+  const displayName = getParticipantDisplayName(participant);
+  const avatarUrl = getParticipantAvatar(participant);
+
+  return (
+    <span
+      className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-slate-200 font-semibold leading-none text-white shadow-sm ring-1 ring-slate-200 ${textClass}`}
+      style={{
+        backgroundColor: avatarUrl ? undefined : getAvatarColor(displayName),
+      }}
+    >
+      {avatarUrl ? (
+        <img
+          src={getFullUrl(avatarUrl)}
+          alt={displayName}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        getAvatarLabel(displayName)
+      )}
+    </span>
+  );
+};
+
+const DeliveryParticipantRow = ({ participant }: { participant: any }) => (
+  <div className="flex min-w-0 items-center gap-3">
+    <ParticipantAvatar
+      participant={participant}
+      sizeClass="h-10 w-10"
+      textClass="text-xs"
+    />
+    <span className="truncate text-sm font-semibold text-primary-900">
+      {getParticipantDisplayName(participant)}
+    </span>
+  </div>
+);
 
 const normalizeReactionType = (value: string) => {
   const normalized = convertDisplayShortcodeToEmoji(String(value || "").trim());
@@ -294,6 +404,7 @@ export const MessageLayout = ({
   const [showReactionPickerLeftward, setShowReactionPickerLeftward] =
     useState(true);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [showDeliveryDetails, setShowDeliveryDetails] = useState(false);
   const [activeReactionFilter, setActiveReactionFilter] = useState("all");
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
   const reactionDropdownRef = useRef<HTMLDivElement>(null);
@@ -321,8 +432,8 @@ export const MessageLayout = ({
   const replyTo = msg.reply_to;
   const replySenderName =
     replyTo?.sender_id &&
-      currentUserId &&
-      String(replyTo.sender_id) === String(currentUserId)
+    currentUserId &&
+    String(replyTo.sender_id) === String(currentUserId)
       ? "Bạn"
       : replyTo?.sender_name || "Tin nhắn gốc";
   const replyType = replyTo?.type;
@@ -336,11 +447,11 @@ export const MessageLayout = ({
   const replyImageUrls =
     replyType === "image"
       ? (
-        replyTo?.media_urls ||
-        (rawReplyContent ? [String(rawReplyContent)] : [])
-      )
-        .filter(Boolean)
-        .map((item: string) => String(item))
+          replyTo?.media_urls ||
+          (rawReplyContent ? [String(rawReplyContent)] : [])
+        )
+          .filter(Boolean)
+          .map((item: string) => String(item))
       : [];
   const replyImageCount =
     replyType === "image"
@@ -358,9 +469,9 @@ export const MessageLayout = ({
     replyTo?.file_name ||
     (replyType === "file" || replyType === "video" || replyType === "audio"
       ? getFileNameFromUrl(
-        String(replyTo?.url || rawReplyContent || ""),
-        "File",
-      )
+          String(replyTo?.url || rawReplyContent || ""),
+          "File",
+        )
       : "");
   const replyPreviewContent = replyTo?.is_deleted
     ? "Tin nhắn đã bị xóa ở phía bạn"
@@ -424,11 +535,11 @@ export const MessageLayout = ({
           reaction?.account?.full_name;
         const userId = String(
           reaction?.user_id ||
-          reaction?.account_id ||
-          reaction?.user?.user_id ||
-          reaction?.user?.id ||
-          reaction?.account?.id ||
-          "",
+            reaction?.account_id ||
+            reaction?.user?.user_id ||
+            reaction?.user?.id ||
+            reaction?.account?.id ||
+            "",
         );
         const userNickname = String(rawNickname || "").trim();
         const userName = String(rawName || userId || "Người dùng").trim();
@@ -451,12 +562,12 @@ export const MessageLayout = ({
         };
       })
       .filter(Boolean) as Array<{
-        type: string;
-        userId: string;
-        userName: string;
-        userNickname: string;
-        userAvatar: string;
-      }>;
+      type: string;
+      userId: string;
+      userName: string;
+      userNickname: string;
+      userAvatar: string;
+    }>;
 
     const dedupedByUser = new Map<string, (typeof parsedReactions)[number]>();
     const anonymousReactions: typeof parsedReactions = [];
@@ -610,17 +721,33 @@ export const MessageLayout = ({
     Boolean(msg.__show_delivery_status) &&
     Boolean(msg.msg_id);
   const seenAvatarParticipants = deliverySummary.seenParticipants || [];
-  const visibleSeenAvatars = seenAvatarParticipants.slice(0, 5);
-  const hiddenSeenAvatarCount = Math.max(
-    0,
-    seenAvatarParticipants.length - visibleSeenAvatars.length,
-  );
+  const deliveredParticipants = deliverySummary.deliveredParticipants || [];
+  const shouldCompactSeenAvatars = seenAvatarParticipants.length >= 4;
+  const visibleSeenAvatars = shouldCompactSeenAvatars
+    ? seenAvatarParticipants.slice(0, 2)
+    : seenAvatarParticipants.slice(0, 3);
+  const hiddenSeenAvatarCount = shouldCompactSeenAvatars
+    ? seenAvatarParticipants.length - visibleSeenAvatars.length
+    : 0;
+  const canOpenDeliveryDetails =
+    showDeliveryStatus &&
+    (seenAvatarParticipants.length > 0 || deliveredParticipants.length > 0);
   const seenAvatarTitle =
     seenAvatarParticipants.length > 0
       ? `Đã xem: ${seenAvatarParticipants
           .map(getParticipantDisplayName)
           .join(", ")}`
       : deliverySummary.label;
+  const messagePreviewText = getMessageContentPreview(msg);
+  const messageCreatedLabel =
+    msg.created_at || msg.createdAt
+      ? new Date(msg.created_at || msg.createdAt).toLocaleString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
   const containerMargin = isLast
     ? hasReactions
       ? "mb-5"
@@ -805,9 +932,11 @@ export const MessageLayout = ({
   return (
     <div
       className={`flex w-full ${containerMargin} ${
-        isCentered 
-          ? "justify-center" 
-          : isMe ? "justify-end" : "justify-start gap-2.5"
+        isCentered
+          ? "justify-center"
+          : isMe
+            ? "justify-end"
+            : "justify-start gap-2.5"
       }`}
       onContextMenu={(e) => {
         // Chỉ hiện menu nếu có ít nhất 1 action khả dụng
@@ -820,9 +949,9 @@ export const MessageLayout = ({
         ) {
           e.preventDefault();
           e.stopPropagation();
-          
+
           window.dispatchEvent(new Event("chat:close-context-menu"));
-          
+
           setTimeout(() => {
             setContextMenuPosition({ x: e.clientX, y: e.clientY });
           }, 0);
@@ -858,9 +987,11 @@ export const MessageLayout = ({
       {/* CỘT CONTENT */}
       <div
         className={`group flex flex-col ${
-          isCentered 
-            ? "items-center max-w-[90%]" 
-            : isMe ? "items-end max-w-[75%] sm:max-w-[70%]" : "items-start max-w-[75%] sm:max-w-[70%]"
+          isCentered
+            ? "items-center max-w-[90%]"
+            : isMe
+              ? "items-end max-w-[75%] sm:max-w-[70%]"
+              : "items-start max-w-[75%] sm:max-w-[70%]"
         } relative ${showActionMenu || showReactionPicker ? "z-20" : ""}`}
       >
         {!isMe && !isCentered && (isFirst || isTopBoundary) && (
@@ -873,10 +1004,11 @@ export const MessageLayout = ({
         {replyTo && (
           <div
             onClick={handleJumpToReplyMessage}
-            className={`relative z-0 w-fit max-w-full rounded-t-xl rounded-b-lg px-2.5 pt-2 pb-5 -mb-3.5 cursor-pointer transition-colors border-l-[3px] flex items-center gap-2.5 ${isMe
+            className={`relative z-0 w-fit max-w-full rounded-t-xl rounded-b-lg px-2.5 pt-2 pb-5 -mb-3.5 cursor-pointer transition-colors border-l-[3px] flex items-center gap-2.5 ${
+              isMe
                 ? "bg-black/4 hover:bg-black/8 border-[#C1A882]"
                 : "bg-black/4 hover:bg-black/8 border-slate-400"
-              }`}
+            }`}
             title={replyTo?.msg_id ? "Đi tới tin nhắn gốc" : undefined}
           >
             {/* KHOẢNG MEDIA THUMBNAIL */}
@@ -923,15 +1055,17 @@ export const MessageLayout = ({
             {/* KHOẢNG TEXT NỘI DUNG */}
             <div className="flex flex-col min-w-0 justify-center">
               <span
-                className={`text-[11px] font-bold truncate ${isMe ? "text-[#a3845c]" : "text-slate-500"
-                  }`}
+                className={`text-[11px] font-bold truncate ${
+                  isMe ? "text-[#a3845c]" : "text-slate-500"
+                }`}
               >
                 {normalizePreviewText(replySenderName)}
               </span>
 
               <div
-                className={`text-[12px] truncate mt-px leading-tight flex items-center gap-1.5 ${isMe ? "text-[#4a361c]/80" : "text-slate-700/80"
-                  }`}
+                className={`text-[12px] truncate mt-px leading-tight flex items-center gap-1.5 ${
+                  isMe ? "text-[#4a361c]/80" : "text-slate-700/80"
+                }`}
               >
                 {replyTo?.is_deleted || replyTo?.is_revoked ? (
                   <span className="italic opacity-70">
@@ -998,109 +1132,116 @@ export const MessageLayout = ({
           {children(borderRadius)}
 
           {/* THANH ICON THAO TÁC (REPLY, REACT, MORE) */}
-          {showActionsOnHover && (onReply ||
-            onReact ||
-            canDeleteForMe ||
-            canRevokeForAll ||
-            canPinMessage ||
-            canForwardMessage) && (
+          {showActionsOnHover &&
+            (onReply ||
+              onReact ||
+              canDeleteForMe ||
+              canRevokeForAll ||
+              canPinMessage ||
+              canForwardMessage) && (
               <div
-                className={`absolute top-1/2 -translate-y-1/2  flex items-center gap-0.5 ${isMe ? "right-full mr-2" : "left-full ml-2"
-                  } ${showReactionPicker || showActionMenu
+                className={`absolute top-1/2 -translate-y-1/2  flex items-center gap-0.5 ${
+                  isMe ? "right-full mr-2" : "left-full ml-2"
+                } ${
+                  showReactionPicker || showActionMenu
                     ? "opacity-100"
                     : "opacity-0 group-hover:opacity-100"
-                  } transition-all duration-200`}
+                } transition-all duration-200`}
               >
                 {(canDeleteForMe ||
                   canRevokeForAll ||
                   canPinMessage ||
                   canForwardMessage) && (
-                    <div className="relative" ref={actionMenuRef}>
-                      <button
-                        ref={actionButtonRef}
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setShowActionMenu((prev) => !prev);
-                        }}
-                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors z-20 ${showActionMenu
-                            ? "text-slate-600 bg-slate-100"
-                            : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                          }`}
-                        title="Tùy chọn"
+                  <div className="relative" ref={actionMenuRef}>
+                    <button
+                      ref={actionButtonRef}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowActionMenu((prev) => !prev);
+                      }}
+                      className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors z-20 ${
+                        showActionMenu
+                          ? "text-slate-600 bg-slate-100"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                      }`}
+                      title="Tùy chọn"
+                    >
+                      <MoreVertical size={16} strokeWidth={2} />
+                    </button>
+
+                    {showActionMenu && (
+                      <div
+                        ref={actionDropdownRef}
+                        className={`absolute min-w-42.5 bg-white border border-slate-200 rounded-lg shadow-lg p-1.5  ${
+                          showActionMenuUpward
+                            ? "bottom-full mb-1"
+                            : "top-full mt-1"
+                        } ${isMe ? "right-0" : "left-0"}`}
                       >
-                        <MoreVertical size={16} strokeWidth={2} />
-                      </button>
+                        {canPinMessage && onPin && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowActionMenu(false);
+                              onPin(msg);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors "
+                          >
+                            <Pin size={14} />
+                            {msg.is_pinned
+                              ? "Bỏ ghim tin nhắn"
+                              : "Ghim tin nhắn"}
+                          </button>
+                        )}
+                        {canForwardMessage && onForward && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowActionMenu(false);
+                              onForward(msg);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors"
+                          >
+                            <Share2 size={14} />
+                            Chuyển tiếp
+                          </button>
+                        )}
+                        {canRevokeForAll && onRevoke && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowActionMenu(false);
+                              onRevoke(msg);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-red-600 hover:bg-slate-100 transition-colors"
+                          >
+                            <RotateCcw size={14} />
+                            Thu hồi tin nhắn
+                          </button>
+                        )}
 
-                      {showActionMenu && (
-                        <div
-                          ref={actionDropdownRef}
-                          className={`absolute min-w-42.5 bg-white border border-slate-200 rounded-lg shadow-lg p-1.5  ${showActionMenuUpward
-                              ? "bottom-full mb-1"
-                              : "top-full mt-1"
-                            } ${isMe ? "right-0" : "left-0"}`}
-                        >
-                          {canPinMessage && onPin && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setShowActionMenu(false);
-                                onPin(msg);
-                              }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors "
-                            >
-                              <Pin size={14} />
-                              {msg.is_pinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-                            </button>
-                          )}
-                          {canForwardMessage && onForward && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setShowActionMenu(false);
-                                onForward(msg);
-                              }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors"
-                            >
-                              <Share2 size={14} />
-                              Chuyển tiếp
-                            </button>
-                          )}
-                          {canRevokeForAll && onRevoke && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setShowActionMenu(false);
-                                onRevoke(msg);
-                              }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-red-600 hover:bg-slate-100 transition-colors"
-                            >
-                              <RotateCcw size={14} />
-                              Thu hồi tin nhắn
-                            </button>
-                          )}
-
-                          {canDeleteForMe && onDelete && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setShowActionMenu(false);
-                                onDelete(msg);
-                              }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-red-600 hover:bg-red-50 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                              Xóa ở phía bạn
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        {canDeleteForMe && onDelete && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowActionMenu(false);
+                              onDelete(msg);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                            Xóa ở phía bạn
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {onReply &&
                   !msg.is_deleted &&
@@ -1132,10 +1273,11 @@ export const MessageLayout = ({
                           event.stopPropagation();
                           setShowReactionPicker((prev) => !prev);
                         }}
-                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${showReactionPicker
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                          showReactionPicker
                             ? "text-slate-600 bg-slate-100"
                             : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                          }`}
+                        }`}
                         title="Thả reaction"
                       >
                         <SmilePlus size={16} strokeWidth={2} />
@@ -1144,13 +1286,15 @@ export const MessageLayout = ({
                       {showReactionPicker && (
                         <div
                           ref={reactionDropdownRef}
-                          className={`absolute ${showReactionPickerUpward
+                          className={`absolute ${
+                            showReactionPickerUpward
                               ? "bottom-[calc(100%+6px)] slide-in-from-bottom-2"
                               : "top-[calc(100%+6px)] slide-in-from-top-2"
-                            } rounded-md bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-0.5 animate-in fade-in zoom-in-95 duration-200 ${showReactionPickerLeftward
+                          } rounded-md bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl px-2 py-1.5 flex items-center gap-0.5 animate-in fade-in zoom-in-95 duration-200 ${
+                            showReactionPickerLeftward
                               ? `right-0 ${showReactionPickerUpward ? "origin-bottom-right" : "origin-top-right"}`
                               : `left-0 ${showReactionPickerUpward ? "origin-bottom-left" : "origin-top-left"}`
-                            }`}
+                          }`}
                         >
                           {QUICK_REACTIONS.map((reaction) => (
                             <button
@@ -1198,10 +1342,11 @@ export const MessageLayout = ({
           {/* HIỂN THỊ REACTION ĐÃ THẢ */}
           {hasReactions && (
             <div
-              className={`absolute ${msg.type === "video" || msg.type === "image"
+              className={`absolute ${
+                msg.type === "video" || msg.type === "image"
                   ? "-bottom-0.5"
                   : "-bottom-2.5"
-                } ${isMe ? "right-0" : "left-0"} z-20 flex items-center gap-0.5 rounded-full bg-white py-px shadow-sm ring-1 ring-slate-100/50 select-none`}
+              } ${isMe ? "right-0" : "left-0"} z-20 flex items-center gap-0.5 rounded-full bg-white py-px shadow-sm ring-1 ring-slate-100/50 select-none`}
             >
               <button
                 type="button"
@@ -1234,54 +1379,48 @@ export const MessageLayout = ({
         {showDeliveryStatus && (
           <div className="mt-1 flex min-h-4 max-w-full items-center justify-end">
             {visibleSeenAvatars.length > 0 ? (
-              <div
-                className="flex max-w-full items-center justify-end -space-x-1.5"
+              <button
+                type="button"
+                onClick={() => setShowDeliveryDetails(true)}
+                className="flex max-w-full items-center justify-end -space-x-1.5 rounded-full px-0.5 transition-opacity hover:opacity-85"
                 title={seenAvatarTitle}
                 aria-label={seenAvatarTitle}
               >
-                {visibleSeenAvatars.map((participant) => {
-                  const participantUserId = getParticipantUserId(participant);
-                  const displayName = getParticipantDisplayName(participant);
-                  const avatarUrl = getParticipantAvatar(participant);
-
-                  return (
-                    <span
-                      key={participantUserId || displayName}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-slate-200 text-[8px] font-semibold leading-none text-white shadow-sm ring-1 ring-slate-200"
-                      style={{
-                        backgroundColor: avatarUrl
-                          ? undefined
-                          : getAvatarColor(displayName),
-                      }}
-                    >
-                      {avatarUrl ? (
-                        <img
-                          src={getFullUrl(avatarUrl)}
-                          alt={displayName}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        getAvatarLabel(displayName)
-                      )}
-                    </span>
-                  );
-                })}
-
                 {hiddenSeenAvatarCount > 0 && (
-                  <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full border border-white bg-slate-500 px-1 text-[8px] font-bold leading-none text-white shadow-sm ring-1 ring-slate-200">
+                  <span className="z-10 flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full border border-white bg-slate-500 px-1 text-[8px] font-bold leading-none text-white shadow-sm ring-1 ring-slate-200">
                     +{hiddenSeenAvatarCount}
                   </span>
                 )}
-              </div>
+                {visibleSeenAvatars.map((participant) => {
+                  const participantUserId = getParticipantUserId(participant);
+                  const displayName = getParticipantDisplayName(participant);
+
+                  return (
+                    <ParticipantAvatar
+                      key={participantUserId || displayName}
+                      participant={participant}
+                      sizeClass="h-4 w-4"
+                      textClass="text-[8px]"
+                    />
+                  );
+                })}
+              </button>
             ) : (
-              <span
-                className="block max-w-full truncate whitespace-nowrap rounded-full px-1.5 text-[10px] font-medium leading-4 text-slate-400"
+              <button
+                type="button"
+                onClick={() => {
+                  if (canOpenDeliveryDetails) setShowDeliveryDetails(true);
+                }}
+                className={`block max-w-full truncate whitespace-nowrap rounded-full px-1.5 text-[10px] font-medium leading-4 text-slate-400 ${
+                  canOpenDeliveryDetails
+                    ? "cursor-pointer transition-colors hover:bg-slate-100 hover:text-slate-600"
+                    : "cursor-default"
+                }`}
                 title={deliverySummary.label}
+                disabled={!canOpenDeliveryDetails}
               >
                 {deliverySummary.label}
-              </span>
+              </button>
             )}
           </div>
         )}
@@ -1315,10 +1454,11 @@ export const MessageLayout = ({
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveReactionFilter(tab.key)}
-                    className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${activeReactionFilter === tab.key
+                    className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                      activeReactionFilter === tab.key
                         ? "bg-slate-200 text-slate-900"
                         : "text-slate-600 hover:bg-slate-200/80"
-                      }`}
+                    }`}
                   >
                     <span className="flex items-center gap-1.5">
                       {tab.key === "all" ? (
@@ -1355,12 +1495,105 @@ export const MessageLayout = ({
         </div>
       )}
 
+      {showDeliveryDetails && showDeliveryStatus && (
+        <div
+          className="fixed inset-0 z-120 flex items-center justify-center bg-primary-900/35 px-4"
+          onClick={() => setShowDeliveryDetails(false)}
+        >
+          <div
+            className="flex max-h-[82vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-primary-200 bg-surface text-primary-900 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-primary-100 bg-surface-raised px-5 py-4">
+              <h3 className="text-lg font-semibold text-primary-900">
+                Thông tin tin nhắn
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDeliveryDetails(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-800"
+                title="Đóng"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="flex justify-end border-b border-primary-100 bg-white px-5 py-5">
+              <div className="max-w-[70%] rounded-lg border border-primary-200 bg-chat-me px-3 py-2 text-right shadow-sm">
+                <p className="truncate text-xs text-primary-600">
+                  {senderName}
+                </p>
+                <p className="break-words text-sm font-semibold text-chat-me-text">
+                  {messagePreviewText || "[Tin nhắn]"}
+                </p>
+                {messageCreatedLabel && (
+                  <p className="mt-1 text-xs text-primary-500">
+                    {messageCreatedLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-surface px-5 py-4">
+              <section>
+                <h4 className="mb-3 text-sm font-bold text-primary-700">
+                  Đã xem ({seenAvatarParticipants.length})
+                </h4>
+                {seenAvatarParticipants.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
+                    {seenAvatarParticipants.map((participant, index) => (
+                      <DeliveryParticipantRow
+                        key={`seen-${getParticipantUserId(participant) || index}`}
+                        participant={participant}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-primary-400">Chưa có ai xem</p>
+                )}
+              </section>
+
+              <section className="mt-5">
+                <h4 className="mb-3 text-sm font-bold text-primary-700">
+                  Đã nhận ({deliveredParticipants.length})
+                </h4>
+                {deliveredParticipants.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
+                    {deliveredParticipants.map((participant, index) => (
+                      <DeliveryParticipantRow
+                        key={`delivered-${getParticipantUserId(participant) || index}`}
+                        participant={participant}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-primary-400">
+                    Chưa có người nhận riêng ngoài danh sách đã xem
+                  </p>
+                )}
+              </section>
+            </div>
+
+            <p className="border-t border-primary-100 bg-surface-raised px-5 py-3 text-xs italic text-primary-500">
+              (*) Thông tin chi tiết "Đã xem", "Đã nhận" được tính theo trạng
+              thái đồng bộ mới nhất của hội thoại.
+            </p>
+          </div>
+        </div>
+      )}
+
       <MessageContextMenu
         isOpen={contextMenuPosition !== null}
         position={contextMenuPosition || { x: 0, y: 0 }}
         onClose={() => setContextMenuPosition(null)}
-        onReply={onReply && !msg.is_deleted && !msg.is_revoked && !isUploadInFlight ? () => onReply(msg) : undefined}
-        onForward={canForwardMessage && onForward ? () => onForward(msg) : undefined}
+        onReply={
+          onReply && !msg.is_deleted && !msg.is_revoked && !isUploadInFlight
+            ? () => onReply(msg)
+            : undefined
+        }
+        onForward={
+          canForwardMessage && onForward ? () => onForward(msg) : undefined
+        }
         onPin={canPinMessage && onPin ? () => onPin(msg) : undefined}
         onRevoke={canRevokeForAll && onRevoke ? () => onRevoke(msg) : undefined}
         onDelete={canDeleteForMe && onDelete ? () => onDelete(msg) : undefined}

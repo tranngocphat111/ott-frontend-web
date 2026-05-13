@@ -77,7 +77,20 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialLoadDoneRef = useRef<string | null>(null);
+  const deliveredOnLoadRef = useRef<Set<string>>(new Set());
   const { isAuthenticated, user } = useAuth();
+
+  const isMessageCursorAtLeast = useCallback((cursor?: string, target?: string) => {
+    const left = String(cursor || "0").trim();
+    const right = String(target || "0").trim();
+    if (!right || right === "0") return true;
+
+    try {
+      return BigInt(left || "0") >= BigInt(right);
+    } catch {
+      return left >= right;
+    }
+  }, []);
 
   // Helper to apply dissolution logic to any incoming conversations array
   const applyDissolutionLogic = useCallback((
@@ -173,9 +186,10 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
           if (item.conversation._id !== conversationId) return item;
           if (!item.conversation.participants) return item;
 
-          const updatedParticipants = item.conversation.participants.map((p) =>
-            String(p.user_id) === String(userId) ? { ...p, ...updates } : p,
-          );
+          const updatedParticipants = item.conversation.participants.map((p) => {
+            const participantUserId = String(p.user_id || p._id || "");
+            return participantUserId === String(userId) ? { ...p, ...updates } : p;
+          });
 
           return {
             ...item,
@@ -249,22 +263,47 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       console.log('🔄 Refreshing conversations for user:', userId);
       const loadedConversations =
         await ConversationService.getUserConversations(userId);
+      const baseFiltered = applyDissolutionLogic(loadedConversations, dissolvedSessionIds);
+      const sortedConversations = [...baseFiltered].sort((a, b) => {
+        // Re-sort by updatedAt to ensure new items are at top
+        const timeA = new Date(a.conversation.updatedAt || a.conversation.createdAt).getTime();
+        const timeB = new Date(b.conversation.updatedAt || b.conversation.createdAt).getTime();
+        return timeB - timeA;
+      });
+
+      sortedConversations.forEach((item) => {
+        const convId = String(item.conversation._id || "").trim();
+        const lastMessage = item.conversation.last_message;
+        const lastMsgId = String(lastMessage?.msg_id || "").trim();
+        const senderId = String(lastMessage?.sender_id || "").trim();
+
+        if (
+          !convId ||
+          !lastMsgId ||
+          !userId ||
+          !senderId ||
+          senderId === String(userId) ||
+          isMessageCursorAtLeast(item.participant.last_delivered_message_id, lastMsgId)
+        ) {
+          return;
+        }
+
+        const deliveryKey = `${convId}:${userId}:${lastMsgId}`;
+        if (deliveredOnLoadRef.current.has(deliveryKey)) return;
+
+        deliveredOnLoadRef.current.add(deliveryKey);
+        item.participant.last_delivered_message_id = lastMsgId;
+        item.participant.last_delivered_at = new Date().toISOString();
+        socketService.markMessagesDeliveredUpTo(convId, userId, lastMsgId);
+      });
 
       setRawConversations(() => {
-        const baseFiltered = applyDissolutionLogic(loadedConversations, dissolvedSessionIds);
-        const merged = [...baseFiltered];
-
-        return merged.sort((a, b) => {
-          // Re-sort by updatedAt to ensure new items are at top
-          const timeA = new Date(a.conversation.updatedAt || a.conversation.createdAt).getTime();
-          const timeB = new Date(b.conversation.updatedAt || b.conversation.createdAt).getTime();
-          return timeB - timeA;
-        });
+        return sortedConversations;
       });
     } catch (error) {
       console.error("Failed to refresh conversations:", error);
     }
-  }, [dissolvedSessionIds, applyDissolutionLogic]);
+  }, [dissolvedSessionIds, applyDissolutionLogic, isMessageCursorAtLeast]);
 
   // Socket: Xử lý tin nhắn mới real-time
   const handleIncomingMessage = useCallback((message: any) => {
@@ -469,19 +508,40 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
     const participant = payload?.participant || {};
     const isSeenReceipt =
-      payload?.receiptType === "seen" || payload?.status === "seen";
+      payload?.receiptType === "seen" ||
+      payload?.status === "seen" ||
+      Boolean(payload?.readAt || payload?.last_read_message_id);
+    const cursorMsgId = String(
+      payload?.msgId ||
+      payload?.msg_id ||
+      payload?.messageId ||
+      "",
+    ).trim();
     const cursorUpdates = {
       last_delivered_message_id:
-        participant.last_delivered_message_id || payload.last_delivered_message_id,
+        participant.last_delivered_message_id ||
+        payload.last_delivered_message_id ||
+        cursorMsgId ||
+        undefined,
       last_delivered_at:
-        participant.last_delivered_at || payload.last_delivered_at,
+        participant.last_delivered_at ||
+        payload.last_delivered_at ||
+        payload.deliveredAt ||
+        (cursorMsgId ? new Date().toISOString() : undefined),
     };
 
     const readCursorUpdates = isSeenReceipt
       ? {
           last_read_message_id:
-            participant.last_read_message_id || payload.last_read_message_id,
-          last_read_at: participant.last_read_at || payload.last_read_at,
+            participant.last_read_message_id ||
+            payload.last_read_message_id ||
+            cursorMsgId ||
+            undefined,
+          last_read_at:
+            participant.last_read_at ||
+            payload.last_read_at ||
+            payload.readAt ||
+            (cursorMsgId ? new Date().toISOString() : undefined),
         }
       : {};
 
@@ -527,6 +587,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
     socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
     socketService.onGroupCallUpdated(handleGroupCallUpdated);
+    socketService.onReadStatus(applyParticipantCursorPayload);
     socketService.onMessageStatusChanged(applyParticipantCursorPayload);
     socketService.onParticipantCursorChanged(applyParticipantCursorPayload);
     socketService.onConversationReadSynced(applyParticipantCursorPayload);
@@ -538,6 +599,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
       cleanupSocket?.off("them_nguoi_moi", handleMemberAdded);
       socketService.offGroupCallUpdated(handleGroupCallUpdated);
+      socketService.offReadStatus(applyParticipantCursorPayload);
       socketService.offMessageStatusChanged(applyParticipantCursorPayload);
       socketService.offParticipantCursorChanged(applyParticipantCursorPayload);
       socketService.offConversationReadSynced(applyParticipantCursorPayload);

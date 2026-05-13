@@ -146,6 +146,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const wasNearBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(false);
   const scrollHeightRef = useRef(0);
+  const scrollTopBeforeLoadMoreRef = useRef(0);
 
   const lastLayoutScrollHeightRef = useRef(0);
   const lastLayoutClientHeightRef = useRef(0);
@@ -1262,6 +1263,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     }
     setReplyToMessage(null);
     scrollHeightRef.current = 0; // Reset scroll position when conversation changes
+    scrollTopBeforeLoadMoreRef.current = 0;
     isLoadingMoreRef.current = false; // Reset loading state
     isFirstLoadRef.current = true; // Mark as first load for new conversation
     if (initialScrollRafRef.current !== null) {
@@ -2191,8 +2193,21 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       isLoadingMoreRef.current = true;
       console.log("📥 User scrolled to top - loading older messages");
 
+      if (initialScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(initialScrollRafRef.current);
+        initialScrollRafRef.current = null;
+      }
+
+      // User is intentionally reading older messages; prevent pending initial
+      // bottom anchoring from snapping the viewport back to the newest message.
+      isFirstLoadRef.current = false;
+      wasNearBottomRef.current = false;
+      forceScrollToBottomRef.current = false;
+      suppressAutoScrollUntilRef.current = Date.now() + 600;
+
       // Save scroll height BEFORE loading
       scrollHeightRef.current = container.scrollHeight;
+      scrollTopBeforeLoadMoreRef.current = container.scrollTop;
 
       loadOlderMessages().finally(() => {
         isLoadingMoreRef.current = false;
@@ -2303,6 +2318,30 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       return;
     }
 
+    // If we just loaded older messages, restore scroll position before any
+    // initial/new-message auto-scroll can run.
+    if (scrollHeightRef.current > 0 && !isLoadingMoreRef.current) {
+      // Không dùng requestAnimationFrame ở đây nếu có thể,
+      // vì useLayoutEffect chạy ĐỒNG BỘ trước khi paint.
+      const newScrollHeight = container.scrollHeight;
+      const heightDifference = newScrollHeight - scrollHeightRef.current;
+
+      container.scrollTop = scrollTopBeforeLoadMoreRef.current + heightDifference;
+      scrollHeightRef.current = 0; // Reset ngay lập tức
+      scrollTopBeforeLoadMoreRef.current = 0;
+      isFirstLoadRef.current = false;
+      wasNearBottomRef.current = false;
+      setShowScrollButton(true);
+
+      // Cập nhật ref để tránh logic auto-scroll xuống dưới chạy đè lên
+      prevMessageCountRef.current = messages.length;
+      prevLastMessageIdRef.current = currentLastMessageId;
+      lastLayoutScrollHeightRef.current = container.scrollHeight;
+      lastLayoutClientHeightRef.current = container.clientHeight;
+
+      return;
+    }
+
     if (forceScrollToBottomRef.current && messages.length > 0 && !loading) {
       if (initialScrollRafRef.current !== null) {
         window.cancelAnimationFrame(initialScrollRafRef.current);
@@ -2334,6 +2373,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
           const activeContainer = messagesContainerRef.current;
           if (!activeContainer) return;
+          if (
+            !isFirstLoadRef.current ||
+            scrollHeightRef.current > 0 ||
+            Date.now() <= suppressAutoScrollUntilRef.current
+          ) {
+            initialScrollRafRef.current = null;
+            return;
+          }
 
           activeContainer.scrollTop = activeContainer.scrollHeight;
           isFirstLoadRef.current = false;
@@ -2344,22 +2391,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           initialScrollRafRef.current = null;
         })();
       });
-
-      return;
-    }
-
-    // If we just loaded older messages, restore scroll position
-    if (scrollHeightRef.current > 0 && !isLoadingMoreRef.current) {
-      // Không dùng requestAnimationFrame ở đây nếu có thể,
-      // vì useLayoutEffect chạy ĐỒNG BỘ trước khi paint.
-      const newScrollHeight = container.scrollHeight;
-      const heightDifference = newScrollHeight - scrollHeightRef.current;
-
-      container.scrollTop = heightDifference;
-      scrollHeightRef.current = 0; // Reset ngay lập tức
-
-      // Cập nhật ref để tránh logic auto-scroll xuống dưới chạy đè lên
-      prevMessageCountRef.current = messages.length;
 
       return;
     }
