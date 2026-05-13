@@ -10,6 +10,17 @@ import { RevokedMessage } from "./RevokedMessage";
 import { CallMessage } from "./CallMessage";
 import { PollMessage } from "./PollMessage";
 
+const stringifyParticipantCursors = (participants?: any[]) =>
+  JSON.stringify(
+    (participants || []).map((participant) => ({
+      user_id: participant?.user_id || participant?._id || "",
+      membership_status: participant?.membership_status || "",
+      last_delivered_message_id:
+        participant?.last_delivered_message_id || "0",
+      last_read_message_id: participant?.last_read_message_id || "0",
+    })),
+  );
+
 export const ChatMessage = memo(
   ({
     msg,
@@ -267,6 +278,12 @@ export const ChatMessage = memo(
     const nextReactions = JSON.stringify(next.msg.reactions || []);
     const prevReplyTo = JSON.stringify(prev.msg.reply_to || null);
     const nextReplyTo = JSON.stringify(next.msg.reply_to || null);
+    const prevParticipantCursors = stringifyParticipantCursors(
+      prev.conversation?.participants,
+    );
+    const nextParticipantCursors = stringifyParticipantCursors(
+      next.conversation?.participants,
+    );
 
     return (
       prev.msg._id === next.msg._id &&
@@ -283,6 +300,8 @@ export const ChatMessage = memo(
       prev.msg.is_pinned === next.msg.is_pinned &&
       prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
       prevReplyTo === nextReplyTo &&
+      prevParticipantCursors === nextParticipantCursors &&
+      prev.currentUserId === next.currentUserId &&
       prev.isFirstInSequence === next.isFirstInSequence &&
       prev.isLastInSequence === next.isLastInSequence
     );

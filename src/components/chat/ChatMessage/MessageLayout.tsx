@@ -131,6 +131,89 @@ const ReactionDetailRow = ({
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
+const isMessageCursorAtLeast = (cursor: unknown, msgId: unknown) => {
+  try {
+    return BigInt(String(cursor || "0")) >= BigInt(String(msgId || "0"));
+  } catch {
+    return false;
+  }
+};
+
+const getParticipantUserId = (participant: any) =>
+  String(participant?.user_id || participant?._id || "").trim();
+
+const isJoinedParticipant = (participant: any) => {
+  const membershipStatus = String(
+    participant?.membership_status || participant?.participant_status || "",
+  );
+  return membershipStatus !== "invited" && membershipStatus !== "removed";
+};
+
+const getMessageDeliverySummary = ({
+  msg,
+  participants,
+  currentUserId,
+}: {
+  msg: any;
+  participants?: any[];
+  currentUserId?: string;
+}) => {
+  const currentMsgId = String(msg?.msg_id || "").trim();
+  const currentUser = String(currentUserId || "").trim();
+  const recipients = (participants || []).filter((participant) => {
+    const participantUserId = getParticipantUserId(participant);
+    return (
+      participantUserId &&
+      participantUserId !== currentUser &&
+      isJoinedParticipant(participant)
+    );
+  });
+
+  const recipientCount = recipients.length;
+  const deliveredCount = recipients.filter((participant) =>
+    isMessageCursorAtLeast(participant.last_delivered_message_id, currentMsgId),
+  ).length;
+  const seenCount = recipients.filter((participant) =>
+    isMessageCursorAtLeast(participant.last_read_message_id, currentMsgId),
+  ).length;
+
+  if (recipientCount <= 1) {
+    return {
+      label:
+        seenCount === 1
+          ? "Đã xem"
+          : deliveredCount === 1
+            ? "Đã nhận"
+            : "Đã gửi",
+      isSeen: seenCount === 1,
+    };
+  }
+
+  if (seenCount === recipientCount) {
+    return { label: "Tất cả đã xem", isSeen: true };
+  }
+
+  if (seenCount > 0) {
+    return {
+      label: `Đã xem ${seenCount}/${recipientCount}`,
+      isSeen: true,
+    };
+  }
+
+  if (deliveredCount === recipientCount) {
+    return { label: "Tất cả đã nhận", isSeen: false };
+  }
+
+  if (deliveredCount > 0) {
+    return {
+      label: `Đã nhận ${deliveredCount}/${recipientCount}`,
+      isSeen: false,
+    };
+  }
+
+  return { label: "Đã gửi", isSeen: false };
+};
+
 const normalizeReactionType = (value: string) => {
   const normalized = convertDisplayShortcodeToEmoji(String(value || "").trim());
   const emojiMatch = normalized.match(
@@ -506,6 +589,15 @@ export const MessageLayout = ({
     !String(msg.type || "").startsWith("call_") &&
     !isUploadInFlight &&
     !!onForward;
+  const deliverySummary = useMemo(
+    () =>
+      getMessageDeliverySummary({
+        msg,
+        participants,
+        currentUserId,
+      }),
+    [currentUserId, msg, participants],
+  );
 
   // ==========================================
   // EFFECT 1: CLICK OUTSIDE CHO ACTION MENU
@@ -857,47 +949,12 @@ export const MessageLayout = ({
           {/* HIỂN THỊ TRẠNG THÁI TIN NHẮN (CHỈ CHO BẢN THÂN) */}
           {isMe && !isCentered && isLast && msg.msg_id && (
             <div className="flex justify-end mt-0.5">
-              <span className={`text-[10px] font-medium px-1 rounded transition-colors ${
-                (() => {
-                  const others = (participants || []).filter(p => String(p.user_id) !== String(currentUserId));
-                  if (others.length === 0) return false;
-                  
-                  try {
-                    const currentMsgId = BigInt(msg.msg_id);
-                    return others.every(p => {
-                      if (!p.last_read_message_id) return false;
-                      try {
-                        return BigInt(p.last_read_message_id) >= currentMsgId;
-                      } catch {
-                        return false;
-                      }
-                    });
-                  } catch {
-                    return false;
-                  }
-                })() ? "text-blue-500" : "text-slate-400"
-              }`}>
-                {(() => {
-                  const others = (participants || []).filter(p => String(p.user_id) !== String(currentUserId));
-                  if (others.length === 0) return "Đã gửi";
-                  
-                  try {
-                    const currentMsgId = BigInt(msg.msg_id);
-                    const allRead = others.every(p => {
-                      if (!p.last_read_message_id) return false;
-                      try {
-                        return BigInt(p.last_read_message_id) >= currentMsgId;
-                      } catch {
-                        return false;
-                      }
-                    });
-                    if (allRead) return "Đã xem";
-                  } catch {
-                    // fall through
-                  }
-                  
-                  return "Đã gửi";
-                })()}
+              <span
+                className={`text-[10px] font-medium px-1 rounded transition-colors ${
+                  deliverySummary.isSeen ? "text-blue-500" : "text-slate-400"
+                }`}
+              >
+                {deliverySummary.label}
               </span>
             </div>
           )}

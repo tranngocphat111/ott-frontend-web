@@ -135,7 +135,7 @@ export class ParticipantService {
     conversationId: string,
     userId: string,
     msgId: string,
-  ): Promise<Participant> {
+  ): Promise<any> {
     const response = await authFetch(
       `${API_CHAT_SERVER_URL}/participants/read`,
       {
@@ -150,6 +150,33 @@ export class ParticipantService {
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.error || "Failed to mark as read");
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Fallback HTTP cho delivered_up_to. Luồng chính đi qua Socket.IO/RabbitMQ.
+   */
+  static async markAsDelivered(
+    conversationId: string,
+    userId: string,
+    msgId: string,
+  ): Promise<any> {
+    const response = await authFetch(
+      `${API_CHAT_SERVER_URL}/participants/delivered`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ conversationId, userId, msgId }),
+      },
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to mark as delivered");
     }
 
     return await response.json();

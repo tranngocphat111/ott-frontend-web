@@ -15,7 +15,6 @@ import {
   PinOff,
   Play,
   Volume2,
-  X,
   AlertTriangle,
   Info,
   Trash2,
@@ -27,8 +26,6 @@ import { primeMessageSenderCache } from "../../hooks/useMessageSender";
 import {
   MessageService,
   ParticipantService,
-  UserService,
-  ConversationService,
   fetchRelationshipStatusViaChat,
   socketService,
 } from "../../services";
@@ -88,8 +85,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     conversations,
     updateConversation,
     updateParticipant,
-    updateConversationParticipant,
-    refreshConversations,
   } = useConversations();
 
   const normalizedUserId = currentUser?.id;
@@ -131,6 +126,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastMarkedRef = useRef<string>("0");
+  const lastDeliveredRef = useRef<string>("0");
+  const seenMarkTimerRef = useRef<number | null>(null);
   const isLoadingMoreRef = useRef(false);
   const isLoadingNewerRef = useRef(false);
   const suppressAutoScrollAfterNewerLoadRef = useRef(false);
@@ -1219,6 +1216,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   // Logic đánh dấu đã đọc
   useEffect(() => {
     lastMarkedRef.current = "0";
+    lastDeliveredRef.current = "0";
+    if (seenMarkTimerRef.current !== null) {
+      window.clearTimeout(seenMarkTimerRef.current);
+      seenMarkTimerRef.current = null;
+    }
     setReplyToMessage(null);
     scrollHeightRef.current = 0; // Reset scroll position when conversation changes
     isLoadingMoreRef.current = false; // Reset loading state
@@ -1243,41 +1245,71 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   }, [activeConversation?.participants]);
 
   useEffect(() => {
-    if (!messages.length || !normalizedUserId || !activeConversation?._id)
+    if (!messages.length || !normalizedUserId || !activeConversation?._id) {
       return;
+    }
 
-    // Mark ALL visible messages as read (including our own)
-    // This is correct because we're viewing them
     const lastMsg = messages[messages.length - 1];
-    if (!lastMsg.msg_id || lastMsg.msg_id === lastMarkedRef.current) return;
+    const msgId = String(lastMsg.msg_id || "").trim();
+    if (!msgId || msgId === lastDeliveredRef.current) return;
 
-    lastMarkedRef.current = lastMsg.msg_id;
-
-    console.log(
-      `📖 Marking conversation as read up to msg_id: ${lastMsg.msg_id}`,
-    );
-
-    // Cập nhật UI ngay lập tức thông qua context
+    lastDeliveredRef.current = msgId;
     updateParticipant(activeConversation._id, {
-      last_read_message_id: lastMsg.msg_id,
+      last_delivered_message_id: msgId,
+      last_delivered_at: new Date().toISOString(),
     });
 
-    // Lưu dự phòng và gọi API
-    localStorage.setItem(
-      `read_${activeConversation._id}_${normalizedUserId}`,
-      lastMsg.msg_id,
-    );
-    ParticipantService.markAsRead(
+    socketService.markMessagesDeliveredUpTo(
       activeConversation._id,
       normalizedUserId,
-      lastMsg.msg_id,
-    )
-      .then((updated) => {
-        console.log(`✓ Backend confirmed read status update:`, updated);
-      })
-      .catch((error) => {
-        console.error(`✗ Failed to mark as read:`, error);
+      msgId,
+    );
+  }, [messages, normalizedUserId, activeConversation?._id, updateParticipant]);
+
+  useEffect(() => {
+    if (!messages.length || !normalizedUserId || !activeConversation?._id) {
+      return;
+    }
+
+    const lastMsg = messages[messages.length - 1];
+    const msgId = String(lastMsg.msg_id || "").trim();
+    if (!msgId || msgId === lastMarkedRef.current) return;
+
+    if (seenMarkTimerRef.current !== null) {
+      window.clearTimeout(seenMarkTimerRef.current);
+    }
+
+    seenMarkTimerRef.current = window.setTimeout(() => {
+      lastMarkedRef.current = msgId;
+      seenMarkTimerRef.current = null;
+
+      const now = new Date().toISOString();
+      updateParticipant(activeConversation._id, {
+        last_delivered_message_id: msgId,
+        last_delivered_at: now,
+        last_read_message_id: msgId,
+        last_read_at: now,
+        unread_count: 0,
       });
+
+      localStorage.setItem(
+        `read_${activeConversation._id}_${normalizedUserId}`,
+        msgId,
+      );
+
+      socketService.markMessageSeenUpTo(
+        activeConversation._id,
+        normalizedUserId,
+        msgId,
+      );
+    }, 250);
+
+    return () => {
+      if (seenMarkTimerRef.current !== null) {
+        window.clearTimeout(seenMarkTimerRef.current);
+        seenMarkTimerRef.current = null;
+      }
+    };
   }, [messages, normalizedUserId, activeConversation?._id, updateParticipant]);
 
   const handleOpenMedia = (msgId: string, imageIndex: number = 0) => {
@@ -2192,6 +2224,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         window.cancelAnimationFrame(initialScrollRafRef.current);
         initialScrollRafRef.current = null;
       }
+      if (seenMarkTimerRef.current !== null) {
+        window.clearTimeout(seenMarkTimerRef.current);
+        seenMarkTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -2351,33 +2387,16 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       unmarkTyping(payload.userId);
     };
 
-    const handleReadStatus = (payload: {
-      conversationId: string;
-      userId: string;
-      msgId: string;
-    }) => {
-      if (payload.conversationId !== activeConversation?._id) return;
-      if (String(payload.userId) === String(normalizedUserId || "")) return;
-
-      updateConversationParticipant(payload.conversationId, payload.userId, {
-        last_read_message_id: payload.msgId,
-      } as any);
-    };
-
     socketService.onTyping(handleTypingStart);
     socketService.onTypingStopped(handleTypingStop);
-    socketService.onReadStatus(handleReadStatus);
 
     return () => {
       socketService.offTyping(handleTypingStart);
       socketService.offTypingStopped(handleTypingStop);
-      socketService.offReadStatus(handleReadStatus);
     };
   }, [
     activeConversation?._id,
     normalizedUserId,
-    updateParticipant,
-    updateConversationParticipant,
   ]);
 
   useEffect(() => {

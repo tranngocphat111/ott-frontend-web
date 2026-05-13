@@ -356,9 +356,23 @@ export const useChat = (conversationId: string, userId?: string) => {
    */
   const handleNewMessage = useCallback(
     (msg: any) => {
+      const normalized = normalizeIncomingMessage(msg) as
+        | (Message & { _id?: string; msg_id?: string; sender_id?: string })
+        | null;
+
+      const msgId = String(normalized?.msg_id || normalized?._id || "").trim();
+      if (
+        userId &&
+        conversationId &&
+        msgId &&
+        String(normalized?.sender_id || "") !== String(userId)
+      ) {
+        socketService.markMessageDelivered(conversationId, userId, msgId);
+      }
+
       appendMessage(msg);
     },
-    [appendMessage],
+    [appendMessage, conversationId, normalizeIncomingMessage, userId],
   );
 
   /**

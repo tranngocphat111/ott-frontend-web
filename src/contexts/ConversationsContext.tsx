@@ -82,7 +82,6 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   // Helper to apply dissolution logic to any incoming conversations array
   const applyDissolutionLogic = useCallback((
     newConversations: ConversationWithParticipant[],
-    currentUserId: string,
     dissolvedIds: Set<string>
   ) => {
     return newConversations
@@ -108,20 +107,14 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
         }
         return newItem;
       });
-  }, [user]);
+  }, []);
 
   const setConversations = useCallback((value: ConversationWithParticipant[] | ((prev: ConversationWithParticipant[]) => ConversationWithParticipant[])) => {
     setRawConversations((prevRaw) => {
-      const currentUserId = String(
-        (user as { user_id?: string; _id?: string } | null)?.user_id ||
-        (user as { user_id?: string; _id?: string } | null)?._id ||
-        "",
-      ).trim();
-
       const nextConversations = typeof value === 'function' ? value(prevRaw) : value;
-      return applyDissolutionLogic(nextConversations, currentUserId, dissolvedSessionIdsRef.current);
+      return applyDissolutionLogic(nextConversations, dissolvedSessionIdsRef.current);
     });
-  }, [user, applyDissolutionLogic]);
+  }, [applyDissolutionLogic]);
 
   // Update specific conversation
   const updateConversation = useCallback(
@@ -217,6 +210,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
           is_pinned: (participantFromConv as any)?.settings?.is_pinned || false,
           notification_status: (participantFromConv as any)?.settings?.notification_status || "on"
         },
+        last_delivered_message_id: (participantFromConv as any)?.last_delivered_message_id || "0",
+        last_delivered_at: (participantFromConv as any)?.last_delivered_at || null,
         last_read_message_id: (participantFromConv as any)?.last_read_message_id || "0",
         last_read_at: (participantFromConv as any)?.last_read_at || new Date().toISOString(),
         deleted_msg_id: (participantFromConv as any)?.deleted_msg_id || "0",
@@ -258,18 +253,10 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const currentUserId = userId;
 
       setRawConversations((prev) => {
-        const baseFiltered = applyDissolutionLogic(loadedConversations, currentUserId, dissolvedSessionIds);
+        const baseFiltered = applyDissolutionLogic(loadedConversations, dissolvedSessionIds);
 
         // Merge strategy: Keep optimistic items that might not be in the loaded list yet
         const merged = [...baseFiltered];
-
-        prev.forEach(prevItem => {
-          const exists = baseFiltered.some(
-            newItem => newItem.conversation._id === prevItem.conversation._id
-          );
-
-
-        });
 
         // Map and resolve last_read_message_id as before
         return merged.map((newItem) => {
@@ -314,6 +301,18 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     const convId = message.conversation_id?.toString();
     if (!convId) return;
 
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = String(rawUser?.id || rawUser?.user_id || rawUser?._id || "").trim();
+    const msgId = String(message.msg_id || message._id || "").trim();
+
+    if (
+      currentUserId &&
+      msgId &&
+      String(message.sender_id || "") !== currentUserId
+    ) {
+      socketService.markMessageDelivered(convId, currentUserId, msgId);
+    }
+
     setConversations((prev) => {
       const targetIndex = prev.findIndex(
         (item) => item.conversation._id === convId,
@@ -321,7 +320,6 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
       if (targetIndex === -1) {
         // If conversation not found, trigger a refresh to fetch it
-        const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
         const currentId = rawUser?.id || rawUser?.user_id || rawUser?._id;
         if (currentId) {
           refreshConversations(currentId);
@@ -492,6 +490,57 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     });
   }, [updateConversation]);
 
+  const applyParticipantCursorPayload = useCallback((payload: any) => {
+    const conversationId = String(payload?.conversationId || "");
+    const userId = String(
+      payload?.userId || payload?.changedUserId || payload?.participant?.user_id || "",
+    );
+    if (!conversationId || !userId) return;
+
+    const participant = payload?.participant || {};
+    const cursorUpdates = {
+      last_delivered_message_id:
+        participant.last_delivered_message_id || payload.last_delivered_message_id,
+      last_delivered_at:
+        participant.last_delivered_at || payload.last_delivered_at,
+      last_read_message_id:
+        participant.last_read_message_id || payload.last_read_message_id,
+      last_read_at:
+        participant.last_read_at || payload.last_read_at,
+    };
+
+    const conversationParticipantUpdates = Object.fromEntries(
+      Object.entries(cursorUpdates).filter(([, value]) => value !== undefined),
+    ) as Partial<ConversationParticipant>;
+
+    updateConversationParticipant(
+      conversationId,
+      userId,
+      conversationParticipantUpdates,
+    );
+
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const currentUserId = String(rawUser?.id || rawUser?.user_id || rawUser?._id || "").trim();
+
+    if (currentUserId && userId === currentUserId) {
+      updateParticipant(conversationId, {
+        ...(conversationParticipantUpdates as Partial<Participant>),
+        unread_count:
+          payload?.receiptType === "seen" || participant.last_read_message_id
+            ? 0
+            : undefined,
+      });
+
+      const readMsgId = participant.last_read_message_id || payload.msgId;
+      if (readMsgId && (payload?.receiptType === "seen" || participant.last_read_message_id)) {
+        localStorage.setItem(
+          `read_${conversationId}_${currentUserId}`,
+          String(readMsgId),
+        );
+      }
+    }
+  }, [updateConversationParticipant, updateParticipant, user]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -505,6 +554,9 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
     socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
     socketService.onGroupCallUpdated(handleGroupCallUpdated);
+    socketService.onMessageStatusChanged(applyParticipantCursorPayload);
+    socketService.onParticipantCursorChanged(applyParticipantCursorPayload);
+    socketService.onConversationReadSynced(applyParticipantCursorPayload);
 
     return () => {
       socketService.offNewMessage(handleIncomingMessage);
@@ -513,8 +565,19 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
       cleanupSocket?.off("them_nguoi_moi", handleMemberAdded);
       socketService.offGroupCallUpdated(handleGroupCallUpdated);
+      socketService.offMessageStatusChanged(applyParticipantCursorPayload);
+      socketService.offParticipantCursorChanged(applyParticipantCursorPayload);
+      socketService.offConversationReadSynced(applyParticipantCursorPayload);
     };
-  }, [handleIncomingMessage, handleRevokedMessage, handleCategoryUpdated, handleMemberAdded, isAuthenticated]);
+  }, [
+    applyParticipantCursorPayload,
+    handleIncomingMessage,
+    handleRevokedMessage,
+    handleCategoryUpdated,
+    handleGroupCallUpdated,
+    handleMemberAdded,
+    isAuthenticated,
+  ]);
 
   const handleGroupDissolved = useCallback((payload: any) => {
     const conversationId = String(payload?.conversationId || "");

@@ -13,6 +13,8 @@ export interface Participant {
     notification_status: 'on' | 'mute' | 'off';
     mute_until?: string | null;
   };
+  last_delivered_message_id: string;
+  last_delivered_at?: string | null;
   last_read_message_id: string;
   last_read_at: string;
   deleted_msg_id: string;
@@ -35,6 +37,11 @@ export interface ConversationParticipant {
   nickname?: string;
   avatar?: string;
   status?: 'online' | 'offline' | 'away' | 'busy';
+  membership_status?: 'joined' | 'invited';
   role?: 'admin' | 'member' | 'owner';
   joined_at?: string;
+  last_delivered_message_id?: string;
+  last_delivered_at?: string | null;
+  last_read_message_id?: string;
+  last_read_at?: string | null;
 }

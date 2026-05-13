@@ -267,6 +267,48 @@ class SocketService {
     });
   }
 
+  markMessageDelivered(
+    conversationId: string,
+    userId: string,
+    msgId: string,
+    deviceId?: string,
+  ) {
+    this.emitWhenConnected("message_delivered", {
+      conversationId,
+      userId,
+      msgId,
+      deviceId,
+    });
+  }
+
+  markMessagesDeliveredUpTo(
+    conversationId: string,
+    userId: string,
+    msgId: string,
+    deviceId?: string,
+  ) {
+    this.emitWhenConnected("messages_delivered_up_to", {
+      conversationId,
+      userId,
+      msgId,
+      deviceId,
+    });
+  }
+
+  markMessageSeenUpTo(
+    conversationId: string,
+    userId: string,
+    msgId: string,
+    deviceId?: string,
+  ) {
+    this.emitWhenConnected("message_seen_up_to", {
+      conversationId,
+      userId,
+      msgId,
+      deviceId,
+    });
+  }
+
   onTyping(
     callback: (payload: { conversationId: string; userId: string }) => void,
   ) {
@@ -623,6 +665,69 @@ class SocketService {
       this.socket?.off("tin_nhan_doc", callback);
     } else {
       this.socket?.removeAllListeners("tin_nhan_doc");
+    }
+  }
+
+  onMessageStatusChanged(
+    callback: (payload: {
+      conversationId: string;
+      msgId: string;
+      status: "sent" | "delivered" | "seen";
+      deliveredCount: number;
+      seenCount: number;
+      recipientCount: number;
+      participant?: any;
+      userId?: string;
+      changedUserId?: string;
+    }) => void,
+  ) {
+    this.socket?.on("message_status_changed", callback);
+  }
+
+  offMessageStatusChanged(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("message_status_changed", callback);
+    } else {
+      this.socket?.removeAllListeners("message_status_changed");
+    }
+  }
+
+  onParticipantCursorChanged(
+    callback: (payload: {
+      conversationId: string;
+      userId: string;
+      msgId: string;
+      receiptType: "delivered" | "seen";
+      participant?: any;
+    }) => void,
+  ) {
+    this.socket?.on("participant_cursor_changed", callback);
+  }
+
+  offParticipantCursorChanged(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("participant_cursor_changed", callback);
+    } else {
+      this.socket?.removeAllListeners("participant_cursor_changed");
+    }
+  }
+
+  onConversationReadSynced(
+    callback: (payload: {
+      conversationId: string;
+      userId: string;
+      msgId: string;
+      participant?: any;
+    }) => void,
+  ) {
+    this.socket?.on("conversation_read_synced", callback);
+  }
+
+  offConversationReadSynced(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("conversation_read_synced", callback);
+    } else {
+      this.socket?.removeAllListeners("conversation_read_synced");
     }
   }
 
