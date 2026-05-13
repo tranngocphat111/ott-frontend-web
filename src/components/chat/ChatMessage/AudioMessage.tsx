@@ -184,16 +184,15 @@ export const AudioMessage = ({
       participants={participants}
       conversationType={conversationType}
     >
-      {(borderRadius) => (
+      {(borderRadius, renderMessageMeta) => (
         <div className="relative inline-block">
           <div
             className={`
               group flex flex-col gap-2 p-3 border transition-all max-w-xs shadow-sm relative overflow-hidden
               ${borderRadius}
-              ${
-                isMe
-                  ? "bg-chat-me border-chat-me hover:brightness-95 text-chat-me-text"
-                  : "bg-chat-other border-chat-other-border hover:bg-gray-50 text-chat-other-text"
+              ${isMe
+                ? "bg-chat-me border-chat-me hover:brightness-95 text-chat-me-text"
+                : "bg-chat-other border-chat-other-border hover:bg-gray-50 text-chat-other-text"
               }
             `}
             style={{ minWidth: "260px" }}
@@ -227,6 +226,11 @@ export const AudioMessage = ({
                   {sizeLabel || "Audio File"}
                 </p>
               </div>
+              {renderMessageMeta() && (
+                <div className="ml-2 shrink-0 self-start pt-0.5">
+                  {renderMessageMeta("media")}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -271,11 +275,10 @@ export const AudioMessage = ({
               <button
                 type="button"
                 onClick={handleDownload}
-                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
-                  isMe
-                    ? "bg-primary-200/60 text-primary-700 hover:bg-primary-200"
-                    : "bg-primary-50 text-slate-600 hover:bg-primary-100"
-                }`}
+                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${isMe
+                  ? "bg-primary-200/60 text-primary-700 hover:bg-primary-200"
+                  : "bg-primary-50 text-slate-600 hover:bg-primary-100"
+                  }`}
                 title="Tải xuống"
                 disabled={hasUploadState}
               >
@@ -296,7 +299,6 @@ export const AudioMessage = ({
 
             {hasUploadState && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                {/* ... existing upload states ... */}
                 {isUploadError ? (
                   <div className="flex flex-col items-center gap-2 text-white px-3 text-center">
                     <AlertCircle size={18} />

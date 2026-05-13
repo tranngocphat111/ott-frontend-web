@@ -194,7 +194,7 @@ export const VideoMessage = ({
       participants={participants}
       conversationType={conversationType}
     >
-      {(borderRadius) => (
+      {(borderRadius, renderMessageMeta) => (
         <div className="relative inline-block">
           <div
             className={`relative max-w-75 overflow-hidden bg-black shadow-sm group cursor-pointer border border-gray-100 transition-all ${borderRadius}`}
@@ -208,6 +208,12 @@ export const VideoMessage = ({
               playsInline
               preload="metadata"
             />
+
+            {renderMessageMeta("media") && (
+              <div className="pointer-events-none absolute right-2 top-2 z-10">
+                {renderMessageMeta("media")}
+              </div>
+            )}
 
             <div
               className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/40 to-transparent px-3 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
