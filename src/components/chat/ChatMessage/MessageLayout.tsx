@@ -738,6 +738,11 @@ export const MessageLayout = ({
   const canOpenDeliveryDetails =
     showDeliveryStatus &&
     (seenAvatarParticipants.length > 0 || deliveredParticipants.length > 0);
+  const shouldShowInlineDeliveryStatus =
+    showDeliveryStatus &&
+    (!deliverySummary.isGroupConversation ||
+      visibleSeenAvatars.length > 0 ||
+      deliverySummary.label === "Đã gửi");
   const seenAvatarTitle =
     seenAvatarParticipants.length > 0
       ? `Đã xem: ${seenAvatarParticipants
@@ -935,6 +940,27 @@ export const MessageLayout = ({
     };
   }, []);
 
+  const handleMessageContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (
+      !onReply &&
+      !onForward &&
+      !canPinMessage &&
+      !canRevokeForAll &&
+      !canDeleteForMe
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    window.dispatchEvent(new Event("chat:close-context-menu"));
+
+    setTimeout(() => {
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    }, 0);
+  };
+
   return (
     <div
       className={`flex w-full ${containerMargin} ${
@@ -944,25 +970,6 @@ export const MessageLayout = ({
             ? "justify-end"
             : "justify-start gap-2.5"
       }`}
-      onContextMenu={(e) => {
-        // Chỉ hiện menu nếu có ít nhất 1 action khả dụng
-        if (
-          onReply ||
-          onForward ||
-          canPinMessage ||
-          canRevokeForAll ||
-          canDeleteForMe
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          window.dispatchEvent(new Event("chat:close-context-menu"));
-
-          setTimeout(() => {
-            setContextMenuPosition({ x: e.clientX, y: e.clientY });
-          }, 0);
-        }
-      }}
     >
       {/* CỘT AVATAR */}
       {!isMe && !hideAvatar && (
@@ -1133,6 +1140,8 @@ export const MessageLayout = ({
           className={`relative w-fit max-w-full ${
             hasReactions && showDeliveryStatus ? "mb-3" : ""
           }`}
+          data-chat-message-bubble="true"
+          onContextMenu={handleMessageContextMenu}
         >
           {/* NỘI DUNG TIN NHẮN CHÍNH */}
           {children(borderRadius)}
@@ -1146,13 +1155,13 @@ export const MessageLayout = ({
               canPinMessage ||
               canForwardMessage) && (
               <div
-                className={`absolute top-1/2 -translate-y-1/2  flex items-center gap-0.5 ${
+                className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 ${
                   isMe ? "right-full mr-2" : "left-full ml-2"
                 } ${
                   showReactionPicker || showActionMenu
                     ? "opacity-100"
                     : "opacity-0 group-hover:opacity-100"
-                } transition-all duration-200`}
+                } ${!isMe && !isCentered ? "flex-row-reverse" : ""} transition-all duration-200`}
               >
                 {(canDeleteForMe ||
                   canRevokeForAll ||
@@ -1382,9 +1391,7 @@ export const MessageLayout = ({
         </div>
 
         {/* TRẠNG THÁI TIN NHẮN: tách khỏi bubble/reaction để không làm méo layout */}
-        {showDeliveryStatus &&
-          (!deliverySummary.isGroupConversation ||
-            visibleSeenAvatars.length > 0) && (
+        {shouldShowInlineDeliveryStatus && (
           <div className="mt-1 flex min-h-4 max-w-full items-center justify-end">
             {visibleSeenAvatars.length > 0 ? (
               <button

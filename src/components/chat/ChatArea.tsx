@@ -310,28 +310,104 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   );
 
   const applyJumpHighlight = useCallback((container: HTMLElement | null) => {
-    // 1. Guard clause: Tránh lỗi crash app nếu container chưa tồn tại
     if (!container) return;
 
-    // 2. Tìm target gọn gàng, type-safe hơn với toán tử ??
     const bubbleTarget =
+      container.querySelector<HTMLElement>('[data-chat-message-bubble="true"]') ??
       container.querySelector<HTMLElement>(".group") ??
       (container.firstElementChild as HTMLElement) ??
       container;
 
-    // 3. Khai báo và chạy animation trực tiếp
+    const previousPosition = bubbleTarget.style.position;
+    const previousZIndex = bubbleTarget.style.zIndex;
+    const previousFilter = bubbleTarget.style.filter;
+    const previousTransformOrigin = bubbleTarget.style.transformOrigin;
+    const contentTarget =
+      (bubbleTarget.firstElementChild as HTMLElement | null) ?? bubbleTarget;
+    const contentStyle = getComputedStyle(contentTarget);
+    const primaryColor =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-primary-500")
+        .trim() || "#B77C45";
+
+    bubbleTarget.style.position = previousPosition || "relative";
+    bubbleTarget.style.zIndex = "45";
+    bubbleTarget.style.transformOrigin = "center";
+
+    const ring = document.createElement("div");
+    ring.setAttribute("aria-hidden", "true");
+    ring.style.position = "absolute";
+    ring.style.inset = "0";
+    ring.style.borderRadius = contentStyle.borderRadius || "inherit";
+    ring.style.pointerEvents = "none";
+    ring.style.border = `2px solid ${primaryColor}`;
+    ring.style.boxShadow = `0 0 0 6px rgba(183, 124, 69, 0.16), 0 14px 36px rgba(183, 124, 69, 0.22)`;
+    ring.style.opacity = "0";
+    ring.style.zIndex = "5";
+    ring.style.mixBlendMode = "normal";
+    bubbleTarget.appendChild(ring);
+
     bubbleTarget.animate(
       [
-        { transform: "scale(1)" },
-        { transform: "scale(1.10)", offset: 0.3 },
-        { transform: "scale(0.9)", offset: 0.7 },
-        { transform: "scale(1)" },
+        { transform: "scale(1)", filter: previousFilter || "brightness(1)" },
+        { transform: "scale(1.025)", filter: "brightness(1.06)", offset: 0.18 },
+        { transform: "scale(1)", filter: "brightness(1.02)", offset: 0.42 },
+        { transform: "scale(1.015)", filter: "brightness(1.05)", offset: 0.68 },
+        { transform: "scale(1)", filter: previousFilter || "brightness(1)" },
       ],
       {
-        duration: 1000,
-        easing: "ease-in-out",
+        duration: 2200,
+        easing: "cubic-bezier(0.2, 0, 0.2, 1)",
       },
     );
+
+    const ringAnimation = ring.animate(
+      [
+        {
+          opacity: 0,
+          transform: "scale(0.96)",
+          boxShadow: "0 0 0 0 rgba(183, 124, 69, 0)",
+        },
+        {
+          opacity: 1,
+          transform: "scale(1)",
+          boxShadow:
+            "0 0 0 6px rgba(183, 124, 69, 0.18), 0 14px 36px rgba(183, 124, 69, 0.24)",
+          offset: 0.16,
+        },
+        {
+          opacity: 0.72,
+          transform: "scale(1.015)",
+          boxShadow:
+            "0 0 0 10px rgba(183, 124, 69, 0.08), 0 12px 30px rgba(183, 124, 69, 0.16)",
+          offset: 0.45,
+        },
+        {
+          opacity: 1,
+          transform: "scale(1)",
+          boxShadow:
+            "0 0 0 6px rgba(183, 124, 69, 0.16), 0 14px 36px rgba(183, 124, 69, 0.22)",
+          offset: 0.68,
+        },
+        {
+          opacity: 0,
+          transform: "scale(1.025)",
+          boxShadow: "0 0 0 14px rgba(183, 124, 69, 0)",
+        },
+      ],
+      {
+        duration: 2200,
+        easing: "cubic-bezier(0.2, 0, 0.2, 1)",
+      },
+    );
+
+    ringAnimation.onfinish = () => {
+      ring.remove();
+      bubbleTarget.style.position = previousPosition;
+      bubbleTarget.style.zIndex = previousZIndex;
+      bubbleTarget.style.filter = previousFilter;
+      bubbleTarget.style.transformOrigin = previousTransformOrigin;
+    };
   }, []);
 
   // Sidebar state (Internal fallback nếu không truyền từ props)
@@ -2160,6 +2236,42 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     void runAutoFill();
   }, [messages.length, hasMore, loading, loadOlderMessages]);
 
+  const shouldShowScrollToBottomButton = useCallback(
+    (container: HTMLDivElement | null = messagesContainerRef.current) => {
+      if (messages.length === 0) return false;
+      if (hasMoreAfter) return true;
+      if (!container) return false;
+
+      const hasScrollableOverflow =
+        container.scrollHeight > container.clientHeight + 8;
+      if (!hasScrollableOverflow) return false;
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+
+      return distanceToBottom >= 100;
+    },
+    [hasMoreAfter, messages.length],
+  );
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+
+    if (messages.length === 0) {
+      wasNearBottomRef.current = true;
+      setShowScrollButton(false);
+      return;
+    }
+
+    if (!container) return;
+    setShowScrollButton(shouldShowScrollToBottomButton(container));
+  }, [
+    activeConversation._id,
+    hasMoreAfter,
+    messages.length,
+    shouldShowScrollToBottomButton,
+  ]);
+
   /**
    * Handle scroll to load older messages (infinite scroll)
    */
@@ -2224,13 +2336,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       loadMessageContextAfterLast().finally(() => {
         isLoadingNewerRef.current = false;
-        setShowScrollButton(true);
+        setShowScrollButton(
+          shouldShowScrollToBottomButton(messagesContainerRef.current),
+        );
       });
     }
 
     // Show/hide scroll button based on scroll position
     wasNearBottomRef.current = isNearBottom;
-    setShowScrollButton(hasMoreAfter ? true : !isNearBottom);
+    setShowScrollButton(shouldShowScrollToBottomButton(container));
     lastScrollTopRef.current = currentScrollTop;
   };
 
@@ -2342,7 +2456,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       // After appending messages below, this viewport is no longer anchored to
       // the bottom. Keep later layout changes from snapping it down.
       wasNearBottomRef.current = false;
-      setShowScrollButton(true);
+      setShowScrollButton(shouldShowScrollToBottomButton(container));
       prevMessageCountRef.current = currentMessageCount;
       prevLastMessageIdRef.current = currentLastMessageId;
 
@@ -2370,7 +2484,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       scrollTopBeforeLoadMoreRef.current = 0;
       isFirstLoadRef.current = false;
       wasNearBottomRef.current = false;
-      setShowScrollButton(true);
+      setShowScrollButton(shouldShowScrollToBottomButton(container));
 
       // Cập nhật ref để tránh logic auto-scroll xuống dưới chạy đè lên
       prevMessageCountRef.current = messages.length;
@@ -2482,6 +2596,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     loading,
     markMessageSeenUpTo,
     normalizedUserId,
+    shouldShowScrollToBottomButton,
     waitForInitialMediaToSettle,
     waitForNextFrame,
   ]);
