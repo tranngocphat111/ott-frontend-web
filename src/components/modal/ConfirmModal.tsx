@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   isDangerous?: boolean;
@@ -42,9 +42,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </div>
 
         {/* Message */}
-        <p className="text-primary-700 text-sm mb-8 leading-relaxed">
+        <div className="text-primary-700 text-sm mb-8 leading-relaxed">
           {message}
-        </p>
+        </div>
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">

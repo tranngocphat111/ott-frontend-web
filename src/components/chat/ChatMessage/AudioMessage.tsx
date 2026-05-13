@@ -296,6 +296,7 @@ export const AudioMessage = ({
 
             {hasUploadState && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                {/* ... existing upload states ... */}
                 {isUploadError ? (
                   <div className="flex flex-col items-center gap-2 text-white px-3 text-center">
                     <AlertCircle size={18} />

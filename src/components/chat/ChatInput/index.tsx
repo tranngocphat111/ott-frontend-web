@@ -22,8 +22,10 @@ import {
   Link2,
   Music,
   ListChecks,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
-import { ConversationService, MessageService } from "../../../services";
+import { AiService, ConversationService, MessageService } from "../../../services";
 import type { ChatInputProps } from "../../../types/message.type";
 import {
   convertDisplayShortcodeToEmoji,
@@ -215,6 +217,8 @@ export const ChatInput = ({
     message: "",
   });
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
+  const [isSTTMode, setIsSTTMode] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const textInputRef = useRef<TextInputHandle>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -330,6 +334,7 @@ export const ChatInput = ({
       window.removeEventListener("chat:focus-input", handler as EventListener);
     };
   }, []);
+
 
   const handleAddMore = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -588,7 +593,7 @@ export const ChatInput = ({
     return fallback;
   };
 
-  const getRealConversationId = async () => {
+  const getRealConversationId = useCallback(async () => {
     if (conversationId.startsWith("VIRTUAL_CONV_")) {
       const targetUserId = conversationId.replace("VIRTUAL_CONV_", "");
       try {
@@ -604,7 +609,7 @@ export const ChatInput = ({
       }
     }
     return conversationId;
-  };
+  }, [conversationId, senderId, onConversationCreated]);
 
   const showUploadLimitModal = (
     invalid: Array<{ file: File; maxSizeMb: number }>,
@@ -629,7 +634,7 @@ export const ChatInput = ({
     return false;
   };
 
-  const buildReplyPreview = (): Message["reply_to"] => {
+  const buildReplyPreview = useCallback((): Message["reply_to"] => {
     if (!replyToMessage) return null;
 
     const rawContent = Array.isArray(replyToMessage.content)
@@ -656,9 +661,9 @@ export const ChatInput = ({
       is_deleted: Boolean(replyToMessage.is_deleted),
       is_revoked: Boolean(replyToMessage.is_revoked),
     };
-  };
+  }, [replyToMessage]);
 
-  const buildLocalDraftMessage = ({
+  const buildLocalDraftMessage = useCallback(({
     clientMessageId,
     type,
     content,
@@ -703,7 +708,7 @@ export const ChatInput = ({
       local_retry: retry,
       local_cancel: cancel,
     };
-  };
+  }, [conversationId, senderId, replyToMessage, buildReplyPreview]);
 
   const inferFileMessageType = (file: File): Message["type"] => {
     if (file.type.startsWith("video/")) return "video";
@@ -711,7 +716,7 @@ export const ChatInput = ({
     return "file";
   };
 
-  const uploadImageBatch = async (
+  const uploadImageBatch = useCallback(async (
     files: File[],
     replyToMsgId?: string,
     clientMessageId = createUploadClientId(),
@@ -799,17 +804,26 @@ export const ChatInput = ({
         }
       });
     }
-  };
+  }, [
+    senderId,
+    buildLocalDraftMessage,
+    onUploadStart,
+    onUploadProgress,
+    onUploadSuccess,
+    onUploadError,
+    onCancelReply,
+    getRealConversationId,
+  ]);
 
   // --- Upload helpers (được gọi khi Send) ---
 
   // Nhiều ảnh → 1 message (gửi cụm)
-  const uploadImages = async (files: File[], replyToMsgId?: string) => {
+  const uploadImages = useCallback(async (files: File[], replyToMsgId?: string) => {
     await uploadImageBatch(files, replyToMsgId);
-  };
+  }, [uploadImageBatch]);
 
   // 1 file (video / tệp) → 1 message
-  const uploadSingleFile = async (
+  const uploadSingleFile = useCallback(async (
     file: File,
     replyToMsgId?: string,
     clientMessageId = createUploadClientId(),
@@ -898,12 +912,23 @@ export const ChatInput = ({
         URL.revokeObjectURL(previewUrl);
       }
     }
-  };
+  }, [
+    senderId,
+    buildLocalDraftMessage,
+    onUploadStart,
+    onUploadProgress,
+    onUploadSuccess,
+    onUploadError,
+    onCancelReply,
+    onSendSuccess,
+    getRealConversationId,
+  ]);
 
   // --- Gửi tất cả (file staged + text) ---
-  const handleSend = async () => {
+  const handleSend = useCallback(async (directText?: string) => {
+    const finalText = (typeof directText === 'string' ? directText : text).trim();
     if (isUploading) return;
-    if (!text.trim() && pendingFiles.length === 0) return;
+    if (!finalText && pendingFiles.length === 0) return;
 
     stopTyping();
 
@@ -941,10 +966,10 @@ export const ChatInput = ({
       }
 
       // Sau đó gửi text nếu có
-      if (text.trim()) {
+      if (finalText) {
         try {
-          const messageType = isStandaloneLink(text) ? "link" : "text";
-          const messageContent = convertEmojiImageMarkupToText(text);
+          const messageType = isStandaloneLink(finalText) ? "link" : "text";
+          const messageContent = convertEmojiImageMarkupToText(finalText);
 
           const effectiveConvId = await getRealConversationId();
 
@@ -957,7 +982,9 @@ export const ChatInput = ({
             undefined,
             replyToMsgId,
           );
-          setText("");
+          if (typeof directText !== 'string') {
+            setText("");
+          }
           await onSendSuccess(sentMessage);
           if (replyToMsgId) onCancelReply?.();
         } catch (error: any) {
@@ -970,7 +997,40 @@ export const ChatInput = ({
         setIsUploading(false);
       }
     }
-  };
+  }, [
+    text,
+    isUploading,
+    pendingFiles,
+    stopTyping,
+    replyToMessage,
+    senderId,
+    onSendSuccess,
+    onCancelReply,
+    isSTTMode,
+    isRecordingVoice,
+    isStandaloneLink,
+    getRealConversationId,
+    buildLocalDraftMessage,
+    validateUploadFiles,
+    uploadImages,
+    uploadSingleFile,
+  ]);
+
+  useEffect(() => {
+    const handleSmartReply = (event: Event) => {
+      const custom = event as CustomEvent<{ text: string }>;
+      const replyText = custom.detail.text;
+      if (replyText) {
+        // Send directly
+        void handleSend(replyText);
+      }
+    };
+
+    window.addEventListener("chat:send-smart-reply", handleSmartReply as EventListener);
+    return () => {
+      window.removeEventListener("chat:send-smart-reply", handleSmartReply as EventListener);
+    };
+  }, [handleSend]);
 
   // --- Handlers từ sub-components → staging ---
 
@@ -1151,15 +1211,32 @@ export const ChatInput = ({
       }
 
       const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const file = new File([blob], `voice-${timestamp}.webm`, {
-        type: "audio/webm",
-      });
+
+      if (isSTTMode) {
+        setIsTranscribing(true);
+        try {
+          const transcribedText = await AiService.transcribeVoice(blob);
+          if (transcribedText) {
+            setText(prev => (prev.trim() ? `${prev} ${transcribedText}` : transcribedText));
+          }
+        } catch (error) {
+          console.error("STT Error:", error);
+          alert("Không thể chuyển đổi giọng nói thành văn bản. Vui lòng thử lại.");
+        } finally {
+          setIsTranscribing(false);
+          setIsSTTMode(false);
+        }
+      } else {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const file = new File([blob], `voice-${timestamp}.webm`, {
+          type: "audio/webm",
+        });
+        await handleVoiceFile(file);
+      }
 
       audioChunksRef.current = [];
       setRecordingTime(0);
       setIsVoicePaused(false);
-      await handleVoiceFile(file);
     }, 100);
   };
 
@@ -1418,7 +1495,7 @@ export const ChatInput = ({
               <span
                 className={`text-xs font-medium ${isVoicePaused ? "text-primary-400" : "text-primary-600"}`}
               >
-                {isVoicePaused ? "Tạm dừng" : "Đang ghi..."}
+                {isVoicePaused ? "Tạm dừng" : isSTTMode ? "Đang nghe..." : "Đang ghi..."}
               </span>
 
               {/* Nút Play/Pause (Gọn gàng bên cạnh text) */}
@@ -1440,12 +1517,16 @@ export const ChatInput = ({
           <button
             onClick={sendVoiceRecording}
             className="ml-1 h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-primary-100 text-primary-600 transition-colors hover:bg-primary-200 active:bg-primary-300"
-            title="Gửi ghi âm"
+            title={isSTTMode ? "Chuyển thành văn bản" : "Gửi ghi âm"}
           >
-            <SendHorizonal
-              size={18}
-              className="translate-x-px translate-y-[0.5px]"
-            />
+            {isSTTMode ? (
+              <Sparkles size={18} />
+            ) : (
+              <SendHorizonal
+                size={18}
+                className="translate-x-px translate-y-[0.5px]"
+              />
+            )}
           </button>
         </div>
       ) : (
@@ -1457,15 +1538,6 @@ export const ChatInput = ({
           />
 
           <FileInput disabled={isUploading} onFiles={handleAttachFiles} />
-
-          <button
-            onClick={startVoiceRecording}
-            disabled={isUploading}
-            className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
-            title="Ghi am"
-          >
-            <Mic size={20} />
-          </button>
 
           {conversationType !== "private" && (
             <button
@@ -1487,6 +1559,37 @@ export const ChatInput = ({
             <Smile size={20} />
           </button>
 
+          <button
+            onClick={startVoiceRecording}
+            disabled={isUploading}
+            className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+            title="Gửi tin nhắn thoại"
+          >
+            <Mic size={20} />
+          </button>
+
+          <button
+            onClick={() => {
+              setIsSTTMode(true);
+              startVoiceRecording();
+            }}
+            disabled={isUploading || isRecordingVoice}
+            className={`p-2 rounded-xl transition-all duration-200 ${isTranscribing ? "animate-pulse text-primary-500 bg-primary-50" : "text-slate-400 hover:text-primary-500 hover:bg-primary-50"
+              }`}
+            title="Nhập liệu bằng giọng nói"
+          >
+            {isTranscribing ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <div className="relative">
+                <Mic size={20} />
+                <span className="absolute -top-1.5 -right-1.5 text-[7px] font-bold bg-primary-500 text-white px-0.5 rounded-[2px] leading-tight ring-1 ring-white">
+                  AI
+                </span>
+              </div>
+            )}
+          </button>
+
           <TextInput
             ref={textInputRef}
             value={text}
@@ -1499,7 +1602,7 @@ export const ChatInput = ({
 
           {canSend && (
             <button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
               title="Gửi"
             >

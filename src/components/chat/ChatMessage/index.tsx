@@ -37,21 +37,23 @@ export const ChatMessage = memo(
     onPin,
     onForward,
     conversation,
+    translatedText,
   }: {
     msg: any;
     isMe: boolean;
-    currentUserId?: string;
+    currentUserId: any;
     isFirstInSequence: boolean;
     isLastInSequence: boolean;
     isTopBoundary?: boolean;
-    onMediaClick?: (imageIndex: number) => void;
+    onMediaClick?: (index: number) => void;
     onReply?: (msg: any) => void;
-    onReact?: (msg: any, reactionType: string) => void;
+    onReact?: (msg: any, reaction: string) => void;
     onRevoke?: (msg: any) => void;
     onDelete?: (msg: any) => void;
     onPin?: (msg: any) => void;
     onForward?: (msg: any) => void;
     conversation?: any;
+    translatedText?: string;
   }) => {
     const msgType = msg.type?.toLowerCase();
     const isDeleted = !!msg.is_deleted;
@@ -278,7 +280,7 @@ export const ChatMessage = memo(
             onPin={onPin}
             onForward={onForward}
             participants={conversation?.participants}
-            conversationType={conversation?.type}
+            translatedText={translatedText}
           />
         );
     }
@@ -314,10 +316,7 @@ export const ChatMessage = memo(
       prev.msg.is_pinned === next.msg.is_pinned &&
       prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
       prevReplyTo === nextReplyTo &&
-      prev.msg.__show_delivery_status === next.msg.__show_delivery_status &&
-      participantCursorsEqual &&
-      conversationTypeEqual &&
-      prev.currentUserId === next.currentUserId &&
+      prev.translatedText === next.translatedText &&
       prev.isFirstInSequence === next.isFirstInSequence &&
       prev.isLastInSequence === next.isLastInSequence
     );

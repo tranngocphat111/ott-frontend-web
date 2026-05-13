@@ -1,6 +1,6 @@
 // src/components/Chat/ChatHeader.tsx
-import React, { useEffect } from "react";
-import { Phone, Video, PanelRightOpen, PanelRightClose } from "lucide-react";
+import React from "react";
+import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles, Languages } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
 import {
@@ -18,6 +18,10 @@ interface ChatHeaderProps extends ChatAreaProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   hideCallActions?: boolean;
+  onSummarize?: () => void;
+  isTranslating?: boolean;
+  onToggleTranslation?: () => void;
+  isSummarizing?: boolean;
 }
 
 // ─── Helper: format last seen ────────────────────────────────────────────────
@@ -86,6 +90,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   isSidebarOpen = false,
   onToggleSidebar,
   hideCallActions = false,
+  onSummarize,
+  isTranslating = false,
+  onToggleTranslation,
+  isSummarizing = false,
 }) => {
   const { isUserOnline, getLastSeen, watchUsers } = usePresence();
 
@@ -213,6 +221,27 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <div className="w-px h-6 bg-gray-200 mx-1" />
             </>
           )}
+
+          {/* AI Tools */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onSummarize}
+              disabled={isSummarizing}
+              className={`p-2 hover:bg-gray-50 rounded-full transition-all duration-200 group relative ${isSummarizing ? "opacity-50" : ""}`}
+              title="Tóm tắt hội thoại (AI)"
+            >
+              <Sparkles size={20} className={`${isSummarizing ? "animate-spin" : "text-primary-500"}`} />
+              {isSummarizing && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
+                </span>
+              )}
+            </button>
+
+          </div>
+
+          <div className="w-px h-6 bg-gray-200 mx-1" />
 
           {/* Sidebar Toggle Button */}
           <button

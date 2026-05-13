@@ -6,6 +6,7 @@ export { ParticipantService } from "./participant.service";
 export { socketService } from "./socket.service";
 export { relationshipSocketService } from "./relationshipSocket.service";
 export { mediaSocketService } from "./mediaSocket.service";
+export { AiService } from "./ai.service";
 
 // Social / media services
 export {
