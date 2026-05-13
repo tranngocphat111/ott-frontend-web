@@ -555,9 +555,14 @@ export const ImageMessage = ({
       participants={participants}
       conversationType={conversationType}
     >
-      {(borderRadius: string) => (
+      {(borderRadius: string, renderMessageMeta) => (
         <div className="relative inline-block">
           {renderGrid(borderRadius)}
+          {renderMessageMeta("media") && (
+            <div className="pointer-events-none absolute right-1.5 top-1.5 z-10">
+              {renderMessageMeta("media")}
+            </div>
+          )}
           {renderUploadOverlay()}
         </div>
       )}

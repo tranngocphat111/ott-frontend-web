@@ -175,16 +175,19 @@ export const LinkMessage = ({
       participants={participants}
       conversationType={conversationType}
     >
-      {(borderRadius) => (
-        <div
-          className={`group relative shadow-sm transition-all border overflow-hidden ${isMe
-            ? "bg-chat-me text-chat-me-text border-white/10"
-            : "bg-chat-other text-chat-other-text border-chat-other-border"
-            } ${borderRadius} ${isGroupInviteLink
-              ? "max-w-[320px] bg-surface border-primary-200"
-              : "max-w-[320px]"
-            }`}
-        >
+      {(borderRadius, renderMessageMeta) => {
+        const messageMeta = renderMessageMeta();
+
+        return (
+          <div
+            className={`group relative shadow-sm transition-all border overflow-hidden ${isMe
+              ? "bg-chat-me text-chat-me-text border-white/10"
+              : "bg-chat-other text-chat-other-text border-chat-other-border"
+              } ${borderRadius} ${isGroupInviteLink
+                ? "max-w-[320px] bg-surface border-primary-200"
+                : "max-w-[320px]"
+              }`}
+          >
           {safeLink ? (
             isGroupInviteLink ? (
               <a
@@ -303,8 +306,14 @@ export const LinkMessage = ({
           ) : (
             <div className="px-3 py-2 font-body">{text}</div>
           )}
-        </div>
-      )}
+            {messageMeta && (
+              <div className="flex justify-end px-3 pb-2">
+                {messageMeta}
+              </div>
+            )}
+          </div>
+        );
+      }}
     </MessageLayout>
     {showConfirm && (
       <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
