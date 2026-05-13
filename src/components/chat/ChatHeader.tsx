@@ -1,5 +1,5 @@
 // src/components/Chat/ChatHeader.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles, Languages } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
@@ -32,26 +32,26 @@ const formatLastSeen = (date: Date | null): string => {
 
   // < 1 phút
   if (diff < 60) return "Vừa hoạt động";
-  
+
   // < 1 giờ
   if (diff < 3600) return `Hoạt động ${Math.floor(diff / 60)} phút trước`;
-  
+
   // < 24 giờ (trong cùng ngày)
-  const isSameDay = 
+  const isSameDay =
     date.getDate() === now.getDate() &&
     date.getMonth() === now.getMonth() &&
     date.getFullYear() === now.getFullYear();
-    
+
   if (isSameDay) return `Hoạt động ${Math.floor(diff / 3600)} giờ trước`;
 
   // Hôm qua
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = 
+  const isYesterday =
     date.getDate() === yesterday.getDate() &&
     date.getMonth() === yesterday.getMonth() &&
     date.getFullYear() === yesterday.getFullYear();
-    
+
   if (isYesterday) return "Hoạt động hôm qua";
 
   // < 7 ngày
@@ -169,17 +169,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <div className="flex items-center gap-2">
                 {conversation.type !== "group" && (
                   <span
-                    className={`w-2 h-2 rounded-full transition-colors duration-500 ${
-                      statusDot
+                    className={`w-2 h-2 rounded-full transition-colors duration-500 ${statusDot
                         ? "bg-green-500 animate-pulse"
                         : "bg-gray-300"
-                    }`}
+                      }`}
                   />
                 )}
                 <p
-                  className={`text-xs font-medium transition-colors duration-500 ${
-                    statusDot ? "text-green-600" : "text-gray-500"
-                  }`}
+                  className={`text-xs font-medium transition-colors duration-500 ${statusDot ? "text-green-600" : "text-gray-500"
+                    }`}
                 >
                   {statusText}
                 </p>
@@ -246,9 +244,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           {/* Sidebar Toggle Button */}
           <button
             onClick={onToggleSidebar}
-            className={`p-2 hover:bg-gray-50 rounded-full transition-colors cursor-pointer ${
-              isSidebarOpen ? "bg-primary-50 text-primary-600" : ""
-            }`}
+            className={`p-2 hover:bg-gray-50 rounded-full transition-colors cursor-pointer ${isSidebarOpen ? "bg-primary-50 text-primary-600" : ""
+              }`}
             title={isSidebarOpen ? "Đóng thông tin" : "Mở thông tin"}
           >
             {isSidebarOpen ? (

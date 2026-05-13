@@ -281,6 +281,7 @@ export const ChatMessage = memo(
             onForward={onForward}
             participants={conversation?.participants}
             translatedText={translatedText}
+            conversationType={conversation?.type}
           />
         );
     }

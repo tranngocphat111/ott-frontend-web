@@ -20,6 +20,7 @@ export const TextMessage = ({
   onForward,
   participants,
   translatedText,
+  conversationType,
 }: {
   msg: Message;
   isMe: boolean;
@@ -35,6 +36,7 @@ export const TextMessage = ({
   onForward?: (msg: Message) => void;
   participants?: any[];
   translatedText?: string;
+  conversationType?: string;
 }) => {
   const [manualTranslatedText, setManualTranslatedText] = useState<string | null>(null);
   const [isTranslatingLocal, setIsTranslatingLocal] = useState(false);
