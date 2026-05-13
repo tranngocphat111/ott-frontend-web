@@ -110,6 +110,14 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   const [pendingFriendRequestIds, setPendingFriendRequestIds] = useState<Set<string>>(new Set());
   const [sentFriendRequestIds, setSentFriendRequestIds] = useState<Set<string>>(new Set());
 
+  // Reset sidebar state when switching conversations
+  useEffect(() => {
+    setViewMode("main");
+    setStorageTab("media");
+    setBulletinTab("pinned");
+    setError(null);
+  }, [conversation?._id]);
+
   // Helper to safely filter valid messages
   const filterValidMessages = (messages: any[]): Message[] => {
     if (!Array.isArray(messages)) return [];
@@ -364,9 +372,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     const handleSocketRelationshipUpdate = (payload: any) => {
       if (!isOpen || !currentUser?.id) return;
 
+      const requesterId = payload.requesterId || payload.requester_id;
+      const receiverId = payload.receiverId || payload.receiver_id;
+
       // If the update involves the current user
-      if (String(payload.requester_id) === String(currentUser.id) ||
-        String(payload.receiver_id) === String(currentUser.id)) {
+      if (String(requesterId) === String(currentUser.id) ||
+        String(receiverId) === String(currentUser.id)) {
         console.log("ChatSidebarRight: Relationship updated via socket, refreshing data...");
         loadSidebarData();
       }
@@ -972,6 +983,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                         await refreshConversations(currentUser.id);
                       }
                     }}
+                    onRelationshipChange={setRelationship}
                   />
                 )}
               </>
@@ -996,6 +1008,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               pendingFriendRequestIds={pendingFriendRequestIds}
               sentFriendRequestIds={sentFriendRequestIds}
               onFriendAccepted={handleFriendAccepted}
+              onMemberBlocked={(userId: string) => {
+                setMembers(prev => prev.filter(m => m.user_id !== userId));
+              }}
+              conversationId={conversation._id}
             />
           </div>
         )}

@@ -30,7 +30,7 @@ const CreatePostCard: React.FC<Props> = ({
         onClick={onOpenModal}
         className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition text-primary-700">
         <Video className="size-5 text-primary-500" />
-        <span className="text-sm font-medium">Video trực tiếp</span>
+        <span className="text-sm font-medium">Live</span>
       </button>
       <button
         onClick={onOpenModal}

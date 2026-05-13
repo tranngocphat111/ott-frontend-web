@@ -10,6 +10,7 @@ import StoryReel from "./StoryReel";
 import {
   fetchStoryGroups,
   fetchSuggestedUsers,
+  deleteStory,
 } from "../../../services/story.service";
 import CreateStoryModal from "./CreateStoryModal";
 import StoryViewer from "./StoryViewer";
@@ -144,6 +145,31 @@ export const StoryFeed: React.FC<Props> = ({
     legacyVideo.msRequestFullscreen?.();
   }, []);
 
+  const handleDeleteStory = useCallback(
+    async (storyId: string) => {
+      const success = await deleteStory(storyId);
+      if (success) {
+        setStoryGroups((prev) =>
+          prev
+            .map((group) => ({
+              ...group,
+              stories: group.stories.filter((s) => s.id !== storyId),
+            }))
+            .filter((group) => group.stories.length > 0),
+        );
+        // If current viewer is open, close it or move to next
+        if (selectedUserStories.length <= 1) {
+          closeViewer();
+        } else {
+          const nextStories = selectedUserStories.filter((s) => s.id !== storyId);
+          setSelectedUserStories(nextStories);
+          setActiveStoryIndex((prev) => Math.min(prev, nextStories.length - 1));
+        }
+      }
+    },
+    [closeViewer, selectedUserStories],
+  );
+
   useEffect(() => {
     if (!isViewerOpen || !activeStory) return;
     setStoryProgress(0);
@@ -254,6 +280,7 @@ export const StoryFeed: React.FC<Props> = ({
         onTogglePause={handleTogglePause}
         onVolumeChange={handleVolumeChange}
         onEnterFullscreen={enterFullscreen}
+        onDeleteStory={handleDeleteStory}
         videoRef={videoRef}
       />
     </>

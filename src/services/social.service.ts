@@ -400,6 +400,52 @@ export async function unfriendViaChat(
     }
 }
 
+/**
+ * Chặn người dùng qua chat-service
+ */
+export async function blockUserViaChat(
+    userId: string,
+    targetId: string,
+): Promise<boolean> {
+    try {
+        const res = await authFetch(
+            `${API_CHAT_SERVER_URL}/relationships/block`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, targetId }),
+                signal: AbortSignal.timeout(5_000)
+            },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Bỏ chặn người dùng qua chat-service
+ */
+export async function unblockUserViaChat(
+    userId: string,
+    targetId: string,
+): Promise<boolean> {
+    try {
+        const res = await authFetch(
+            `${API_CHAT_SERVER_URL}/relationships/unblock`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, targetId }),
+                signal: AbortSignal.timeout(5_000)
+            },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 export async function rejectFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {

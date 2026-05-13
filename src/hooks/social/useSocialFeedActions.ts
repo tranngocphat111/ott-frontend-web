@@ -70,9 +70,15 @@ export const useSocialFeedActions = ({
 
     const handleDeletePost = useCallback(
         async (id: string) => {
-            await deletePost(id);
+            // Immediate update
+            setPosts((prev) => prev.filter((p) => p.id !== id));
+            const success = await deletePost(id);
+            if (!success) {
+                // If failed, we might want to reload or show an error
+                console.error("Xóa bài viết thất bại");
+            }
         },
-        [],
+        [setPosts],
     );
 
     const handleUpdatePost = useCallback(
@@ -95,12 +101,16 @@ export const useSocialFeedActions = ({
                 accessControls,
             );
             if (result.post) {
+                // Immediate update
+                setPosts((prev) =>
+                    prev.map((p) => (p.id === postId ? result.post! : p)),
+                );
                 return { ok: true };
             }
 
             return { ok: false, error: result.error };
         },
-        [currentUser.id],
+        [currentUser.id, setPosts],
     );
 
     const handleNewPost = useCallback(

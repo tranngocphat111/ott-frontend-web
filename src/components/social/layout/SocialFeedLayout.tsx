@@ -2,6 +2,8 @@ import React from "react";
 import LeftSidebarSection from "./LeftSidebarSection";
 import CenterFeedSection from "./CenterFeedSection";
 import RightSidebarSection from "./RightSidebarSection";
+import MobileSidebarTriggers from "./MobileSidebarTriggers";
+import type { PostUser } from "../types";
 
 interface Props {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -9,6 +11,7 @@ interface Props {
   center?: React.ReactNode;
   right?: React.ReactNode;
   bottom?: React.ReactNode;
+  currentUser?: PostUser;
 }
 
 const SocialFeedLayout: React.FC<Props> = ({
@@ -17,6 +20,7 @@ const SocialFeedLayout: React.FC<Props> = ({
   center,
   right,
   bottom,
+  currentUser,
 }) => (
   <div
     ref={containerRef}
@@ -29,6 +33,9 @@ const SocialFeedLayout: React.FC<Props> = ({
       </div>
       {bottom}
     </div>
+
+    {/* Mobile triggers */}
+    {currentUser && <MobileSidebarTriggers currentUser={currentUser} />}
   </div>
 );
 

@@ -216,6 +216,8 @@ export async function fetchStoryGroups(accountId: string): Promise<StoryUserGrou
             if (Array.isArray(reel.stories) && reel.stories.length > 0) {
                 return groupStories(reel.stories);
             }
+
+            return [];
         }
 
         const fallbackRes = await authFetch(`${API_MEDIA_SERVER_URL}/stories`);
@@ -286,5 +288,16 @@ export async function uploadStoryMedia(file: File, storyItemId?: string): Promis
         return unwrapApiResult<StoryUploadResponse>(json);
     } catch {
         return null;
+    }
+}
+export async function deleteStory(storyId: string): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/stories/${storyId}`, {
+            method: "DELETE",
+            signal: AbortSignal.timeout(5_000),
+        });
+        return res.ok;
+    } catch {
+        return false;
     }
 }

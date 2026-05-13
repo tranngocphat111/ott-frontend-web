@@ -105,6 +105,7 @@ const SocialFeed: React.FC = () => {
     <>
       <SocialFeedLayout
         containerRef={containerRef}
+        currentUser={currentUser}
         left={<SocialLeftSidebar currentUser={currentUser} />}
         center={
           <>

@@ -1,9 +1,10 @@
 import React from "react";
 import { Trash2, LogOut, AlertTriangle, UserRoundX } from "lucide-react";
 import { ConversationService, ParticipantService } from "../../../../services";
-import { unfriendViaChat } from "../../../../services/social.service";
+import { unfriendViaChat, blockUserViaChat, unblockUserViaChat } from "../../../../services/social.service";
 import type { GroupActionsProps } from "../../../../interfaces";
 import { ConfirmModal } from "../../../modal/ConfirmModal";
+import { useConversations } from "../../../../contexts/ConversationsContext";
 
 const GroupActions: React.FC<GroupActionsProps> = ({
   conversation,
@@ -14,10 +15,12 @@ const GroupActions: React.FC<GroupActionsProps> = ({
   onUnfriend,
   onLeaveSuccess,
   onActionSuccess,
+  onRelationshipChange,
 }) => {
+  const { refreshConversations } = useConversations();
   const [confirmState, setConfirmState] = React.useState<{
     isOpen: boolean;
-    action: "delete-history" | "leave-group" | "dissolve-group" | "unfriend" | null;
+    action: "delete-history" | "leave-group" | "dissolve-group" | "unfriend" | "block" | "unblock" | null;
   }>({
     isOpen: false,
     action: null,
@@ -82,6 +85,38 @@ const GroupActions: React.FC<GroupActionsProps> = ({
     }
   };
 
+  const handleBlock = async () => {
+    try {
+      const otherId = conversation.participants?.find(p => String(p.user_id) !== String(currentUserId))?.user_id;
+      if (!otherId) return;
+      
+      const result = await blockUserViaChat(currentUserId, otherId);
+      if (result) {
+        if (onRelationshipChange) onRelationshipChange(result);
+        await refreshConversations(currentUserId);
+        if (onActionSuccess) await onActionSuccess();
+      }
+    } catch (error) {
+      console.error("Error blocking:", error);
+    }
+  };
+
+  const handleUnblock = async () => {
+    try {
+      const otherId = conversation.participants?.find(p => String(p.user_id) !== String(currentUserId))?.user_id;
+      if (!otherId) return;
+      
+      const result = await unblockUserViaChat(currentUserId, otherId);
+      if (result) {
+        if (onRelationshipChange) onRelationshipChange(result);
+        await refreshConversations(currentUserId);
+        if (onActionSuccess) await onActionSuccess();
+      }
+    } catch (error) {
+      console.error("Error unblocking:", error);
+    }
+  };
+
   const handleConfirmAction = async () => {
     const action = confirmState.action;
     setConfirmState({ isOpen: false, action: null });
@@ -103,6 +138,16 @@ const GroupActions: React.FC<GroupActionsProps> = ({
 
     if (action === "unfriend") {
       await handleUnfriend();
+      return;
+    }
+
+    if (action === "block") {
+      await handleBlock();
+      return;
+    }
+
+    if (action === "unblock") {
+      await handleUnblock();
     }
   };
 
@@ -157,6 +202,30 @@ const GroupActions: React.FC<GroupActionsProps> = ({
         </button>
       )}
 
+      {!isGroupChat && (relationship as any)?.status === "BLOCKED" && ((relationship as any)?.requester_id === currentUserId || (relationship as any)?.requesterId === currentUserId || (relationship as any)?.actorId === currentUserId) && (
+        <button
+          onClick={() =>
+            setConfirmState({ isOpen: true, action: "unblock" })
+          }
+          className="w-full cursor-pointer flex items-center gap-3 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+        >
+          <UserRoundX size={18} />
+          <span>Bỏ chặn</span>
+        </button>
+      )}
+
+      {!isGroupChat && (relationship as any)?.status !== "BLOCKED" && (
+        <button
+          onClick={() =>
+            setConfirmState({ isOpen: true, action: "block" })
+          }
+          className="w-full cursor-pointer flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <UserRoundX size={18} />
+          <span>Chặn người dùng</span>
+        </button>
+      )}
+
       <ConfirmModal
         isOpen={confirmState.isOpen}
         title={
@@ -166,7 +235,11 @@ const GroupActions: React.FC<GroupActionsProps> = ({
               ? "Rời nhóm"
               : confirmState.action === "unfriend"
                 ? "Hủy kết bạn"
-                : "Xóa lịch sử trò chuyện"
+                : confirmState.action === "block"
+                  ? "Chặn người dùng"
+                  : confirmState.action === "unblock"
+                    ? "Bỏ chặn"
+                    : "Xóa lịch sử trò chuyện"
         }
         message={
           confirmState.action === "dissolve-group"
@@ -175,7 +248,11 @@ const GroupActions: React.FC<GroupActionsProps> = ({
               ? "Bạn có chắc muốn rời khỏi nhóm này?"
               : confirmState.action === "unfriend"
                 ? "Bạn có chắc chắn muốn hủy kết bạn với người này?"
-                : "Bạn có chắc muốn xóa toàn bộ lịch sử trò chuyện phía bạn?"
+                : confirmState.action === "block"
+                  ? "Bạn có chắc chắn muốn chặn người dùng này? Họ sẽ không thể nhắn tin cho bạn và ngược lại."
+                  : confirmState.action === "unblock"
+                    ? "Bạn có chắc chắn muốn bỏ chặn người dùng này?"
+                    : "Bạn có chắc muốn xóa toàn bộ lịch sử trò chuyện phía bạn?"
         }
         confirmText={
           confirmState.action === "dissolve-group"
@@ -184,7 +261,11 @@ const GroupActions: React.FC<GroupActionsProps> = ({
               ? "Rời nhóm"
               : confirmState.action === "unfriend"
                 ? "Hủy kết bạn"
-                : "Xóa"
+                : confirmState.action === "block"
+                  ? "Chặn"
+                  : confirmState.action === "unblock"
+                    ? "Bỏ chặn"
+                    : "Xóa"
         }
         cancelText="Hủy"
         isDangerous={true}

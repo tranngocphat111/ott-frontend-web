@@ -119,147 +119,8 @@ const useChatSearch = ({
     );
   }, []);
 
-  const deepSearchMessages = useCallback(
-    async (
-      q: string,
-      limit: number,
-    ) => {
-      if (!normalizedUserId || !q.trim()) return [];
-
-      const conversationMetaById = new Map<
-        string,
-        { name: string; avatar: string; senderNameById: Record<string, string> }
-      >();
-
-      conversations.forEach((item) => {
-        const senderNameById: Record<string, string> = {};
-
-        (item.conversation.participants || []).forEach((participant) => {
-          const participantId = String(
-            participant.user_id || participant._id || "",
-          ).trim();
-          if (!participantId) return;
-
-          const preferredName =
-            String(participant.nickname || "").trim() ||
-            String(participant.display_name || "").trim() ||
-            String(participant.name || "").trim() ||
-            participantId;
-
-          senderNameById[participantId] = preferredName;
-        });
-
-        conversationMetaById.set(item.conversation._id, {
-          name:
-            getConversationDisplayName(item.conversation, normalizedUserId) ||
-            item.conversation.name ||
-            "Đoạn chat",
-          avatar:
-            getConversationDisplayAvatar(item.conversation, normalizedUserId) ||
-            "",
-          senderNameById,
-        });
-      });
-
-      const results: SearchEverythingResponse["messages"] = [];
-      const seenMessageIds = new Set<string>();
-
-      const sortedConversations = [...conversations].sort((a, b) => {
-        const timeA = new Date(
-          a.conversation.updatedAt || a.conversation.createdAt || 0,
-        ).getTime();
-        const timeB = new Date(
-          b.conversation.updatedAt || b.conversation.createdAt || 0,
-        ).getTime();
-        return timeB - timeA;
-      });
-
-      for (const item of sortedConversations) {
-        if (results.length >= limit) break;
-
-        const conversationId = item.conversation._id;
-        let pageMessages: RawMessage[] = [];
-        let hasMore = true;
-        let pageCount = 0;
-        const maxPagesPerConversation = 12;
-
-        try {
-          const firstBatch = await MessageService.getMessages(
-            conversationId,
-            normalizedUserId,
-          );
-          pageMessages = Array.isArray(firstBatch) ? firstBatch : [];
-        } catch {
-          pageMessages = [];
-        }
-
-        while (pageMessages.length > 0 && hasMore && pageCount < maxPagesPerConversation) {
-          pageCount += 1;
-
-          pageMessages.forEach((msg) => {
-            if (results.length >= limit) return;
-            if (msg?.is_deleted || msg?.is_revoked) return;
-            if (!messageContainsKeyword(msg, q)) return;
-
-            const messageId = String(msg.msg_id || msg._id || "");
-            if (!messageId || seenMessageIds.has(messageId)) return;
-            seenMessageIds.add(messageId);
-
-            const senderId = String(msg.sender_id || "");
-            const senderDisplayName =
-              conversationMetaById.get(conversationId)?.senderNameById?.[senderId] ||
-              msg.sender_name ||
-              senderId;
-
-            results.push({
-              _id: String(msg._id || messageId),
-              msg_id: messageId,
-              conversation_id: conversationId,
-              sender_id: senderId,
-              sender_name: senderDisplayName,
-              type: String(msg.type || "text"),
-              preview: normalizePreview(msg),
-              createdAt: msg.createdAt || msg.created_at,
-            });
-          });
-
-          if (results.length >= limit) break;
-
-          const oldest = pageMessages[0];
-          const oldestMsgId = String(oldest?.msg_id || "");
-          if (!oldestMsgId) break;
-
-          try {
-            const olderResponse = await MessageService.getOlderMessages(
-              conversationId,
-              oldestMsgId,
-              50,
-              normalizedUserId,
-            );
-
-            const olderMessages = Array.isArray(olderResponse?.messages)
-              ? (olderResponse.messages as RawMessage[])
-              : [];
-
-            pageMessages = olderMessages;
-            hasMore = Boolean(olderResponse?.hasMore && olderMessages.length > 0);
-          } catch {
-            hasMore = false;
-            pageMessages = [];
-          }
-        }
-      }
-
-      return results
-        .sort((a, b) => {
-          const timeA = new Date(a.createdAt || 0).getTime();
-          const timeB = new Date(b.createdAt || 0).getTime();
-          return timeB - timeA;
-        })
-        .slice(0, limit);
-    },
-    [conversations, messageContainsKeyword, normalizePreview, normalizedUserId],
-  );
+  // Removed deepSearchMessages to optimize performance. 
+  // Backend searchEverything is now responsible for global message searching.
 
   useEffect(() => {
     if (!keyword || !normalizedUserId) {
@@ -276,38 +137,16 @@ const useChatSearch = ({
 
       try {
         setIsSearching(true);
+        const scope = searchTab === "all" ? ["all"] : [searchTab];
+
         const data = await MessageService.searchEverything(
           normalizedUserId,
           keyword,
           {
             limit: 24,
+            scope,
           },
         );
-
-        // Phone search logic
-        const sanitizedKeyword = keyword.replace(/\s+/g, "");
-        if (/^\d{10,11}$/.test(sanitizedKeyword)) {
-          const phoneUser = await UserService.getUserByPhone(sanitizedKeyword);
-          if (phoneUser && phoneUser.user_id !== normalizedUserId) {
-            // Check if already in current results (either conversations or contacts)
-            const alreadyInConversations = data.conversations?.some((c: any) => 
-               c.conversation_id && conversations.find(local => local.conversation._id === c.conversation_id)?.conversation.participants?.some(p => String(p.user_id || (p as any)._id) === String(phoneUser.user_id))
-            );
-            const alreadyInContacts = data.contacts?.some((c: any) => c.user_id === phoneUser.user_id);
-            
-            if (!alreadyInConversations && !alreadyInContacts) {
-              const newContact: SearchContactItem = {
-                user_id: phoneUser.user_id,
-                name: phoneUser.display_name || phoneUser.name || phoneUser.phone || 'Người dùng',
-                avatar: phoneUser.avatar,
-                phone: phoneUser.phone,
-                conversation_ids: []
-              };
-              data.contacts = [newContact, ...(data.contacts || [])];
-              data.total = (data.total || 0) + 1;
-            }
-          }
-        }
 
         // Merge contacts into conversations for the UI
         if (data.contacts?.length > 0) {
@@ -366,41 +205,32 @@ const useChatSearch = ({
           data.contacts = []; 
         }
 
-        let mergedResults = data;
-
-        if (keyword.length >= 2 && (data.messages?.length || 0) < 24) {
-          const deepMatches = await deepSearchMessages(keyword, 24);
-
-          const mergedById = new Map<string, SearchEverythingResponse["messages"][number]>();
-
-          [...(data.messages || []), ...deepMatches].forEach((msg) => {
-            const key = String(msg.msg_id || msg._id || "");
-            if (!key || mergedById.has(key)) return;
-            mergedById.set(key, msg);
+        // Enrich results with local data if available to ensure consistent avatars/names
+        if (data.conversations) {
+          data.conversations = data.conversations.map((conv: any) => {
+            const existingVisible = conversations.find(c => c.conversation._id === conv.conversation_id);
+            if (existingVisible) {
+              const localName = getConversationDisplayName(existingVisible.conversation, normalizedUserId);
+              const localAvatar = getConversationDisplayAvatar(existingVisible.conversation, normalizedUserId);
+              return {
+                ...conv,
+                name: localName || conv.name,
+                avatar: localAvatar || conv.avatar,
+              };
+            }
+            return conv;
           });
-
-          const mergedMessages = [...mergedById.values()]
-            .sort((a, b) => {
-              const timeA = new Date(a.createdAt || 0).getTime();
-              const timeB = new Date(b.createdAt || 0).getTime();
-              return timeB - timeA;
-            })
-            .slice(0, 24);
-
         }
 
-        // Always recalculate total after merging and potentially deep searching
-        mergedResults = {
-          ...mergedResults,
-          total:
-            (mergedResults.conversations?.length || 0) +
-            (mergedResults.messages?.length || 0) +
-            (mergedResults.files?.length || 0) +
-            (mergedResults.media?.length || 0),
-        };
+        // Recalculate total after merging
+        data.total =
+          (data.conversations?.length || 0) +
+          (data.messages?.length || 0) +
+          (data.files?.length || 0) +
+          (data.media?.length || 0);
 
         if (requestId !== latestSearchRequestRef.current) return;
-        setSearchResults(mergedResults);
+        setSearchResults(data);
       } catch (error) {
         console.error("Search failed:", error);
         if (requestId !== latestSearchRequestRef.current) return;
@@ -409,13 +239,13 @@ const useChatSearch = ({
         if (requestId !== latestSearchRequestRef.current) return;
         setIsSearching(false);
       }
-    }, 350);
+    }, 500);
 
     return () => window.clearTimeout(timer);
   }, [
-    deepSearchMessages,
     keyword,
     normalizedUserId,
+    searchTab,
   ]);
 
   useEffect(() => {

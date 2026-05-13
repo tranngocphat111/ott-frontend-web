@@ -33,8 +33,13 @@ export interface ConversationContextMenuProps {
   onManageCategories: () => void;
   onMute: (duration: string) => void;
   onDelete: () => void;
+  onBlock?: () => void;
+  onUnblock?: () => void;
   isPinned?: boolean;
   isMuted?: boolean;
+  isBlocked?: boolean;
+  canUnblock?: boolean;
+  isGroup?: boolean;
   categories: Category[];
   currentCategoryId?: string;
 }

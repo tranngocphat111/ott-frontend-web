@@ -226,9 +226,12 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       // If the update involves the current user and the other participant in this private chat
       if (activeConversation?.type === "private") {
         const otherParticipantId = activeConversation.participants?.find(p => String(p.user_id) !== String(normalizedUserId))?.user_id;
-        if (otherParticipantId &&
-          (String(payload.requester_id) === String(otherParticipantId) ||
-            String(payload.receiver_id) === String(otherParticipantId))) {
+        const requesterId = payload.requesterId || payload.requester_id;
+        const receiverId = payload.receiverId || payload.receiver_id;
+
+        if (otherParticipantId && 
+            (String(requesterId) === String(otherParticipantId) || 
+             String(receiverId) === String(otherParticipantId))) {
           console.log("ChatArea: Relationship status updated via socket:", payload.status);
           setRelationshipStatus(payload);
         }
@@ -3071,7 +3074,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           )}
         </div>
 
-        {isParticipant && !isDissolved && !isInvited ? (
+        {isParticipant && !isDissolved && !isInvited && relationshipStatus?.status !== "BLOCKED" ? (
           <ChatInput
             key={
               activeConversation.type === 'private' || activeConversation._id.startsWith('VIRTUAL_CONV_')
@@ -3101,8 +3104,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           />
         ) : (
           <div className="px-5 py-4 bg-white border-t border-slate-100">
-            <div className={`flex items-center gap-3 ${isDissolved ? "text-primary-600" : "text-slate-500"} bg-slate-50 px-4 py-3 rounded-xl border border-slate-100`}>
-              {isDissolved ? (
+            <div className={`flex items-center gap-3 ${isDissolved || relationshipStatus?.status === "BLOCKED" ? "text-primary-600" : "text-slate-500"} bg-slate-50 px-4 py-3 rounded-xl border border-slate-100`}>
+              {isDissolved || relationshipStatus?.status === "BLOCKED" ? (
                 <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
                   <Info size={18} strokeWidth={2.5} />
                 </div>
@@ -3114,7 +3117,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               <p className="text-[14px] font-semibold">
                 {isDissolved
                   ? "Bạn không thể gửi tin nhắn vào nhóm được nữa"
-                  : "Bạn không còn là thành viên của nhóm này"}
+                  : relationshipStatus?.status === "BLOCKED"
+                    ? ((relationshipStatus.requester_id === normalizedUserId || relationshipStatus.requesterId === normalizedUserId) 
+                        ? "Bạn đã chặn người dùng này. Bỏ chặn để tiếp tục trò chuyện." 
+                        : "Bạn không thể gửi tin nhắn cho người dùng này.")
+                    : "Bạn không còn là thành viên của nhóm này"}
               </p>
             </div>
           </div>

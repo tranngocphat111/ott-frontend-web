@@ -721,6 +721,54 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, [user]);
 
+  const handleBlockedFromGroup = useCallback((payload: { conversationId?: string }) => {
+    const convId = String(payload?.conversationId || "");
+    if (!convId) return;
+
+    setConversations((prev) => prev.filter((item) => item.conversation._id !== convId));
+
+    window.dispatchEvent(
+      new CustomEvent("chat:kicked-from-group", {
+        detail: { conversationId: convId },
+      }),
+    );
+  }, []);
+
+  const handleMemberBlocked = useCallback((payload: {
+    conversationId?: string;
+    userId?: string;
+    blockedBy?: string;
+  }) => {
+    const convId = String(payload?.conversationId || "");
+    const blockedUserId = String(payload?.userId || "");
+    if (!convId || !blockedUserId) return;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.conversation._id !== convId) return item;
+        if (!item.conversation.participants) return item;
+
+        const updatedParticipants = item.conversation.participants.filter(
+          (p) => String(p.user_id) !== blockedUserId,
+        );
+
+        return {
+          ...item,
+          conversation: {
+            ...item.conversation,
+            participants: updatedParticipants,
+          },
+        };
+      }),
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("chat:member-removed", {
+        detail: { conversationId: convId, userId: blockedUserId },
+      }),
+    );
+  }, []);
+
 
   const handleMemberLeft = useCallback((payload: {
     conversationId?: string;
@@ -798,6 +846,10 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socketService.onMemberAdded(handleMemberAdded);
     socketService.onNewConversation(handleNewConversation);
 
+    const socket = socketService.getSocket();
+    socket?.on("bi_chan_khoi_nhom", handleBlockedFromGroup);
+    socket?.on("thanh_vien_bi_chan", handleMemberBlocked);
+
     window.addEventListener("chat:remove-conversation", handleRemoveConversation);
 
     return () => {
@@ -807,6 +859,11 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       socketService.offMemberLeft(handleMemberLeft);
       socketService.offMemberAdded(handleMemberAdded);
       socketService.offNewConversation(handleNewConversation);
+      
+      const cleanupSocket = socketService.getSocket();
+      cleanupSocket?.off("bi_chan_khoi_nhom", handleBlockedFromGroup);
+      cleanupSocket?.off("thanh_vien_bi_chan", handleMemberBlocked);
+
       window.removeEventListener("chat:remove-conversation", handleRemoveConversation);
     };
   }, [

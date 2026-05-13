@@ -6,7 +6,7 @@ import ConversationContextMenu from "../modal/conversation/ConversationContextMe
 import CategoryManagementModal from "../modal/category/CategoryManagementModal";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import type { ConversationItemProps } from "../../interfaces";
-import { ParticipantService } from "../../services";
+import { ParticipantService, fetchRelationshipStatusViaChat, blockUserViaChat, unblockUserViaChat, socketService } from "../../services";
 import type { Category } from "../../types";
 import { useConversations } from "../../contexts/ConversationsContext";
 import { PiTagSimpleFill } from "react-icons/pi";
@@ -62,6 +62,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [isProcessingInvitation, setIsProcessingInvitation] = useState(false);
+  const [relationship, setRelationship] = useState<any>(null);
   const { user: authUser } = useAuth();
 
   // ── PRESENCE ──────────────────────────────────────────────────────────────
@@ -92,6 +93,44 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   }, [participant.settings.category_id, categories]);
 
+  const loadRelationship = React.useCallback(async () => {
+    if (conversation.type === "private" && currentUserId) {
+      const otherId = conversation.participants?.find(p => String(p.user_id || (p as any)._id) !== String(currentUserId))?.user_id;
+      if (otherId) {
+        try {
+          const rel = await fetchRelationshipStatusViaChat(currentUserId, otherId);
+          setRelationship(rel);
+        } catch (err) {
+          console.error("Error loading relationship in ConversationItem:", err);
+        }
+      }
+    }
+  }, [conversation.type, conversation.participants, currentUserId]);
+
+  useEffect(() => {
+    loadRelationship();
+  }, [loadRelationship]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const handleRelationshipUpdate = (payload: any) => {
+      if (conversation.type === "private") {
+        const otherId = conversation.participants?.find(p => String(p.user_id || (p as any)._id) !== String(currentUserId))?.user_id;
+        const reqId = payload.requesterId || payload.requester_id;
+        const recId = payload.receiverId || payload.receiver_id;
+
+        if (otherId && (String(reqId) === String(otherId) || String(recId) === String(otherId))) {
+          setRelationship(payload);
+        }
+      }
+    };
+
+    socketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () => {
+      socketService.offRelationshipUpdate(handleRelationshipUpdate);
+    };
+  }, [conversation.type, conversation.participants, currentUserId]);
 
   // Check if conversation is muted
   const isMuted = !!(
@@ -335,6 +374,35 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
+  const handleBlock = async () => {
+    if (!currentUserId) return;
+    const otherId = conversation.participants?.find(p => String(p.user_id || (p as any)._id) !== String(currentUserId))?.user_id;
+    if (!otherId) return;
+
+
+    try {
+      const rel = await blockUserViaChat(currentUserId, otherId);
+      setRelationship(rel);
+      await refreshConversations(currentUserId);
+    } catch (error) {
+      console.error("Error blocking user:", error);
+    }
+  };
+
+  const handleUnblock = async () => {
+    if (!currentUserId) return;
+    const otherId = conversation.participants?.find(p => String(p.user_id || (p as any)._id) !== String(currentUserId))?.user_id;
+    if (!otherId) return;
+
+    try {
+      const rel = await unblockUserViaChat(currentUserId, otherId);
+      setRelationship(rel);
+      await refreshConversations(currentUserId);
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+    }
+  };
+
   return (
     <>
       <div
@@ -469,8 +537,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         onManageCategories={handleManageCategories}
         onMute={handleMute}
         onDelete={handleDelete}
+        onBlock={handleBlock}
+        onUnblock={handleUnblock}
         isPinned={participant.settings.is_pinned}
         isMuted={isMuted}
+        isBlocked={relationship?.status === "BLOCKED"}
+        canUnblock={(relationship?.requester_id === currentUserId || relationship?.requesterId === currentUserId || relationship?.actorId === currentUserId)}
+        isGroup={conversation.type === "group"}
         categories={categories}
         currentCategoryId={participant.settings.category_id || undefined}
       />

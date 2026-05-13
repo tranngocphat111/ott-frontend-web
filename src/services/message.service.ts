@@ -594,13 +594,14 @@ export class MessageService {
   static async searchEverything(
     userId: string,
     keyword: string,
-    options?: { limit?: number; senderId?: string },
+    options?: { limit?: number; senderId?: string; scope?: string[] },
   ): Promise<SearchEverythingResponse> {
     try {
       const params = new URLSearchParams();
       params.set("q", keyword);
       if (options?.limit) params.set("limit", String(options.limit));
       if (options?.senderId) params.set("senderId", options.senderId);
+      if (options?.scope) params.set("scope", options.scope.join(","));
 
       const response = await authFetch(
         `${API_CHAT_SERVER_URL}/search/${encodeURIComponent(userId)}?${params.toString()}`,

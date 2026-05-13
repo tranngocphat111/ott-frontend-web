@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pin, Tag, Bell, BellOff, Trash2 } from 'lucide-react';
+import { Pin, Tag, Bell, BellOff, Trash2, UserRoundX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MenuItem from './MenuItem';
 import CategorySubmenu from './CategorySubmenu';
@@ -17,6 +17,11 @@ const ConversationContextMenu: React.FC<ConversationContextMenuProps> = ({
   onDelete,
   isPinned = false,
   isMuted = false,
+  isBlocked = false,
+  canUnblock = false,
+  isGroup = false,
+  onBlock,
+  onUnblock,
   categories,
   currentCategoryId,
 }) => {
@@ -107,6 +112,21 @@ const ConversationContextMenu: React.FC<ConversationContextMenuProps> = ({
       color: 'text-red-600',
       isDanger: true,
     },
+    ...(!isGroup && !isBlocked ? [{
+      id: 'block',
+      icon: UserRoundX,
+      label: 'Chặn người dùng',
+      onClick: onBlock || (() => {}),
+      color: 'text-red-600',
+      isDanger: true,
+    }] : []),
+    ...(!isGroup && isBlocked && canUnblock ? [{
+      id: 'unblock',
+      icon: UserRoundX,
+      label: 'Bỏ chặn',
+      onClick: onUnblock || (() => {}),
+      color: 'text-blue-600',
+    }] : []),
   ];
 
   const handleMouseEnter = (itemId: string, event: React.MouseEvent<HTMLButtonElement>) => {

@@ -80,6 +80,8 @@ export interface MembersFullViewProps {
   pendingFriendRequestIds?: Set<string>;
   sentFriendRequestIds?: Set<string>;
   onFriendAccepted?: (userId: string) => Promise<void>;
+  onMemberBlocked?: (userId: string) => void;
+  conversationId: string;
 }
 
 export interface StorageViewProps {
@@ -118,6 +120,7 @@ export interface GroupActionsProps {
   onUnfriend?: () => void;
   onLeaveSuccess: () => void;
   onActionSuccess?: () => Promise<void> | void;
+  onRelationshipChange?: (rel: any) => void;
 }
 
 export interface AddMemberModalProps {

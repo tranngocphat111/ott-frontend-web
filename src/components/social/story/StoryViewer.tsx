@@ -8,6 +8,7 @@ import {
   Volume2,
   VolumeX,
   X,
+  Trash2,
 } from "lucide-react";
 import avatar from "../../../assets/avatar.png";
 import type { StoryItem, StoryUserGroup } from "../types";
@@ -30,7 +31,8 @@ interface Props {
   onTogglePause: () => void;
   onVolumeChange: (nextVolume: number) => void;
   onEnterFullscreen: () => void;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  onDeleteStory: (storyId: string) => void;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
 const StoryViewer: React.FC<Props> = ({
@@ -51,6 +53,7 @@ const StoryViewer: React.FC<Props> = ({
   onTogglePause,
   onVolumeChange,
   onEnterFullscreen,
+  onDeleteStory,
   videoRef,
 }) => {
   if (!isOpen || !activeStory) return null;
@@ -159,6 +162,16 @@ const StoryViewer: React.FC<Props> = ({
                   {isPaused ?
                     <Play className="size-4" />
                   : <Pause className="size-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Xóa story này?")) {
+                      onDeleteStory(activeStory.id);
+                    }
+                  }}
+                  className="size-8 rounded-full bg-red-500/30 hover:bg-red-500/50 text-red-200 inline-flex items-center justify-center transition">
+                  <Trash2 className="size-4" />
                 </button>
                 <button
                   type="button"
