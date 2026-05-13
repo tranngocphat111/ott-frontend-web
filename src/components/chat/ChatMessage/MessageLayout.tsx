@@ -222,6 +222,7 @@ const getMessageDeliverySummary = ({
     return {
       label: "Đã gửi",
       isSeen: false,
+      isGroupConversation,
       seenParticipants,
       deliveredParticipants,
     };
@@ -236,6 +237,7 @@ const getMessageDeliverySummary = ({
             ? "Đã nhận"
             : "Đã gửi",
       isSeen: seenCount === 1,
+      isGroupConversation,
       seenParticipants,
       deliveredParticipants,
     };
@@ -245,6 +247,7 @@ const getMessageDeliverySummary = ({
     return {
       label: "Tất cả đã xem",
       isSeen: true,
+      isGroupConversation,
       seenParticipants,
       deliveredParticipants,
     };
@@ -254,6 +257,7 @@ const getMessageDeliverySummary = ({
     return {
       label: `Đã xem ${seenCount}/${recipientCount}`,
       isSeen: true,
+      isGroupConversation,
       seenParticipants,
       deliveredParticipants,
     };
@@ -262,9 +266,10 @@ const getMessageDeliverySummary = ({
   if (deliveredCount > 0) {
     return {
       label: isGroupConversation
-        ? `Đã nhận ${deliveredCount}/${recipientCount}`
+        ? "Đã gửi"
         : "Đã nhận",
       isSeen: false,
+      isGroupConversation,
       seenParticipants,
       deliveredParticipants,
     };
@@ -273,6 +278,7 @@ const getMessageDeliverySummary = ({
   return {
     label: "Đã gửi",
     isSeen: false,
+    isGroupConversation,
     seenParticipants,
     deliveredParticipants,
   };
@@ -1376,7 +1382,9 @@ export const MessageLayout = ({
         </div>
 
         {/* TRẠNG THÁI TIN NHẮN: tách khỏi bubble/reaction để không làm méo layout */}
-        {showDeliveryStatus && (
+        {showDeliveryStatus &&
+          (!deliverySummary.isGroupConversation ||
+            visibleSeenAvatars.length > 0) && (
           <div className="mt-1 flex min-h-4 max-w-full items-center justify-end">
             {visibleSeenAvatars.length > 0 ? (
               <button

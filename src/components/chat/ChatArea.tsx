@@ -19,7 +19,6 @@ import {
   Info,
   Trash2,
   Sparkles,
-  X,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useConversations } from "../../contexts/ConversationsContext";
@@ -128,6 +127,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const composerContainerRef = useRef<HTMLDivElement>(null);
+  const lastComposerHeightRef = useRef<number | null>(null);
   const lastMarkedRef = useRef<string>("0");
   const lastDeliveredRef = useRef<string>("0");
 
@@ -213,7 +214,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const [relationshipStatus, setRelationshipStatus] = useState<any>(null);
   const [isRelationshipLoading, setIsRelationshipLoading] = useState(false);
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
-  const [isSmartReplyLoading, setIsSmartReplyLoading] = useState(false);
+  const [, setIsSmartReplyLoading] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isSmartReplyOpen, setIsSmartReplyOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -1424,14 +1425,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     markMessageSeenUpTo,
   ]);
 
-  useEffect(() => {
-    if (smartReplies.length > 0) {
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-    }
-  }, [smartReplies.length]);
-
   const handleOpenMedia = (msgId: string, imageIndex: number = 0) => {
     setSelectedMediaId(msgId);
     setSelectedImageIndex(imageIndex);
@@ -2258,6 +2251,52 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     wasNearBottomRef.current = true;
     setShowScrollButton(false);
   }, [hasMoreAfter, loadMessages, loading, waitForNextFrame]);
+
+  useLayoutEffect(() => {
+    const composer = composerContainerRef.current;
+    if (!composer || typeof ResizeObserver === "undefined") return;
+
+    lastComposerHeightRef.current = composer.getBoundingClientRect().height;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const nextHeight =
+        entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+      const previousHeight = lastComposerHeightRef.current;
+      lastComposerHeightRef.current = nextHeight;
+
+      if (
+        previousHeight === null ||
+        Math.abs(nextHeight - previousHeight) < 1
+      ) {
+        return;
+      }
+
+      const container = messagesContainerRef.current;
+      if (!container) return;
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      const shouldKeepBottom =
+        wasNearBottomRef.current || distanceToBottom < 180;
+
+      if (!shouldKeepBottom || isLoadingMoreRef.current || isLoadingNewerRef.current) {
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        const activeContainer = messagesContainerRef.current;
+        if (!activeContainer) return;
+        activeContainer.scrollTop = activeContainer.scrollHeight;
+        wasNearBottomRef.current = true;
+        setShowScrollButton(false);
+      });
+    });
+
+    observer.observe(composer);
+
+    return () => observer.disconnect();
+  }, [activeConversation._id]);
 
   useEffect(() => {
     if (typingUsers.length === 0) return;
@@ -3252,51 +3291,10 @@ isExpanded && (
 
         {isParticipant && !isDissolved && !isInvited && relationshipStatus?.status !== "BLOCKED" ? (
           <>
-            {/* AI Smart Replies - Premium Glassmorphism UI */}
-            {isSmartReplyOpen && smartReplies.length > 0 && (
-              <div className="px-4 py-3 flex items-center gap-3 animate-slide-up relative z-10 bg-white/40 backdrop-blur-sm border-t border-primary-100/20">
-                <div className="flex-1 flex flex-wrap gap-2.5">
-                  {smartReplies.map((reply, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        handleSelectSmartReply(reply);
-                        setIsSmartReplyOpen(false); // Đóng sau khi chọn
-                      }}
-                      className="px-4 py-2 bg-white/80 backdrop-blur-md border border-primary-100/50 rounded-2xl text-[13px] font-medium text-primary-800 hover:text-white hover:bg-primary-500 hover:border-primary-500 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 group"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 group-hover:bg-white transition-colors" />
-                      {reply}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 pl-2 border-l border-primary-100/30">
-                  <button
-                    onClick={() => setIsSmartReplyOpen(false)}
-                    className="p-2 text-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-all rounded-full"
-                    title="Đóng gợi ý"
-                  >
-                    <X size={18} />
-                  </button>
-                 </div>
-              </div>
-            )}
-
-            <div className="relative bg-white border-t border-slate-100">
-              {/* Nút "Gợi ý AI" kiểu Pill - Hiện phía trên input bên phải */}
-              {smartReplies.length > 0 && !isSmartReplyOpen && (
-                 <button
-                  onClick={() => setIsSmartReplyOpen(true)}
-                  className="absolute -top-12 right-6 px-4 py-2 bg-white border border-primary-100 text-primary-600 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 z-20 group animate-in fade-in slide-in-from-bottom-2"
-                >
-                  <div className="relative">
-                    <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
-                  </div>
-                  <span className="text-xs font-bold tracking-wide">Gợi ý trả lời (AI)</span>
-                </button>
-              )}
-
+            <div
+              ref={composerContainerRef}
+              className="relative bg-white border-t border-slate-100"
+            >
               <div className="w-full">
                 <ChatInput
                   key={
@@ -3325,6 +3323,14 @@ isExpanded && (
                   replyToMessage={replyToMessage}
                   onCancelReply={() => setReplyToMessage(null)}
                   conversationType={activeConversation?.type}
+                  smartReplies={smartReplies}
+                  isSmartReplyOpen={isSmartReplyOpen}
+                  onSmartReplyToggle={() => setIsSmartReplyOpen((open) => !open)}
+                  onSmartReplyClose={() => setIsSmartReplyOpen(false)}
+                  onSmartReplySelect={(reply) => {
+                    handleSelectSmartReply(reply);
+                    setIsSmartReplyOpen(false);
+                  }}
                 />
               </div>
             </div>

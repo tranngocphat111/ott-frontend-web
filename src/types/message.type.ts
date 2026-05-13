@@ -143,6 +143,11 @@ export interface ChatInputProps {
   onCancelReply?: () => void;
   conversationType?: string;
   onConversationCreated?: (newConversation: any) => void;
+  smartReplies?: string[];
+  isSmartReplyOpen?: boolean;
+  onSmartReplyToggle?: () => void;
+  onSmartReplyClose?: () => void;
+  onSmartReplySelect?: (reply: string) => void;
 }
 
 export interface ImageSendDraft {

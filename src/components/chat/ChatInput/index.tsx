@@ -199,6 +199,11 @@ export const ChatInput = ({
   replyToMessage,
   onCancelReply,
   conversationType,
+  smartReplies = [],
+  isSmartReplyOpen = false,
+  onSmartReplyToggle,
+  onSmartReplyClose,
+  onSmartReplySelect,
 }: ChatInputProps): ReactElement => {
   const [text, setText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -219,6 +224,8 @@ export const ChatInput = ({
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
   const [isSTTMode, setIsSTTMode] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [dismissedSmartReplySignature, setDismissedSmartReplySignature] =
+    useState("");
   const textInputRef = useRef<TextInputHandle>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -1357,6 +1364,40 @@ export const ChatInput = ({
 
   const canSend =
     (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
+  const smartReplySignature = smartReplies.join("\u001f");
+  const shouldShowSmartReplyCue =
+    smartReplies.length > 0 &&
+    smartReplySignature !== dismissedSmartReplySignature &&
+    text.trim().length === 0 &&
+    pendingFiles.length === 0 &&
+    !replyToMessage &&
+    !showEmojiPicker &&
+    !isUploading &&
+    !isRecordingVoice;
+  const visibleSmartReplies = isSmartReplyOpen
+    ? smartReplies.slice(0, 5)
+    : smartReplies.slice(0, 3);
+  const hiddenSmartReplyCount = Math.max(
+    0,
+    smartReplies.length - visibleSmartReplies.length,
+  );
+
+  const handleSmartReplySelect = (reply: string) => {
+    onSmartReplySelect?.(reply);
+  };
+
+  const handleSmartReplyToggle = () => {
+    if (isSmartReplyOpen) {
+      onSmartReplyClose?.();
+    } else {
+      onSmartReplyToggle?.();
+    }
+  };
+
+  const handleDismissSmartReplies = () => {
+    setDismissedSmartReplySignature(smartReplySignature);
+    onSmartReplyClose?.();
+  };
 
   const handleTextKeyDown = async (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1451,6 +1492,48 @@ export const ChatInput = ({
             onClick={onCancelReply}
             className="self-center p-1 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
             title="Huỷ trả lời"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {shouldShowSmartReplyCue && (
+        <div className="mb-4 flex h-7 items-center gap-2 overflow-hidden rounded-2xl  bg-white px-2 ">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary-500">
+            <Sparkles size={14} />
+          </span>
+
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleSmartReplies.map((reply, index) => (
+              <button
+                key={`${reply}-${index}`}
+                type="button"
+                onClick={() => handleSmartReplySelect(reply)}
+                className="h-7  shrink-0 truncate rounded-full border border-slate-200 bg-slate-50 px-3 text-left text-[13px] font-medium text-slate-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-800"
+                title={reply}
+              >
+                {reply}
+              </button>
+            ))}
+
+            {smartReplies.length > 3 && (
+              <button
+                type="button"
+                onClick={handleSmartReplyToggle}
+                className="h-7 shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                title={isSmartReplyOpen ? "Thu gọn gợi ý" : "Xem thêm gợi ý"}
+              >
+                {isSmartReplyOpen ? "Thu gọn" : `+${hiddenSmartReplyCount}`}
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDismissSmartReplies}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-50 hover:text-slate-600"
+            title="Ẩn gợi ý"
           >
             <X size={14} />
           </button>
