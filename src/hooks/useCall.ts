@@ -691,9 +691,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
         setIsConnecting(true);
         setBusyUserIds([]);
         
-        if (!isGroupCall) {
-          await ensureLocalStream(mode);
-        }
+        await ensureLocalStream(mode);
 
         activeConversationRef.current = conversationId;
         setCallType(mode);
@@ -755,9 +753,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
         setIsConnecting(true);
         setBusyUserIds([]);
         
-        if (!isGroupCall) {
-          await ensureLocalStream(mode);
-        }
+        await ensureLocalStream(mode);
 
         activeConversationRef.current = conversationId;
         setCallType(mode);
@@ -1092,15 +1088,10 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
         setLivekitToken(payload.livekitToken);
       }
 
-      if (payload.isGroup) {
-        // SFU mode: do not create peer connections
-        return;
-      }
-
       if (!localStreamRef.current) return;
 
-      // Full-mesh strategy for group call: every existing participant creates
-      // a connection to the newly joined participant.
+      // Full-mesh strategy: every existing participant creates a connection to
+      // the newly joined participant. This keeps web compatible with mobile.
       if (payload.userId === userId) {
         return;
       }

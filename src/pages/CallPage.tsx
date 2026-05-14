@@ -199,14 +199,16 @@ const CallPage: React.FC = () => {
     conversationId,
     userId: normalizedUserId,
   });
+  const shouldUseLiveKitGroup =
+    isGroup && Boolean(livekitToken) && searchParams.get("transport") === "livekit";
 
   // Release camera/mic for LiveKit when entering group mode
   useEffect(() => {
-    if (isGroup && livekitToken && localStream) {
+    if (shouldUseLiveKitGroup && localStream) {
       console.log("Releasing local stream for group call transition...");
       stopLocalStream();
     }
-  }, [isGroup, livekitToken, localStream, stopLocalStream]);
+  }, [shouldUseLiveKitGroup, localStream, stopLocalStream]);
 
   // Khi người nhận đang bận: thông báo về parent window rồi đóng tab này
   useEffect(() => {
@@ -469,7 +471,7 @@ const CallPage: React.FC = () => {
     };
   }, [callType, primaryRemote, remoteCameraStates]);
 
-  if (isGroup && livekitToken) {
+  if (shouldUseLiveKitGroup && livekitToken) {
     return (
       <LiveKitGroupCall
         token={livekitToken}
@@ -505,6 +507,10 @@ const CallPage: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-primary-900 flex flex-col overflow-hidden relative font-body text-white">
+      {remoteStreams.slice(1).map((item) => (
+        <StreamAudio key={`audio-${item.userId}`} stream={item.stream} />
+      ))}
+
       {/* 1. NỀN: Video người đối diện */}
       <div className="absolute inset-0 z-0 bg-primary-900">
         {primaryRemote ? (
@@ -561,6 +567,23 @@ const CallPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {isGroup && callType === "video" && remoteStreams.length > 1 && (
+        <div className="absolute left-6 right-6 bottom-28 z-20 flex gap-3 overflow-x-auto pb-1">
+          {remoteStreams.slice(1).map((item) => (
+            <div
+              key={item.userId}
+              className="h-24 w-36 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-primary-800 shadow-xl"
+            >
+              <StreamVideo
+                stream={item.stream}
+                muted
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Lớp phủ Gradient để text dễ đọc hơn */}
       <div className="absolute inset-0 z-0 pointer-events-none bg-linear-to-b from-primary-950/70 via-transparent to-primary-950/80" />
