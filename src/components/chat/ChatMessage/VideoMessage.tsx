@@ -64,6 +64,9 @@ export const VideoMessage = ({
   const isUploadSuccess = msg.local_status === "success";
   const isUploadError = msg.local_status === "error";
   const hasUploadState = isUploading || isUploadSuccess || isUploadError;
+  const isFlagged = (msg.system_meta?.media_warnings || []).some(
+    (warning) => Number(warning.index || 0) === 0,
+  );
 
   useEffect(() => {
     const video = videoRef.current;
@@ -186,7 +189,9 @@ export const VideoMessage = ({
             <video
               ref={videoRef}
               src={url}
-              className="w-full h-full object-cover max-h-100"
+              className={`w-full h-full object-cover max-h-100 transition duration-200 ${
+                isFlagged ? "blur-md scale-105" : ""
+              }`}
               controls={false}
               playsInline
               preload="metadata"

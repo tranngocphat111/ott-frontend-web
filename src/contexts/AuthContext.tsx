@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
-    let socketServiceRef: any = null;
+    let socketServiceRef: typeof import('../services/socket.service').socketService | null = null;
     let presenceHeartbeatTimer: ReturnType<typeof window.setInterval> | null = null;
     let disposed = false;
 
@@ -159,7 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (document.visibilityState === 'visible') {
           socketService.refreshPresence(user.id);
         }
-      }, 120000);
+      }, 20000);
 
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleWindowFocus);

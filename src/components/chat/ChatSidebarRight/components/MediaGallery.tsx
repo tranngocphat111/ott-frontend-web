@@ -17,6 +17,11 @@ const getMediaKey = (content: unknown) => {
   return "";
 };
 
+const isMediaFlagged = (message: Message, index: number) => {
+  const warnings = message.system_meta?.media_warnings || [];
+  return warnings.some((warning) => Number(warning.index || 0) === index);
+};
+
 const MediaGallery: React.FC<MediaGalleryProps> = ({
   messages,
   onMediaClick,
@@ -43,6 +48,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     type: "image" | "video";
     key: string;
     index: number;
+    isFlagged: boolean;
   }> = [];
 
   validMessages.forEach((message, messageIndex) => {
@@ -63,6 +69,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         type: type as "image" | "video",
         key,
         index,
+        isFlagged: isMediaFlagged(message, index),
       });
     });
   });
@@ -73,7 +80,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   return (
     <div>
       <div className="grid grid-cols-4 gap-2 mb-3">
-        {displayedItems.map(({ messageIndex, messageId, type, key, index }) => (
+        {displayedItems.map(({ messageIndex, messageId, type, key, index, isFlagged }) => (
           <div
             key={`${validMessages[messageIndex]._id}-${index}`}
             onClick={() => onMediaClick(messageId, index)}
@@ -83,7 +90,9 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               <img
                 src={getFullUrl(key)}
                 alt="Media"
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover transition duration-200 ${
+                  isFlagged ? "blur-md scale-105" : ""
+                }`}
                 loading="lazy"
                 decoding="async"
                 onError={(e) => {

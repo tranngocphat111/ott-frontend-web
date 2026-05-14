@@ -42,7 +42,7 @@ export interface Message {
     | "system_group_dissolved";
   created_at: string;
   createdAt?: string; // For backwards compatibility
-  sender_id: String;
+  sender_id: string;
   conversation_id?: string;
   size?: number;
   sender_name?: string;
@@ -52,6 +52,7 @@ export interface Message {
   reactions?: MessageReaction[];
   attachments?: MessageAttachment[];
   action?: string;
+  system_meta?: MessageSystemMeta | null;
   is_deleted?: boolean;
   is_revoked?: boolean;
   // Pinned message fields
@@ -142,12 +143,24 @@ export interface ChatInputProps {
   replyToMessage?: Message | null;
   onCancelReply?: () => void;
   conversationType?: string;
-  onConversationCreated?: (newConversation: any) => void;
+  onConversationCreated?: (newConversation: unknown) => void;
   smartReplies?: string[];
   isSmartReplyOpen?: boolean;
   onSmartReplyToggle?: () => void;
   onSmartReplyClose?: () => void;
   onSmartReplySelect?: (reply: string) => void;
+}
+
+export interface MessageMediaWarning {
+  index?: number;
+  key?: string;
+  source?: string;
+  reason?: string;
+}
+
+export interface MessageSystemMeta {
+  media_policy_status?: "flagged" | "clean" | string;
+  media_warnings?: MessageMediaWarning[];
 }
 
 export interface ImageSendDraft {

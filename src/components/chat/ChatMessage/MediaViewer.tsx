@@ -21,6 +21,7 @@ interface MediaItem {
   type: string;
   imageIndex: number;
   createdAtMs: number;
+  isFlagged?: boolean;
 }
 
 interface MediaViewerProps {
@@ -38,6 +39,11 @@ const resolveContentKey = (item: unknown): string => {
     return String((item as { url?: string }).url || "");
   }
   return "";
+};
+
+const isMessageMediaFlagged = (message: Message, index: number) => {
+  const warnings = message.system_meta?.media_warnings || [];
+  return warnings.some((warning) => Number(warning.index || 0) === index);
 };
 
 export const MediaViewer = ({
@@ -67,6 +73,7 @@ export const MediaViewer = ({
             type: "image",
             imageIndex: idx,
             createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+            isFlagged: isMessageMediaFlagged(m, idx),
           });
         });
       } else if (type === "video") {
@@ -80,6 +87,7 @@ export const MediaViewer = ({
           type: "video",
           imageIndex: 0,
           createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+          isFlagged: isMessageMediaFlagged(m, 0),
         });
       }
     }
@@ -614,7 +622,9 @@ export const MediaViewer = ({
           <img
             src={current.url}
             alt="Full view"
-            className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl ${
+              current.isFlagged ? "blur-lg" : ""
+            }`}
             onError={(e) => {
               e.currentTarget.src = "";
             }}
@@ -687,7 +697,9 @@ export const MediaViewer = ({
                   <img
                     src={item.url}
                     alt="thumb"
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${
+                      item.isFlagged ? "blur-sm scale-105" : ""
+                    }`}
                     loading="lazy"
                   />
                 )}

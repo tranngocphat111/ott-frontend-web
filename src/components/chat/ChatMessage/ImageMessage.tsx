@@ -91,7 +91,7 @@ export const ImageMessage = ({
   onDelete?: (msg: Message) => void;
   onPin?: (msg: Message) => void;
   onForward?: (msg: Message) => void;
-  participants?: any[];
+  participants?: unknown[];
   conversationType?: string;
 }) => {
   const GRID_WIDTH = 260;
@@ -118,6 +118,16 @@ export const ImageMessage = ({
     if (!url) return "";
     return previewMap[url] || imagePreviewCache.get(url) || url;
   };
+
+  const isMediaFlagged = (index: number) => {
+    const warnings = msg.system_meta?.media_warnings || [];
+    return warnings.some((warning) => Number(warning.index || 0) === index);
+  };
+
+  const getImageClassName = (index: number, baseClassName: string) =>
+    `${baseClassName} transition duration-200 ${
+      isMediaFlagged(index) ? "blur-md scale-105" : ""
+    }`;
 
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +258,10 @@ export const ImageMessage = ({
           <img
             src={getDisplaySrc(urls[0])}
             alt="Attachment"
-            className="block w-full h-auto object-cover min-w-[200px] min-h-[120px]"
+            className={getImageClassName(
+              0,
+              "block w-full h-auto object-cover min-w-[200px] min-h-[120px]",
+            )}
             loading="eager"
             fetchPriority="high"
             decoding="async"
@@ -283,7 +296,7 @@ export const ImageMessage = ({
                   <img
                     src={getDisplaySrc(url)}
                     alt="Attachment"
-                    className="w-full h-full object-cover"
+                    className={getImageClassName(index, "w-full h-full object-cover")}
                     loading={priority.loading}
                     fetchPriority={priority.fetchPriority}
                     decoding="async"
@@ -319,7 +332,7 @@ export const ImageMessage = ({
                 <img
                   src={getDisplaySrc(urls[0])}
                   alt="Attachment"
-                  className="w-full h-full object-cover"
+                  className={getImageClassName(0, "w-full h-full object-cover")}
                   loading={priority.loading}
                   fetchPriority={priority.fetchPriority}
                   decoding="async"
@@ -346,7 +359,10 @@ export const ImageMessage = ({
                   <img
                     src={getDisplaySrc(url)}
                     alt="Attachment"
-                    className="w-full h-full object-cover"
+                    className={getImageClassName(
+                      index + 1,
+                      "w-full h-full object-cover",
+                    )}
                     loading={priority.loading}
                     fetchPriority={priority.fetchPriority}
                     decoding="async"
@@ -384,7 +400,7 @@ export const ImageMessage = ({
                   <img
                     src={getDisplaySrc(url)}
                     alt="Attachment"
-                    className="w-full h-full object-cover"
+                    className={getImageClassName(index, "w-full h-full object-cover")}
                     loading={priority.loading}
                     fetchPriority={priority.fetchPriority}
                     decoding="async"
@@ -421,7 +437,7 @@ export const ImageMessage = ({
                 <img
                   src={getDisplaySrc(urls[0])}
                   alt="Attachment"
-                  className="h-full w-full object-cover"
+                  className={getImageClassName(0, "h-full w-full object-cover")}
                   loading={priority.loading}
                   fetchPriority={priority.fetchPriority}
                   decoding="async"
@@ -449,7 +465,10 @@ export const ImageMessage = ({
                   <img
                     src={getDisplaySrc(url)}
                     alt="Attachment"
-                    className="h-full w-full object-cover"
+                    className={getImageClassName(
+                      index + 1,
+                      "h-full w-full object-cover",
+                    )}
                     loading={priority.loading}
                     fetchPriority={priority.fetchPriority}
                     decoding="async"
@@ -478,7 +497,10 @@ export const ImageMessage = ({
                   <img
                     src={getDisplaySrc(url)}
                     alt="Attachment"
-                    className="h-full w-full object-cover"
+                    className={getImageClassName(
+                      index + 3,
+                      "h-full w-full object-cover",
+                    )}
                     loading={priority.loading}
                     fetchPriority={priority.fetchPriority}
                     decoding="async"
@@ -520,7 +542,7 @@ export const ImageMessage = ({
                 <img
                   src={getDisplaySrc(url)}
                   alt="Attachment"
-                  className="w-full h-full object-cover"
+                  className={getImageClassName(index, "w-full h-full object-cover")}
                   loading={priority.loading}
                   fetchPriority={priority.fetchPriority}
                   decoding="async"
