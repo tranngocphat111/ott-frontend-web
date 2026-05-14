@@ -8,6 +8,19 @@ export type ImageCompressionOptions = {
     initialQuality?: number;
 };
 
+const renameWithExtension = (fileName: string, fileType: string) => {
+    const extensionByType: Record<string, string> = {
+        "image/webp": "webp",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+    };
+    const extension = extensionByType[fileType] || fileName.split(".").pop() || "";
+    if (!extension) return fileName;
+
+    const baseName = fileName.replace(/\.[^.]+$/, "");
+    return `${baseName || "image"}.${extension}`;
+};
+
 export const compressImageFile = async (
     file: File,
     options: ImageCompressionOptions = {},
@@ -23,6 +36,7 @@ export const compressImageFile = async (
         useWebWorker = true,
         initialQuality = 0.8,
     } = options;
+    const outputType = fileType ?? file.type;
 
     try {
         const compressed = await imageCompression(file, {
@@ -30,16 +44,22 @@ export const compressImageFile = async (
             maxWidthOrHeight,
             useWebWorker,
             initialQuality,
-            fileType: fileType ?? file.type,
+            fileType: outputType,
         });
 
+        const outputName =
+            outputType !== file.type ? renameWithExtension(file.name, outputType) : file.name;
+
         if (compressed instanceof File) {
-            return compressed;
+            return new File([compressed], outputName, {
+                type: compressed.type || outputType,
+                lastModified: file.lastModified || Date.now(),
+            });
         }
 
-        return new File([compressed], file.name, {
-            type: fileType ?? file.type,
-            lastModified: Date.now(),
+        return new File([compressed], outputName, {
+            type: outputType,
+            lastModified: file.lastModified || Date.now(),
         });
     } catch (error) {
         console.error("compressImageFile failed", error);

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Clock3,
   MoreVertical,
   SmilePlus,
   Reply,
@@ -49,8 +50,14 @@ type MessageLayoutProps = {
   showActionsOnHover?: boolean;
   participants?: any[];
   conversationType?: string;
-  children: (borderRadius: string) => React.ReactNode;
+  children: (
+    borderRadius: string,
+    renderMessageMeta: RenderMessageMeta,
+  ) => React.ReactNode;
 };
+
+type MessageMetaVariant = "bubble" | "media";
+type RenderMessageMeta = (variant?: MessageMetaVariant) => React.ReactNode;
 
 type ReactionEntry = {
   type: string;
@@ -146,21 +153,21 @@ const getParticipantUserId = (participant: any) =>
 const getParticipantDisplayName = (participant: any) =>
   String(
     participant?.display_name ||
-      participant?.nickname ||
-      participant?.name ||
-      participant?.user?.name ||
-      participant?.user_id ||
-      "Người dùng",
+    participant?.nickname ||
+    participant?.name ||
+    participant?.user?.name ||
+    participant?.user_id ||
+    "Người dùng",
   ).trim();
 
 const getParticipantAvatar = (participant: any) =>
   String(
     participant?.avatar ||
-      participant?.avatar_url ||
-      participant?.profile_picture ||
-      participant?.user?.avatar ||
-      participant?.user?.avatar_url ||
-      "",
+    participant?.avatar_url ||
+    participant?.profile_picture ||
+    participant?.user?.avatar ||
+    participant?.user?.avatar_url ||
+    "",
   ).trim();
 
 const isJoinedParticipant = (participant: any) => {
@@ -209,9 +216,23 @@ const getMessageDeliverySummary = ({
   const seenParticipants = recipients.filter((participant) =>
     isMessageCursorAtLeast(participant.last_read_message_id, currentMsgId),
   );
+  const deliveredParticipants = recipients.filter(
+    (participant) =>
+      isMessageCursorAtLeast(
+        participant.last_delivered_message_id,
+        currentMsgId,
+      ) &&
+      !isMessageCursorAtLeast(participant.last_read_message_id, currentMsgId),
+  );
 
   if (recipientCount === 0) {
-    return { label: "Đã gửi", isSeen: false, seenParticipants };
+    return {
+      label: "Đã gửi",
+      isSeen: false,
+      isGroupConversation,
+      seenParticipants,
+      deliveredParticipants,
+    };
   }
 
   if (!isGroupConversation && recipientCount <= 1) {
@@ -223,24 +244,140 @@ const getMessageDeliverySummary = ({
             ? "Đã nhận"
             : "Đã gửi",
       isSeen: seenCount === 1,
+      isGroupConversation,
       seenParticipants,
+      deliveredParticipants,
     };
   }
 
   if (seenCount === recipientCount) {
-    return { label: "Tất cả đã xem", isSeen: true, seenParticipants };
+    return {
+      label: "Tất cả đã xem",
+      isSeen: true,
+      isGroupConversation,
+      seenParticipants,
+      deliveredParticipants,
+    };
   }
 
   if (seenCount > 0) {
     return {
       label: `Đã xem ${seenCount}/${recipientCount}`,
       isSeen: true,
+      isGroupConversation,
       seenParticipants,
+      deliveredParticipants,
     };
   }
 
-  return { label: "Đã gửi", isSeen: false, seenParticipants };
+  if (deliveredCount > 0) {
+    return {
+      label: isGroupConversation
+        ? "Đã gửi"
+        : "Đã nhận",
+      isSeen: false,
+      isGroupConversation,
+      seenParticipants,
+      deliveredParticipants,
+    };
+  }
+
+  return {
+    label: "Đã gửi",
+    isSeen: false,
+    isGroupConversation,
+    seenParticipants,
+    deliveredParticipants,
+  };
 };
+
+const getMessageContentPreview = (msg: any) => {
+  const rawContent = Array.isArray(msg?.content)
+    ? msg.content[0]
+    : msg?.content;
+  const textContent =
+    typeof rawContent === "string"
+      ? rawContent
+      : String(rawContent?.text || rawContent || "");
+
+  switch (String(msg?.type || "").toLowerCase()) {
+    case "image":
+      return "[Hình ảnh]";
+    case "video":
+      return "[Video]";
+    case "audio":
+      return "[Âm thanh]";
+    case "file":
+      return msg?.fileName || getFileNameFromUrl(textContent, "Tệp tin");
+    case "poll":
+      return msg?.poll_question || "[Bình chọn]";
+    default:
+      return convertDisplayShortcodeToEmoji(
+        convertEmojiImageMarkupToText(textContent || ""),
+      );
+  }
+};
+
+const getMessageTimeLabel = (msg: any) => {
+  const rawTime = msg?.created_at || msg?.createdAt || msg?.timestamp;
+  if (!rawTime) return "";
+
+  const date = new Date(rawTime);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
+const ParticipantAvatar = ({
+  participant,
+  sizeClass = "h-8 w-8",
+  textClass = "text-[10px]",
+}: {
+  participant: any;
+  sizeClass?: string;
+  textClass?: string;
+}) => {
+  const displayName = getParticipantDisplayName(participant);
+  const avatarUrl = getParticipantAvatar(participant);
+
+  return (
+    <span
+      className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-slate-200 font-semibold leading-none text-white shadow-sm ring-1 ring-slate-200 ${textClass}`}
+      style={{
+        backgroundColor: avatarUrl ? undefined : getAvatarColor(displayName),
+      }}
+    >
+      {avatarUrl ? (
+        <img
+          src={getFullUrl(avatarUrl)}
+          alt={displayName}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        getAvatarLabel(displayName)
+      )}
+    </span>
+  );
+};
+
+const DeliveryParticipantRow = ({ participant }: { participant: any }) => (
+  <div className="flex min-w-0 items-center gap-3">
+    <ParticipantAvatar
+      participant={participant}
+      sizeClass="h-10 w-10"
+      textClass="text-xs"
+    />
+    <span className="truncate text-sm font-semibold text-primary-900">
+      {getParticipantDisplayName(participant)}
+    </span>
+  </div>
+);
 
 const normalizeReactionType = (value: string) => {
   const normalized = convertDisplayShortcodeToEmoji(String(value || "").trim());
@@ -294,10 +431,13 @@ export const MessageLayout = ({
   const [showReactionPickerLeftward, setShowReactionPickerLeftward] =
     useState(true);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [showDeliveryDetails, setShowDeliveryDetails] = useState(false);
+  const [showHoverTime, setShowHoverTime] = useState(false);
   const [activeReactionFilter, setActiveReactionFilter] = useState("all");
   const reactionTriggerRef = useRef<HTMLButtonElement>(null);
   const reactionDropdownRef = useRef<HTMLDivElement>(null);
   const reactionHoverTimeoutRef = useRef<number | null>(null);
+  const hoverTimeTimeoutRef = useRef<number | null>(null);
 
   const preloadedSender = useMemo(
     () => ({
@@ -610,17 +750,41 @@ export const MessageLayout = ({
     Boolean(msg.__show_delivery_status) &&
     Boolean(msg.msg_id);
   const seenAvatarParticipants = deliverySummary.seenParticipants || [];
-  const visibleSeenAvatars = seenAvatarParticipants.slice(0, 5);
-  const hiddenSeenAvatarCount = Math.max(
-    0,
-    seenAvatarParticipants.length - visibleSeenAvatars.length,
-  );
+  const deliveredParticipants = deliverySummary.deliveredParticipants || [];
+  const shouldCompactSeenAvatars = seenAvatarParticipants.length >= 4;
+  const visibleSeenAvatars = shouldCompactSeenAvatars
+    ? seenAvatarParticipants.slice(0, 2)
+    : seenAvatarParticipants.slice(0, 3);
+  const hiddenSeenAvatarCount = shouldCompactSeenAvatars
+    ? seenAvatarParticipants.length - visibleSeenAvatars.length
+    : 0;
+  const shouldShowInlineDeliveryStatus =
+    showDeliveryStatus &&
+    (!deliverySummary.isGroupConversation ||
+      visibleSeenAvatars.length > 0 ||
+      deliverySummary.label === "Đã gửi");
+  const messageTimeLabel = getMessageTimeLabel(msg);
+  const shouldShowMessageTime =
+    !isCentered && Boolean(messageTimeLabel) && isLast;
+  const hasSeenAvatarMeta = visibleSeenAvatars.length > 0;
+  const inlineMetaLabel =
+    shouldShowMessageTime || showHoverTime ? messageTimeLabel : "";
   const seenAvatarTitle =
     seenAvatarParticipants.length > 0
       ? `Đã xem: ${seenAvatarParticipants
-          .map(getParticipantDisplayName)
-          .join(", ")}`
+        .map(getParticipantDisplayName)
+        .join(", ")}`
       : deliverySummary.label;
+  const messagePreviewText = getMessageContentPreview(msg);
+  const messageCreatedLabel =
+    msg.created_at || msg.createdAt
+      ? new Date(msg.created_at || msg.createdAt).toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      : "";
   const containerMargin = isLast
     ? hasReactions
       ? "mb-5"
@@ -628,6 +792,34 @@ export const MessageLayout = ({
     : hasReactions
       ? "mb-4"
       : "mb-1";
+  const renderMessageMeta: RenderMessageMeta = (variant = "bubble") => {
+    if (!inlineMetaLabel) return null;
+
+    if (variant === "media") {
+      return (
+        <span
+          className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-4 text-white shadow-sm ring-1 backdrop-blur-md select-none ${isMe
+              ? "bg-primary-900/40 ring-white/10"
+              : "bg-black/45 ring-white/10"
+            }`}
+          title={inlineMetaLabel}
+        >
+          <Clock3 size={10} strokeWidth={2.2} />
+          <span className="truncate">{inlineMetaLabel}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className={`inline-flex max-w-full items-center gap-1 truncate text-[10px] font-medium leading-4 select-none ${isMe ? "text-primary-700/65" : "text-slate-500/80"
+          }`}
+        title={inlineMetaLabel}
+      >
+        <span className="truncate">{inlineMetaLabel}</span>
+      </span>
+    );
+  };
 
   const canDeleteForMe = !!onDelete && !isUploadInFlight;
   const canRevokeForAll =
@@ -802,32 +994,63 @@ export const MessageLayout = ({
     };
   }, []);
 
+  const handleMessageContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (
+      !onReply &&
+      !onForward &&
+      !canPinMessage &&
+      !canRevokeForAll &&
+      !canDeleteForMe
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    window.dispatchEvent(new Event("chat:close-context-menu"));
+
+    setTimeout(() => {
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    }, 0);
+  };
+
+  const clearHoverTimeTimer = () => {
+    if (hoverTimeTimeoutRef.current !== null) {
+      window.clearTimeout(hoverTimeTimeoutRef.current);
+      hoverTimeTimeoutRef.current = null;
+    }
+  };
+
+  const handleMessageMouseEnter = () => {
+    clearHoverTimeTimer();
+    if (!messageTimeLabel || shouldShowMessageTime || isCentered) return;
+
+    hoverTimeTimeoutRef.current = window.setTimeout(() => {
+      setShowHoverTime(true);
+      hoverTimeTimeoutRef.current = null;
+    }, 650);
+  };
+
+  const handleMessageMouseLeave = () => {
+    clearHoverTimeTimer();
+    setShowHoverTime(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearHoverTimeTimer();
+    };
+  }, []);
+
   return (
     <div
-      className={`flex w-full ${containerMargin} ${
-        isCentered 
-          ? "justify-center" 
-          : isMe ? "justify-end" : "justify-start gap-2.5"
-      }`}
-      onContextMenu={(e) => {
-        // Chỉ hiện menu nếu có ít nhất 1 action khả dụng
-        if (
-          onReply ||
-          onForward ||
-          canPinMessage ||
-          canRevokeForAll ||
-          canDeleteForMe
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          window.dispatchEvent(new Event("chat:close-context-menu"));
-          
-          setTimeout(() => {
-            setContextMenuPosition({ x: e.clientX, y: e.clientY });
-          }, 0);
-        }
-      }}
+      className={`flex w-full ${containerMargin} ${isCentered
+          ? "justify-center"
+          : isMe
+            ? "justify-end"
+            : "justify-start gap-2.5"
+        }`}
     >
       {/* CỘT AVATAR */}
       {!isMe && !hideAvatar && (
@@ -857,11 +1080,12 @@ export const MessageLayout = ({
 
       {/* CỘT CONTENT */}
       <div
-        className={`group flex flex-col ${
-          isCentered 
-            ? "items-center max-w-[90%]" 
-            : isMe ? "items-end max-w-[75%] sm:max-w-[70%]" : "items-start max-w-[75%] sm:max-w-[70%]"
-        } relative ${showActionMenu || showReactionPicker ? "z-20" : ""}`}
+        className={`group flex flex-col ${isCentered
+            ? "items-center max-w-[90%]"
+            : isMe
+              ? "items-end max-w-[75%] sm:max-w-[70%]"
+              : "items-start max-w-[75%] sm:max-w-[70%]"
+          } relative ${showActionMenu || showReactionPicker ? "z-20" : ""}`}
       >
         {!isMe && !isCentered && (isFirst || isTopBoundary) && (
           <span className="text-[12px] font-medium text-slate-500 mb-1 ml-1 select-none">
@@ -990,26 +1214,30 @@ export const MessageLayout = ({
           </div>
         )}
         <div
-          className={`relative w-fit max-w-full ${
-            hasReactions && showDeliveryStatus ? "mb-3" : ""
-          }`}
+          className={`relative w-fit max-w-full ${hasReactions && showDeliveryStatus ? "mb-3" : ""
+            }`}
+          data-chat-message-bubble="true"
+          onContextMenu={handleMessageContextMenu}
+          onMouseEnter={handleMessageMouseEnter}
+          onMouseLeave={handleMessageMouseLeave}
         >
           {/* NỘI DUNG TIN NHẮN CHÍNH */}
-          {children(borderRadius)}
+          {children(borderRadius, renderMessageMeta)}
 
           {/* THANH ICON THAO TÁC (REPLY, REACT, MORE) */}
-          {showActionsOnHover && (onReply ||
-            onReact ||
-            canDeleteForMe ||
-            canRevokeForAll ||
-            canPinMessage ||
-            canForwardMessage) && (
+          {showActionsOnHover &&
+            (onReply ||
+              onReact ||
+              canDeleteForMe ||
+              canRevokeForAll ||
+              canPinMessage ||
+              canForwardMessage) && (
               <div
-                className={`absolute top-1/2 -translate-y-1/2  flex items-center gap-0.5 ${isMe ? "right-full mr-2" : "left-full ml-2"
+                className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 ${isMe ? "right-full mr-2" : "left-full ml-2"
                   } ${showReactionPicker || showActionMenu
                     ? "opacity-100"
                     : "opacity-0 group-hover:opacity-100"
-                  } transition-all duration-200`}
+                  } ${!isMe && !isCentered ? "flex-row-reverse" : ""} transition-all duration-200`}
               >
                 {(canDeleteForMe ||
                   canRevokeForAll ||
@@ -1051,7 +1279,9 @@ export const MessageLayout = ({
                               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] text-slate-700 hover:bg-slate-100 transition-colors "
                             >
                               <Pin size={14} />
-                              {msg.is_pinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+                              {msg.is_pinned
+                                ? "Bỏ ghim tin nhắn"
+                                : "Ghim tin nhắn"}
                             </button>
                           )}
                           {canForwardMessage && onForward && (
@@ -1230,56 +1460,43 @@ export const MessageLayout = ({
           )}
         </div>
 
-        {/* TRẠNG THÁI TIN NHẮN: tách khỏi bubble/reaction để không làm méo layout */}
-        {showDeliveryStatus && (
-          <div className="mt-1 flex min-h-4 max-w-full items-center justify-end">
-            {visibleSeenAvatars.length > 0 ? (
-              <div
-                className="flex max-w-full items-center justify-end -space-x-1.5"
+        {/* Avatar đã xem vẫn nằm ngoài bubble để không làm nặng phần nội dung. */}
+        {shouldShowInlineDeliveryStatus && (
+          <div
+            className={`flex min-h-4 max-w-full flex-col gap-0.5 ${(msg?.type === "image" || msg?.type === "video")
+                ? hasReactions ? "mt-1" : "-mt-0.5"
+                : hasReactions ? "mt-3" : "mt-1"
+              } ${isMe ? "items-end" : "items-start"}`}
+          >
+            {hasSeenAvatarMeta ? (
+              <button
+                type="button"
+                onClick={() => setShowDeliveryDetails(true)}
+                className="flex max-w-full items-center justify-end -space-x-1.5 rounded-full px-0.5 transition-opacity hover:opacity-85"
                 title={seenAvatarTitle}
                 aria-label={seenAvatarTitle}
               >
-                {visibleSeenAvatars.map((participant) => {
-                  const participantUserId = getParticipantUserId(participant);
-                  const displayName = getParticipantDisplayName(participant);
-                  const avatarUrl = getParticipantAvatar(participant);
-
-                  return (
-                    <span
-                      key={participantUserId || displayName}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white bg-slate-200 text-[8px] font-semibold leading-none text-white shadow-sm ring-1 ring-slate-200"
-                      style={{
-                        backgroundColor: avatarUrl
-                          ? undefined
-                          : getAvatarColor(displayName),
-                      }}
-                    >
-                      {avatarUrl ? (
-                        <img
-                          src={getFullUrl(avatarUrl)}
-                          alt={displayName}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        getAvatarLabel(displayName)
-                      )}
-                    </span>
-                  );
-                })}
-
                 {hiddenSeenAvatarCount > 0 && (
-                  <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full border border-white bg-slate-500 px-1 text-[8px] font-bold leading-none text-white shadow-sm ring-1 ring-slate-200">
+                  <span className="z-10 flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full border border-white bg-slate-500 px-1 text-[8px] font-bold leading-none text-white shadow-sm ring-1 ring-slate-200">
                     +{hiddenSeenAvatarCount}
                   </span>
                 )}
-              </div>
+                {visibleSeenAvatars.map((participant) => {
+                  const participantUserId = getParticipantUserId(participant);
+                  const displayName = getParticipantDisplayName(participant);
+
+                  return (
+                    <ParticipantAvatar
+                      key={participantUserId || displayName}
+                      participant={participant}
+                      sizeClass="h-4 w-4"
+                      textClass="text-[8px]"
+                    />
+                  );
+                })}
+              </button>
             ) : (
-              <span
-                className="block max-w-full truncate whitespace-nowrap rounded-full px-1.5 text-[10px] font-medium leading-4 text-slate-400"
-                title={deliverySummary.label}
-              >
+              <span className="text-[11px] font-medium text-slate-500 truncate max-w-full">
                 {deliverySummary.label}
               </span>
             )}
@@ -1355,12 +1572,105 @@ export const MessageLayout = ({
         </div>
       )}
 
+      {showDeliveryDetails && showDeliveryStatus && (
+        <div
+          className="fixed inset-0 z-120 flex items-center justify-center bg-primary-900/35 px-4"
+          onClick={() => setShowDeliveryDetails(false)}
+        >
+          <div
+            className="flex max-h-[82vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-primary-200 bg-surface text-primary-900 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-primary-100 bg-surface-raised px-5 py-4">
+              <h3 className="text-lg font-semibold text-primary-900">
+                Thông tin tin nhắn
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDeliveryDetails(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-800"
+                title="Đóng"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="flex justify-end border-b border-primary-100 bg-white px-5 py-5">
+              <div className="max-w-[70%] rounded-lg border border-primary-200 bg-chat-me px-3 py-2 text-right shadow-sm">
+                <p className="truncate text-xs text-primary-600">
+                  {senderName}
+                </p>
+                <p className="break-words text-sm font-semibold text-chat-me-text">
+                  {messagePreviewText || "[Tin nhắn]"}
+                </p>
+                {messageCreatedLabel && (
+                  <p className="mt-1 text-xs text-primary-500">
+                    {messageCreatedLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-surface px-5 py-4">
+              <section>
+                <h4 className="mb-3 text-sm font-bold text-primary-700">
+                  Đã xem ({seenAvatarParticipants.length})
+                </h4>
+                {seenAvatarParticipants.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
+                    {seenAvatarParticipants.map((participant, index) => (
+                      <DeliveryParticipantRow
+                        key={`seen-${getParticipantUserId(participant) || index}`}
+                        participant={participant}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-primary-400">Chưa có ai xem</p>
+                )}
+              </section>
+
+              <section className="mt-5">
+                <h4 className="mb-3 text-sm font-bold text-primary-700">
+                  Đã nhận ({deliveredParticipants.length})
+                </h4>
+                {deliveredParticipants.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
+                    {deliveredParticipants.map((participant, index) => (
+                      <DeliveryParticipantRow
+                        key={`delivered-${getParticipantUserId(participant) || index}`}
+                        participant={participant}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-primary-400">
+                    Chưa có người nhận riêng ngoài danh sách đã xem
+                  </p>
+                )}
+              </section>
+            </div>
+
+            <p className="border-t border-primary-100 bg-surface-raised px-5 py-3 text-xs italic text-primary-500">
+              (*) Thông tin chi tiết "Đã xem", "Đã nhận" được tính theo trạng
+              thái đồng bộ mới nhất của hội thoại.
+            </p>
+          </div>
+        </div>
+      )}
+
       <MessageContextMenu
         isOpen={contextMenuPosition !== null}
         position={contextMenuPosition || { x: 0, y: 0 }}
         onClose={() => setContextMenuPosition(null)}
-        onReply={onReply && !msg.is_deleted && !msg.is_revoked && !isUploadInFlight ? () => onReply(msg) : undefined}
-        onForward={canForwardMessage && onForward ? () => onForward(msg) : undefined}
+        onReply={
+          onReply && !msg.is_deleted && !msg.is_revoked && !isUploadInFlight
+            ? () => onReply(msg)
+            : undefined
+        }
+        onForward={
+          canForwardMessage && onForward ? () => onForward(msg) : undefined
+        }
         onPin={canPinMessage && onPin ? () => onPin(msg) : undefined}
         onRevoke={canRevokeForAll && onRevoke ? () => onRevoke(msg) : undefined}
         onDelete={canDeleteForMe && onDelete ? () => onDelete(msg) : undefined}

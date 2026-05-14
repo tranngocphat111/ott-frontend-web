@@ -87,9 +87,9 @@ export const TextMessage = ({
       participants={participants}
       conversationType={conversationType}
     >
-      {(borderRadius) => (
+      {(borderRadius, renderMessageMeta) => (
         <div
-          className={`px-3 py-2 text-[15px] leading-relaxed shadow-sm wrap-break-word whitespace-pre-wrap transition-all border
+          className={`px-3 py-2 text-[15px] leading-relaxed shadow-sm wrap-break-word whitespace-pre-wrap transition-all border ${isMe ? "text-right" : "text-left"}
           ${
             isMe
               ? "bg-chat-me text-chat-me-text border-chat-me"
@@ -139,6 +139,15 @@ export const TextMessage = ({
               )}
               {isTranslatingLocal ? "Đang dịch..." : "Dịch tin nhắn"}
             </button>
+          )}
+          {renderMessageMeta() && (
+            <div
+              className={`mt-1 flex ${
+                isMe ? "justify-end" : "justify-start"
+              }`}
+            >
+              {renderMessageMeta()}
+            </div>
           )}
         </div>
       )}

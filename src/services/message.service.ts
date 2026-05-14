@@ -2,6 +2,53 @@ import { API_CHAT_SERVER_URL } from "../config/api.config";
 import type { SearchEverythingResponse } from "../types";
 import { authFetch } from "./api/fetchClient";
 
+const S3_MEDIA_VIOLATION_MESSAGE =
+  "Ảnh hoặc video này có thể vi phạm chính sách lưu trữ, vui lòng chọn tệp khác.";
+const S3_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+const sanitizeS3FileName = (fileName: string) => {
+  const baseName =
+    String(fileName || "file")
+      .split(/[\\/]/)
+      .pop()
+      ?.normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") || "file";
+
+  return baseName.slice(0, 160) || "file";
+};
+
+const resolveUploadContentDisposition = (contentType: string, fileName: string) => {
+  const disposition = /^(image|video|audio)\//i.test(contentType)
+    ? "inline"
+    : "attachment";
+  return `${disposition}; filename="${sanitizeS3FileName(fileName)}"`;
+};
+
+const extractXmlTagValue = (xml: string, tagName: string) => {
+  const match = xml.match(
+    new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "i"),
+  );
+  return match?.[1]?.trim() || "";
+};
+
+const isLikelyS3Violation = (status: number, bodyText: string) => {
+  const normalized = bodyText.toLowerCase();
+  return (
+    status === 403 ||
+    normalized.includes("accessdenied") ||
+    normalized.includes("explicit deny") ||
+    normalized.includes("policy") ||
+    normalized.includes("malware") ||
+    normalized.includes("virus") ||
+    normalized.includes("unsafe") ||
+    normalized.includes("moderation") ||
+    normalized.includes("violation")
+  );
+};
+
 export class MessageService {
   static getChatApiUrl() {
     return API_CHAT_SERVER_URL;
@@ -62,10 +109,25 @@ export class MessageService {
         headers: {
           "Content-Type":
             contentType || file.type || "application/octet-stream", // Đảm bảo khớp với fileType lúc xin URL
+          "Cache-Control": S3_CACHE_CONTROL,
+          "Content-Disposition": resolveUploadContentDisposition(
+            contentType || file.type || "application/octet-stream",
+            file.name,
+          ),
         },
       });
 
-      if (!response.ok) throw new Error("Upload lên S3 thất bại");
+      if (!response.ok) {
+        const bodyText = await response.text().catch(() => "");
+        if (isLikelyS3Violation(response.status, bodyText)) {
+          throw new Error(S3_MEDIA_VIOLATION_MESSAGE);
+        }
+
+        const s3Message =
+          extractXmlTagValue(bodyText, "Message") ||
+          extractXmlTagValue(bodyText, "Code");
+        throw new Error(s3Message || "Upload lên S3 thất bại");
+      }
       return true;
     } catch (error) {
       console.error("Error uploading to S3:", error);
@@ -147,7 +209,9 @@ export class MessageService {
         try {
           const errorData = await response.json();
           if (errorData?.error) errorMessage = errorData.error;
-        } catch {}
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
         throw new Error(errorMessage);
       }
 
@@ -309,7 +373,9 @@ export class MessageService {
         try {
           const errorData = await response.json();
           if (errorData?.error) errorMessage = errorData.error;
-        } catch {}
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
         throw new Error(errorMessage);
       }
 
@@ -339,7 +405,18 @@ export class MessageService {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage =
+            errorData?.message ||
+            errorData?.error ||
+            errorData?.details ||
+            errorMessage;
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
+        throw new Error(String(errorMessage));
       }
 
       return await response.json();
@@ -478,7 +555,7 @@ export class MessageService {
   static async getPollMessages(conversationId: string, userId?: string) {
     try {
       const messages = await this.getMessages(conversationId, userId);
-      return messages.filter((msg: any) => msg.type === "poll");
+      return messages.filter((msg: { type?: string }) => msg.type === "poll");
     } catch (error) {
       console.error("Error fetching poll messages:", error);
       throw error;

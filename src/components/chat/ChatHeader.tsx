@@ -1,6 +1,6 @@
 // src/components/Chat/ChatHeader.tsx
 import React, { useEffect } from "react";
-import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles, Languages } from "lucide-react";
+import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
 import {
@@ -19,8 +19,6 @@ interface ChatHeaderProps extends ChatAreaProps {
   onToggleSidebar?: () => void;
   hideCallActions?: boolean;
   onSummarize?: () => void;
-  isTranslating?: boolean;
-  onToggleTranslation?: () => void;
   isSummarizing?: boolean;
 }
 
@@ -91,8 +89,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onToggleSidebar,
   hideCallActions = false,
   onSummarize,
-  isTranslating = false,
-  onToggleTranslation,
   isSummarizing = false,
 }) => {
   const { isUserOnline, getLastSeen, watchUsers } = usePresence();

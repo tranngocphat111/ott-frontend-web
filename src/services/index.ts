@@ -7,6 +7,11 @@ export { socketService } from "./socket.service";
 export { relationshipSocketService } from "./relationshipSocket.service";
 export { mediaSocketService } from "./mediaSocket.service";
 export { AiService } from "./ai.service";
+export type {
+  AiSmartReplySuggestion,
+  AiSummaryActionItem,
+  AiSummaryResult,
+} from "./ai.service";
 
 // Social / media services
 export {

@@ -9,8 +9,31 @@ import { LinkMessage } from "./LinkMessage";
 import { RevokedMessage } from "./RevokedMessage";
 import { CallMessage } from "./CallMessage";
 import { PollMessage } from "./PollMessage";
+import type { Conversation, ConversationParticipant, Message } from "../../../types";
 
-const stringifyParticipantCursors = (participants?: any[]) =>
+type RenderableMessage = Message & {
+  __show_delivery_status?: boolean;
+};
+
+type ChatMessageProps = {
+  msg: RenderableMessage;
+  isMe: boolean;
+  currentUserId?: string;
+  isFirstInSequence: boolean;
+  isLastInSequence: boolean;
+  isTopBoundary?: boolean;
+  onMediaClick?: (index: number) => void;
+  onReply?: (msg: Message) => void;
+  onReact?: (msg: Message, reaction: string) => void;
+  onRevoke?: (msg: Message) => void;
+  onDelete?: (msg: Message) => void;
+  onPin?: (msg: Message) => void;
+  onForward?: (msg: Message) => void;
+  conversation?: Conversation;
+  translatedText?: string;
+};
+
+const stringifyParticipantCursors = (participants?: ConversationParticipant[]) =>
   JSON.stringify(
     (participants || []).map((participant) => ({
       user_id: participant?.user_id || participant?._id || "",
@@ -38,23 +61,7 @@ export const ChatMessage = memo(
     onForward,
     conversation,
     translatedText,
-  }: {
-    msg: any;
-    isMe: boolean;
-    currentUserId: any;
-    isFirstInSequence: boolean;
-    isLastInSequence: boolean;
-    isTopBoundary?: boolean;
-    onMediaClick?: (index: number) => void;
-    onReply?: (msg: any) => void;
-    onReact?: (msg: any, reaction: string) => void;
-    onRevoke?: (msg: any) => void;
-    onDelete?: (msg: any) => void;
-    onPin?: (msg: any) => void;
-    onForward?: (msg: any) => void;
-    conversation?: any;
-    translatedText?: string;
-  }) => {
+  }: ChatMessageProps) => {
     const msgType = msg.type?.toLowerCase();
     const isDeleted = !!msg.is_deleted;
     const isRevoked = !!msg.is_revoked;
@@ -70,7 +77,7 @@ export const ChatMessage = memo(
     const imageUrls = useMemo(() => {
       if (msgType !== "image") return [];
       const content = Array.isArray(msg.content) ? msg.content : [msg.content];
-      return content.map((c: string) => getFullUrl(c));
+      return content.map((item) => getFullUrl(item));
     }, [msg.content, msgType]);
 
     if (isRevoked) {
@@ -291,6 +298,8 @@ export const ChatMessage = memo(
     const nextReactions = JSON.stringify(next.msg.reactions || []);
     const prevReplyTo = JSON.stringify(prev.msg.reply_to || null);
     const nextReplyTo = JSON.stringify(next.msg.reply_to || null);
+    const prevSystemMeta = JSON.stringify(prev.msg.system_meta || null);
+    const nextSystemMeta = JSON.stringify(next.msg.system_meta || null);
     const shouldCompareParticipantCursors =
       Boolean(prev.msg.__show_delivery_status) ||
       Boolean(next.msg.__show_delivery_status);
@@ -315,11 +324,14 @@ export const ChatMessage = memo(
       prev.msg.is_deleted === next.msg.is_deleted &&
       prev.msg.is_revoked === next.msg.is_revoked &&
       prev.msg.is_pinned === next.msg.is_pinned &&
+      prevSystemMeta === nextSystemMeta &&
       prev.msg.reply_to_msg_id === next.msg.reply_to_msg_id &&
       prevReplyTo === nextReplyTo &&
       prev.translatedText === next.translatedText &&
       prev.isFirstInSequence === next.isFirstInSequence &&
-      prev.isLastInSequence === next.isLastInSequence
+      prev.isLastInSequence === next.isLastInSequence &&
+      participantCursorsEqual &&
+      conversationTypeEqual
     );
   },
 );

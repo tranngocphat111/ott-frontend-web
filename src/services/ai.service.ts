@@ -1,37 +1,123 @@
 import { apiClient } from './api/client';
 
+export interface AiSmartReplySuggestion {
+  text: string;
+  intent?: string;
+  tone?: string;
+}
+
+export interface AiSummaryActionItem {
+  owner: string;
+  task: string;
+  due?: string;
+}
+
+export interface AiSummaryResult {
+  summary: string;
+  highlights: string[];
+  actionItems: AiSummaryActionItem[];
+  questions: string[];
+  sentiment?: string;
+}
+
+interface AiTranslationResponse {
+  translatedText: string;
+  detectedLanguage?: string;
+  targetLanguage?: string;
+}
+
+const unwrapApiPayload = <T>(response: unknown): T => {
+  const payload = response as any;
+  return (payload?.result ?? payload) as T;
+};
+
+const normalizeSmartReplies = (payload: unknown): string[] => {
+  const data = unwrapApiPayload<any>(payload);
+  const rawReplies = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.replies)
+      ? data.replies
+      : Array.isArray(data?.suggestions)
+        ? data.suggestions
+        : [];
+
+  return rawReplies
+    .map((reply: string | AiSmartReplySuggestion) =>
+      typeof reply === 'string' ? reply : reply?.text,
+    )
+    .filter((reply: unknown): reply is string => typeof reply === 'string' && reply.trim().length > 0)
+    .map((reply: string) => reply.trim())
+    .slice(0, 5);
+};
+
+const normalizeSummary = (payload: unknown): AiSummaryResult => {
+  const data = unwrapApiPayload<any>(payload);
+
+  if (typeof data === 'string') {
+    return {
+      summary: data,
+      highlights: [],
+      actionItems: [],
+      questions: [],
+      sentiment: 'neutral',
+    };
+  }
+
+  return {
+    summary: data?.summary || 'Không thể tóm tắt hội thoại lúc này.',
+    highlights: Array.isArray(data?.highlights) ? data.highlights.filter(Boolean) : [],
+    actionItems: Array.isArray(data?.actionItems) ? data.actionItems.filter((item: any) => item?.task) : [],
+    questions: Array.isArray(data?.questions) ? data.questions.filter(Boolean) : [],
+    sentiment: data?.sentiment || 'neutral',
+  };
+};
+
 export const AiService = {
-  getSmartReplies: async (conversationId: string): Promise<string[]> => {
+  getSmartReplies: async (conversationId: string, userId?: string): Promise<string[]> => {
     try {
-      const response = await apiClient.get<string[]>(`/ai/smart-replies`, {
-        params: { conversationId },
+      const response = await apiClient.get<unknown>(`/ai/smart-replies`, {
+        params: {
+          conversationId,
+          userId,
+          detailed: true,
+        },
       });
-      return (response as any).result || response;
+      return normalizeSmartReplies(response);
     } catch (error) {
       console.error('Smart Reply Error:', error);
       return [];
     }
   },
 
-  summarizeConversation: async (conversationId: string): Promise<string> => {
+  summarizeConversation: async (
+    conversationId: string,
+    userId?: string,
+  ): Promise<AiSummaryResult> => {
     try {
-      const response = await apiClient.get<{ summary: string }>(`/ai/summarize`, {
-        params: { conversationId },
+      const response = await apiClient.get<unknown>(`/ai/summarize`, {
+        params: { conversationId, userId },
       });
-      return (response as any).result?.summary || (response as any).summary || '';
+      return normalizeSummary(response);
     } catch (error) {
       console.error('Summarization Error:', error);
-      return 'Không thể tóm tắt hội thoại lúc này.';
+      return {
+        summary: 'Không thể tóm tắt hội thoại lúc này.',
+        highlights: [],
+        actionItems: [],
+        questions: [],
+        sentiment: 'neutral',
+      };
     }
   },
 
   translateText: async (text: string, targetLang: string = 'Tiếng Việt'): Promise<string> => {
     try {
-      const response = await apiClient.post<{ translatedText: string }>(`/ai/translate`, {
+      const response = await apiClient.post<AiTranslationResponse>(`/ai/translate`, {
         text,
         targetLang,
       });
-      return (response as any).result?.translatedText || (response as any).translatedText || text;
+      const data = unwrapApiPayload<AiTranslationResponse>(response);
+      return data?.translatedText || text;
     } catch (error) {
       console.error('Translation Error:', error);
       return text;
@@ -48,7 +134,8 @@ export const AiService = {
           'Content-Type': 'multipart/form-data',
         },
       });
-      return (response as any).result?.text || (response as any).text || '';
+      const data = unwrapApiPayload<{ text: string }>(response);
+      return data?.text || '';
     } catch (error) {
       console.error('Transcription Error:', error);
       return '';

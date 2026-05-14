@@ -1,13 +1,26 @@
 import React from "react";
 import { Image } from "lucide-react";
-import { URL_S3 } from "../../../../config/api.config";
 import type { Message } from "../../../../types";
+import { getFullUrl } from "../../../../utils";
 
 interface MediaGalleryProps {
   messages: Message[];
   onMediaClick: (messageId: string, imageIndex: number) => void;
   onViewAll: () => void;
 }
+
+const getMediaKey = (content: unknown) => {
+  if (typeof content === "string") return content;
+  if (content && typeof content === "object" && "url" in content) {
+    return String((content as { url?: unknown }).url || "");
+  }
+  return "";
+};
+
+const isMediaFlagged = (message: Message, index: number) => {
+  const warnings = message.system_meta?.media_warnings || [];
+  return warnings.some((warning) => Number(warning.index || 0) === index);
+};
 
 const MediaGallery: React.FC<MediaGalleryProps> = ({
   messages,
@@ -35,6 +48,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     type: "image" | "video";
     key: string;
     index: number;
+    isFlagged: boolean;
   }> = [];
 
   validMessages.forEach((message, messageIndex) => {
@@ -45,8 +59,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
       ? message.content
       : [message.content];
 
-    contentArray.forEach((content: any, index) => {
-      const key = typeof content === "string" ? content : content?.url;
+    contentArray.forEach((content, index) => {
+      const key = getMediaKey(content);
       if (!key) return;
 
       allMediaItems.push({
@@ -55,6 +69,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         type: type as "image" | "video",
         key,
         index,
+        isFlagged: isMediaFlagged(message, index),
       });
     });
   });
@@ -65,7 +80,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   return (
     <div>
       <div className="grid grid-cols-4 gap-2 mb-3">
-        {displayedItems.map(({ messageIndex, messageId, type, key, index }) => (
+        {displayedItems.map(({ messageIndex, messageId, type, key, index, isFlagged }) => (
           <div
             key={`${validMessages[messageIndex]._id}-${index}`}
             onClick={() => onMediaClick(messageId, index)}
@@ -73,9 +88,13 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
           >
             {type === "image" ? (
               <img
-                src={`${URL_S3}${key}`}
+                src={getFullUrl(key)}
                 alt="Media"
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover transition duration-200 ${
+                  isFlagged ? "blur-md scale-105" : ""
+                }`}
+                loading="lazy"
+                decoding="async"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
@@ -83,8 +102,11 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             ) : type === "video" ? (
               <div className="relative w-full h-full">
                 <video
-                  src={`${URL_S3}${key}`}
+                  src={getFullUrl(key)}
                   className="w-full h-full object-cover"
+                  preload="metadata"
+                  muted
+                  playsInline
                 />
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                   <div className="w-6 h-6 bg-white/80 rounded-full flex items-center justify-center">

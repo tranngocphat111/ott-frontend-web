@@ -65,7 +65,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
-    let socketServiceRef: any = null;
+    let socketServiceRef: typeof import('../services/socket.service').socketService | null = null;
+    let presenceHeartbeatTimer: ReturnType<typeof window.setInterval> | null = null;
+    let disposed = false;
+
+    const syncPresence = () => {
+      if (!socketServiceRef || !user?.id) return;
+      if (document.visibilityState === 'hidden') return;
+
+      socketServiceRef.connect();
+      socketServiceRef.joinUserRoom(user.id);
+      socketServiceRef.refreshPresence?.(user.id);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncPresence();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      syncPresence();
+    };
 
     const handleUserInfoUpdated = (payload: {
       userId: string;
@@ -124,16 +145,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     import('../services/socket.service').then(({ socketService }) => {
+      if (disposed) return;
       socketServiceRef = socketService;
 
       socketService.connect();
       socketService.joinUserRoom(user.id);
+      socketService.refreshPresence(user.id);
 
       socketService.onUserInfoUpdated(handleUserInfoUpdated);
       socketService.onForceLogout(handleForceLogout);
+
+      presenceHeartbeatTimer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          socketService.refreshPresence(user.id);
+        }
+      }, 20000);
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleWindowFocus);
+      window.addEventListener('online', handleWindowFocus);
     });
 
     return () => {
+      disposed = true;
+      if (presenceHeartbeatTimer) {
+        window.clearInterval(presenceHeartbeatTimer);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('online', handleWindowFocus);
+
       if (socketServiceRef) {
         socketServiceRef.offUserInfoUpdated(handleUserInfoUpdated);
         socketServiceRef.offForceLogout(handleForceLogout);

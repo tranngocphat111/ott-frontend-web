@@ -6,11 +6,14 @@ import {
   Download,
   Play,
   Loader2,
+  Pause,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import type { Message } from "../../../types";
 import { getFullUrl } from "../../../utils";
-import { API_CHAT_SERVER_URL } from "../../../config/api.config";
 import { MessageService } from "../../../services";
+import { downloadChatMedia } from "./downloadMedia";
 
 interface MediaItem {
   messageId: string;
@@ -18,6 +21,7 @@ interface MediaItem {
   type: string;
   imageIndex: number;
   createdAtMs: number;
+  isFlagged?: boolean;
 }
 
 interface MediaViewerProps {
@@ -35,6 +39,11 @@ const resolveContentKey = (item: unknown): string => {
     return String((item as { url?: string }).url || "");
   }
   return "";
+};
+
+const isMessageMediaFlagged = (message: Message, index: number) => {
+  const warnings = message.system_meta?.media_warnings || [];
+  return warnings.some((warning) => Number(warning.index || 0) === index);
 };
 
 export const MediaViewer = ({
@@ -64,6 +73,7 @@ export const MediaViewer = ({
             type: "image",
             imageIndex: idx,
             createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+            isFlagged: isMessageMediaFlagged(m, idx),
           });
         });
       } else if (type === "video") {
@@ -77,6 +87,7 @@ export const MediaViewer = ({
           type: "video",
           imageIndex: 0,
           createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+          isFlagged: isMessageMediaFlagged(m, 0),
         });
       }
     }
@@ -113,6 +124,11 @@ export const MediaViewer = ({
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoVolume, setVideoVolume] = useState(0.8);
   const [isLoadingMoreMedia, setIsLoadingMoreMedia] = useState(false);
   const hasInitializedRef = useRef(false);
   const pendingAnchorRef = useRef<string | null>(null);
@@ -349,8 +365,48 @@ export const MediaViewer = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose, handleNext, handlePrev]);
 
+  const currentMediaItem = mediaList[currentIndex];
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || currentMediaItem?.type !== "video") {
+      setIsVideoPlaying(false);
+      setVideoDuration(0);
+      setVideoCurrentTime(0);
+      return;
+    }
+
+    const handleLoadedMetadata = () => {
+      video.volume = videoVolume;
+      setVideoDuration(video.duration || 0);
+      setVideoCurrentTime(video.currentTime || 0);
+    };
+    const handleTimeUpdate = () => setVideoCurrentTime(video.currentTime || 0);
+    const handlePlay = () => setIsVideoPlaying(true);
+    const handlePause = () => setIsVideoPlaying(false);
+    const handleEnded = () => {
+      setIsVideoPlaying(false);
+      setVideoCurrentTime(video.duration || 0);
+    };
+
+    video.volume = videoVolume;
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+    video.addEventListener("ended", handleEnded);
+
+    return () => {
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("ended", handleEnded);
+    };
+  }, [currentMediaItem?.type, currentMediaItem?.url, videoVolume]);
+
   const handleDownload = async () => {
-    const current = mediaList[currentIndex];
+    const current = currentMediaItem;
     if (!current || isDownloading) return;
 
     const fileName =
@@ -358,15 +414,7 @@ export const MediaViewer = ({
 
     try {
       setIsDownloading(true);
-
-      const downloadUrl = `${API_CHAT_SERVER_URL}/media/download?fileUrl=${encodeURIComponent(current.url)}&fileName=${encodeURIComponent(fileName)}`;
-
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadChatMedia(current.url, fileName);
     } catch (error) {
       console.error("Lỗi tải file:", error);
       alert("Không thể tải file này. Vui lòng thử lại.");
@@ -377,8 +425,64 @@ export const MediaViewer = ({
 
   if (!isOpen || mediaList.length === 0) return null;
 
-  const current = mediaList[currentIndex];
+  const current = currentMediaItem;
   const isVideo = current.type === "video";
+  const safeVideoDuration = Number.isFinite(videoDuration) ? videoDuration : 0;
+  const safeVideoCurrentTime = Number.isFinite(videoCurrentTime)
+    ? videoCurrentTime
+    : 0;
+  const videoProgress =
+    safeVideoDuration > 0
+      ? Math.min(100, Math.max(0, (safeVideoCurrentTime / safeVideoDuration) * 100))
+      : 0;
+
+  const formatVideoTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60);
+    return `${min}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const toggleVideoPlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      void video.play();
+      return;
+    }
+
+    video.pause();
+  };
+
+  const handleViewerVideoSeek = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const video = videoRef.current;
+    if (!video || safeVideoDuration <= 0) return;
+
+    const nextTime = (Number(event.target.value) / 100) * safeVideoDuration;
+    video.currentTime = nextTime;
+    setVideoCurrentTime(nextTime);
+  };
+
+  const handleViewerVolumeChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const nextVolume = Number(event.target.value);
+    setVideoVolume(nextVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = nextVolume;
+    }
+  };
+
+  const toggleViewerMute = () => {
+    const nextVolume = videoVolume > 0 ? 0 : 0.8;
+    setVideoVolume(nextVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = nextVolume;
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-9999 bg-black/95 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
@@ -422,20 +526,105 @@ export const MediaViewer = ({
         )}
 
         {isVideo ? (
-          <div className="relative max-w-full max-h-[80vh] rounded-lg overflow-hidden shadow-2xl bg-black">
+          <div className="group/video relative max-w-full max-h-[80vh] rounded-lg overflow-hidden shadow-2xl bg-black">
             <video
+              ref={videoRef}
               key={current.url}
               src={current.url}
               className="max-w-full max-h-[80vh] object-contain"
-              controls
+              controls={false}
+              playsInline
               preload="metadata"
+              onClick={toggleVideoPlay}
             />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/45 to-transparent px-5 pb-4 pt-16 opacity-0 transition-opacity duration-200 group-hover/video:pointer-events-auto group-hover/video:opacity-100">
+              <div className="flex items-center gap-3 text-white">
+                <button
+                  type="button"
+                  onClick={toggleVideoPlay}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-md transition-transform hover:scale-105"
+                  title={isVideoPlaying ? "Tạm dừng" : "Phát"}
+                >
+                  {isVideoPlaying ? (
+                    <Pause size={16} fill="currentColor" />
+                  ) : (
+                    <Play size={16} fill="currentColor" className="ml-0.5" />
+                  )}
+                </button>
+
+                <span className="w-12 text-right text-xs font-medium tabular-nums text-white/90">
+                  {formatVideoTime(videoCurrentTime)}
+                </span>
+
+                <div className="relative flex h-6 flex-1 items-center">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    value={videoProgress}
+                    onChange={handleViewerVideoSeek}
+                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Tiến trình video"
+                  />
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                    <div
+                      className="h-full rounded-full bg-white transition-[width] duration-75"
+                      style={{ width: `${videoProgress}%` }}
+                    />
+                  </div>
+                  <div
+                    className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-white shadow"
+                    style={{ left: `${videoProgress}%` }}
+                  />
+                </div>
+
+                <span className="w-12 text-xs font-medium tabular-nums text-white/65">
+                  {formatVideoTime(videoDuration)}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleViewerMute}
+                    className="p-1.5 text-white/90 transition-colors hover:text-white"
+                    title={videoVolume <= 0.01 ? "Bật âm thanh" : "Tắt âm thanh"}
+                  >
+                    {videoVolume <= 0.01 ? (
+                      <VolumeX size={18} />
+                    ) : (
+                      <Volume2 size={18} />
+                    )}
+                  </button>
+                  <div className="relative hidden h-6 w-20 items-center sm:flex">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={videoVolume}
+                      onChange={handleViewerVolumeChange}
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                      aria-label="Âm lượng video"
+                    />
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
+                      <div
+                        className="h-full rounded-full bg-white"
+                        style={{ width: `${videoVolume * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <img
             src={current.url}
             alt="Full view"
-            className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+            className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl ${
+              current.isFlagged ? "blur-lg" : ""
+            }`}
             onError={(e) => {
               e.currentTarget.src = "";
             }}
@@ -508,7 +697,9 @@ export const MediaViewer = ({
                   <img
                     src={item.url}
                     alt="thumb"
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${
+                      item.isFlagged ? "blur-sm scale-105" : ""
+                    }`}
                     loading="lazy"
                   />
                 )}

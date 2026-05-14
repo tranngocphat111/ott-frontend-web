@@ -19,10 +19,10 @@ import {
   Info,
   Trash2,
   Sparkles,
-  X,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useConversations } from "../../contexts/ConversationsContext";
+import { useToast } from "../../contexts/ToastContext";
 import { useChat } from "../../hooks/useChat";
 import { primeMessageSenderCache } from "../../hooks/useMessageSender";
 import {
@@ -32,6 +32,7 @@ import {
   socketService,
   AiService,
 } from "../../services";
+import type { AiSummaryResult } from "../../services";
 import type { ChatAreaProps } from "../../interfaces";
 import type {
   ImageSendError,
@@ -76,11 +77,26 @@ interface ExtendedChatAreaProps extends ChatAreaProps {
 const isSystemLikeType = (type?: string) =>
   String(type || "").startsWith("system_");
 
+const REVOKE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const REVOKE_EXPIRED_MESSAGE =
+  "Bạn chỉ có thể thu hồi tin nhắn trong vòng 24 giờ";
+
+const isRevokeWindowExpired = (msg: Message) => {
+  const rawTime = msg.created_at || msg.createdAt;
+  if (!rawTime) return false;
+
+  const createdTime = new Date(rawTime).getTime();
+  if (Number.isNaN(createdTime)) return false;
+
+  return Date.now() - createdTime > REVOKE_WINDOW_MS;
+};
+
 const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   conversation,
   isSidebarOpen = false,
   onToggleSidebar,
 }) => {
+  const { showToast } = useToast();
   const { user: currentUser } = useAuth();
   const {
     conversations,
@@ -128,6 +144,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const composerContainerRef = useRef<HTMLDivElement>(null);
+  const lastComposerHeightRef = useRef<number | null>(null);
   const lastMarkedRef = useRef<string>("0");
   const lastDeliveredRef = useRef<string>("0");
 
@@ -146,6 +164,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const wasNearBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(false);
   const scrollHeightRef = useRef(0);
+  const scrollTopBeforeLoadMoreRef = useRef(0);
 
   const lastLayoutScrollHeightRef = useRef(0);
   const lastLayoutClientHeightRef = useRef(0);
@@ -154,6 +173,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const prevMessageCountRef = useRef(0);
   const prevLastMessageIdRef = useRef<string | null>(null);
+  const lastSmartReplyMessageIdRef = useRef<string | null>(null);
   const autoFillOlderRef = useRef(false);
 
   const pendingCallParamsRef = useRef<{
@@ -213,11 +233,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const [isRelationshipLoading, setIsRelationshipLoading] = useState(false);
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
   const [isSmartReplyLoading, setIsSmartReplyLoading] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
   const [isSmartReplyOpen, setIsSmartReplyOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summaryResult, setSummaryResult] = useState<string | null>(null);
-  const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({});
+  const [summaryResult, setSummaryResult] = useState<AiSummaryResult | null>(null);
 
   const fetchStatus = useCallback(async () => {
     if (activeConversation?.type === "private" && !activeConversation.is_self_conversation && normalizedUserId) {
@@ -308,28 +326,104 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   );
 
   const applyJumpHighlight = useCallback((container: HTMLElement | null) => {
-    // 1. Guard clause: Tránh lỗi crash app nếu container chưa tồn tại
     if (!container) return;
 
-    // 2. Tìm target gọn gàng, type-safe hơn với toán tử ??
     const bubbleTarget =
+      container.querySelector<HTMLElement>('[data-chat-message-bubble="true"]') ??
       container.querySelector<HTMLElement>(".group") ??
       (container.firstElementChild as HTMLElement) ??
       container;
 
-    // 3. Khai báo và chạy animation trực tiếp
+    const previousPosition = bubbleTarget.style.position;
+    const previousZIndex = bubbleTarget.style.zIndex;
+    const previousFilter = bubbleTarget.style.filter;
+    const previousTransformOrigin = bubbleTarget.style.transformOrigin;
+    const contentTarget =
+      (bubbleTarget.firstElementChild as HTMLElement | null) ?? bubbleTarget;
+    const contentStyle = getComputedStyle(contentTarget);
+    const primaryColor =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-primary-500")
+        .trim() || "#B77C45";
+
+    bubbleTarget.style.position = previousPosition || "relative";
+    bubbleTarget.style.zIndex = "45";
+    bubbleTarget.style.transformOrigin = "center";
+
+    const ring = document.createElement("div");
+    ring.setAttribute("aria-hidden", "true");
+    ring.style.position = "absolute";
+    ring.style.inset = "0";
+    ring.style.borderRadius = contentStyle.borderRadius || "inherit";
+    ring.style.pointerEvents = "none";
+    ring.style.border = `2px solid ${primaryColor}`;
+    ring.style.boxShadow = `0 0 0 6px rgba(183, 124, 69, 0.16), 0 14px 36px rgba(183, 124, 69, 0.22)`;
+    ring.style.opacity = "0";
+    ring.style.zIndex = "5";
+    ring.style.mixBlendMode = "normal";
+    bubbleTarget.appendChild(ring);
+
     bubbleTarget.animate(
       [
-        { transform: "scale(1)" },
-        { transform: "scale(1.10)", offset: 0.3 },
-        { transform: "scale(0.9)", offset: 0.7 },
-        { transform: "scale(1)" },
+        { transform: "scale(1)", filter: previousFilter || "brightness(1)" },
+        { transform: "scale(1.025)", filter: "brightness(1.06)", offset: 0.18 },
+        { transform: "scale(1)", filter: "brightness(1.02)", offset: 0.42 },
+        { transform: "scale(1.015)", filter: "brightness(1.05)", offset: 0.68 },
+        { transform: "scale(1)", filter: previousFilter || "brightness(1)" },
       ],
       {
-        duration: 1000,
-        easing: "ease-in-out",
+        duration: 2200,
+        easing: "cubic-bezier(0.2, 0, 0.2, 1)",
       },
     );
+
+    const ringAnimation = ring.animate(
+      [
+        {
+          opacity: 0,
+          transform: "scale(0.96)",
+          boxShadow: "0 0 0 0 rgba(183, 124, 69, 0)",
+        },
+        {
+          opacity: 1,
+          transform: "scale(1)",
+          boxShadow:
+            "0 0 0 6px rgba(183, 124, 69, 0.18), 0 14px 36px rgba(183, 124, 69, 0.24)",
+          offset: 0.16,
+        },
+        {
+          opacity: 0.72,
+          transform: "scale(1.015)",
+          boxShadow:
+            "0 0 0 10px rgba(183, 124, 69, 0.08), 0 12px 30px rgba(183, 124, 69, 0.16)",
+          offset: 0.45,
+        },
+        {
+          opacity: 1,
+          transform: "scale(1)",
+          boxShadow:
+            "0 0 0 6px rgba(183, 124, 69, 0.16), 0 14px 36px rgba(183, 124, 69, 0.22)",
+          offset: 0.68,
+        },
+        {
+          opacity: 0,
+          transform: "scale(1.025)",
+          boxShadow: "0 0 0 14px rgba(183, 124, 69, 0)",
+        },
+      ],
+      {
+        duration: 2200,
+        easing: "cubic-bezier(0.2, 0, 0.2, 1)",
+      },
+    );
+
+    ringAnimation.onfinish = () => {
+      ring.remove();
+      bubbleTarget.style.position = previousPosition;
+      bubbleTarget.style.zIndex = previousZIndex;
+      bubbleTarget.style.filter = previousFilter;
+      bubbleTarget.style.transformOrigin = previousTransformOrigin;
+    };
   }, []);
 
   // Sidebar state (Internal fallback nếu không truyền từ props)
@@ -1262,6 +1356,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     }
     setReplyToMessage(null);
     scrollHeightRef.current = 0; // Reset scroll position when conversation changes
+    scrollTopBeforeLoadMoreRef.current = 0;
     isLoadingMoreRef.current = false; // Reset loading state
     isFirstLoadRef.current = true; // Mark as first load for new conversation
     if (initialScrollRafRef.current !== null) {
@@ -1421,14 +1516,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     latestMessageMatchesActiveConversation,
     markMessageSeenUpTo,
   ]);
-
-  useEffect(() => {
-    if (smartReplies.length > 0) {
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-    }
-  }, [smartReplies.length]);
 
   const handleOpenMedia = (msgId: string, imageIndex: number = 0) => {
     setSelectedMediaId(msgId);
@@ -1710,6 +1797,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const handleRevokeMessage = async (msg: Message) => {
     if (!activeConversation?._id || !normalizedUserId || !msg.msg_id) return;
 
+    if (isRevokeWindowExpired(msg)) {
+      showToast(REVOKE_EXPIRED_MESSAGE, "warning", "Thông báo", 3000);
+      return;
+    }
+
     setConfirmModal({
       isOpen: true,
       action: "revoke",
@@ -1971,6 +2063,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }
 
       if (action === "revoke") {
+        if (isRevokeWindowExpired(message)) {
+          showToast(REVOKE_EXPIRED_MESSAGE, "warning", "Thông báo", 3000);
+          return;
+        }
+
         const revokedResult = await MessageService.revokeMessage(
           activeConversation._id,
           message.msg_id,
@@ -2099,6 +2196,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         `${action === "revoke" ? "Thu hồi" : "Xóa"} tin nhắn thất bại:`,
         error,
       );
+      const errorMessage = error instanceof Error ? error.message : "";
+      if (
+        action === "revoke" &&
+        /24|thu hồi|thu hoi|revoke/i.test(errorMessage)
+      ) {
+        showToast(REVOKE_EXPIRED_MESSAGE, "warning", "Thông báo", 3000);
+      }
     } finally {
       setConfirmModal({
         isOpen: false,
@@ -2165,6 +2269,42 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     void runAutoFill();
   }, [messages.length, hasMore, loading, loadOlderMessages]);
 
+  const shouldShowScrollToBottomButton = useCallback(
+    (container: HTMLDivElement | null = messagesContainerRef.current) => {
+      if (messages.length === 0) return false;
+      if (hasMoreAfter) return true;
+      if (!container) return false;
+
+      const hasScrollableOverflow =
+        container.scrollHeight > container.clientHeight + 8;
+      if (!hasScrollableOverflow) return false;
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+
+      return distanceToBottom >= 100;
+    },
+    [hasMoreAfter, messages.length],
+  );
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+
+    if (messages.length === 0) {
+      wasNearBottomRef.current = true;
+      setShowScrollButton(false);
+      return;
+    }
+
+    if (!container) return;
+    setShowScrollButton(shouldShowScrollToBottomButton(container));
+  }, [
+    activeConversation._id,
+    hasMoreAfter,
+    messages.length,
+    shouldShowScrollToBottomButton,
+  ]);
+
   /**
    * Handle scroll to load older messages (infinite scroll)
    */
@@ -2191,8 +2331,21 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       isLoadingMoreRef.current = true;
       console.log("📥 User scrolled to top - loading older messages");
 
+      if (initialScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(initialScrollRafRef.current);
+        initialScrollRafRef.current = null;
+      }
+
+      // User is intentionally reading older messages; prevent pending initial
+      // bottom anchoring from snapping the viewport back to the newest message.
+      isFirstLoadRef.current = false;
+      wasNearBottomRef.current = false;
+      forceScrollToBottomRef.current = false;
+      suppressAutoScrollUntilRef.current = Date.now() + 600;
+
       // Save scroll height BEFORE loading
       scrollHeightRef.current = container.scrollHeight;
+      scrollTopBeforeLoadMoreRef.current = container.scrollTop;
 
       loadOlderMessages().finally(() => {
         isLoadingMoreRef.current = false;
@@ -2216,13 +2369,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       loadMessageContextAfterLast().finally(() => {
         isLoadingNewerRef.current = false;
-        setShowScrollButton(true);
+        setShowScrollButton(
+          shouldShowScrollToBottomButton(messagesContainerRef.current),
+        );
       });
     }
 
     // Show/hide scroll button based on scroll position
     wasNearBottomRef.current = isNearBottom;
-    setShowScrollButton(hasMoreAfter ? true : !isNearBottom);
+    setShowScrollButton(shouldShowScrollToBottomButton(container));
     lastScrollTopRef.current = currentScrollTop;
   };
 
@@ -2243,6 +2398,52 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     wasNearBottomRef.current = true;
     setShowScrollButton(false);
   }, [hasMoreAfter, loadMessages, loading, waitForNextFrame]);
+
+  useLayoutEffect(() => {
+    const composer = composerContainerRef.current;
+    if (!composer || typeof ResizeObserver === "undefined") return;
+
+    lastComposerHeightRef.current = composer.getBoundingClientRect().height;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const nextHeight =
+        entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+      const previousHeight = lastComposerHeightRef.current;
+      lastComposerHeightRef.current = nextHeight;
+
+      if (
+        previousHeight === null ||
+        Math.abs(nextHeight - previousHeight) < 1
+      ) {
+        return;
+      }
+
+      const container = messagesContainerRef.current;
+      if (!container) return;
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      const shouldKeepBottom =
+        wasNearBottomRef.current || distanceToBottom < 180;
+
+      if (!shouldKeepBottom || isLoadingMoreRef.current || isLoadingNewerRef.current) {
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        const activeContainer = messagesContainerRef.current;
+        if (!activeContainer) return;
+        activeContainer.scrollTop = activeContainer.scrollHeight;
+        wasNearBottomRef.current = true;
+        setShowScrollButton(false);
+      });
+    });
+
+    observer.observe(composer);
+
+    return () => observer.disconnect();
+  }, [activeConversation._id]);
 
   useEffect(() => {
     if (typingUsers.length === 0) return;
@@ -2288,7 +2489,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       // After appending messages below, this viewport is no longer anchored to
       // the bottom. Keep later layout changes from snapping it down.
       wasNearBottomRef.current = false;
-      setShowScrollButton(true);
+      setShowScrollButton(shouldShowScrollToBottomButton(container));
       prevMessageCountRef.current = currentMessageCount;
       prevLastMessageIdRef.current = currentLastMessageId;
 
@@ -2299,6 +2500,30 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         suppressAutoScrollAfterNewerLoadRef.current = false;
         newerLoadScrollTopRef.current = null;
       }
+
+      return;
+    }
+
+    // If we just loaded older messages, restore scroll position before any
+    // initial/new-message auto-scroll can run.
+    if (scrollHeightRef.current > 0 && !isLoadingMoreRef.current) {
+      // Không dùng requestAnimationFrame ở đây nếu có thể,
+      // vì useLayoutEffect chạy ĐỒNG BỘ trước khi paint.
+      const newScrollHeight = container.scrollHeight;
+      const heightDifference = newScrollHeight - scrollHeightRef.current;
+
+      container.scrollTop = scrollTopBeforeLoadMoreRef.current + heightDifference;
+      scrollHeightRef.current = 0; // Reset ngay lập tức
+      scrollTopBeforeLoadMoreRef.current = 0;
+      isFirstLoadRef.current = false;
+      wasNearBottomRef.current = false;
+      setShowScrollButton(shouldShowScrollToBottomButton(container));
+
+      // Cập nhật ref để tránh logic auto-scroll xuống dưới chạy đè lên
+      prevMessageCountRef.current = messages.length;
+      prevLastMessageIdRef.current = currentLastMessageId;
+      lastLayoutScrollHeightRef.current = container.scrollHeight;
+      lastLayoutClientHeightRef.current = container.clientHeight;
 
       return;
     }
@@ -2334,6 +2559,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
           const activeContainer = messagesContainerRef.current;
           if (!activeContainer) return;
+          if (
+            !isFirstLoadRef.current ||
+            scrollHeightRef.current > 0 ||
+            Date.now() <= suppressAutoScrollUntilRef.current
+          ) {
+            initialScrollRafRef.current = null;
+            return;
+          }
 
           activeContainer.scrollTop = activeContainer.scrollHeight;
           isFirstLoadRef.current = false;
@@ -2344,22 +2577,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           initialScrollRafRef.current = null;
         })();
       });
-
-      return;
-    }
-
-    // If we just loaded older messages, restore scroll position
-    if (scrollHeightRef.current > 0 && !isLoadingMoreRef.current) {
-      // Không dùng requestAnimationFrame ở đây nếu có thể,
-      // vì useLayoutEffect chạy ĐỒNG BỘ trước khi paint.
-      const newScrollHeight = container.scrollHeight;
-      const heightDifference = newScrollHeight - scrollHeightRef.current;
-
-      container.scrollTop = heightDifference;
-      scrollHeightRef.current = 0; // Reset ngay lập tức
-
-      // Cập nhật ref để tránh logic auto-scroll xuống dưới chạy đè lên
-      prevMessageCountRef.current = messages.length;
 
       return;
     }
@@ -2412,6 +2629,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     loading,
     markMessageSeenUpTo,
     normalizedUserId,
+    shouldShowScrollToBottomButton,
     waitForInitialMediaToSettle,
     waitForNextFrame,
   ]);
@@ -2457,20 +2675,26 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   // AI Smart Replies Logic
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-
-    // Debug logic
-    if (lastMessage) {
-      console.log("[AI Debug] Last message sender:", lastMessage.sender_id);
-      console.log("[AI Debug] Current user ID:", normalizedUserId);
-      console.log("[AI Debug] Should trigger:", String(lastMessage.sender_id) !== String(normalizedUserId));
-    }
+    let cancelled = false;
+    const latestMessage = activeConversation.last_message;
+    const latestMessageId = String(latestMessage?.msg_id || "").trim();
+    const latestMessageType = String(latestMessage?.type || "");
+    const smartReplySourceKey = latestMessageId
+      ? `${activeConversation._id}:${latestMessageId}`
+      : "";
 
     if (
-      lastMessage &&
-      String(lastMessage.sender_id) !== String(normalizedUserId) &&
-      !isSystemLikeType(lastMessage.type)
+      latestMessage &&
+      latestMessageId &&
+      normalizedUserId &&
+      smartReplySourceKey !== lastSmartReplyMessageIdRef.current &&
+      String(latestMessage.sender_id) !== String(normalizedUserId) &&
+      (latestMessageType === "text" || latestMessageType === "link") &&
+      !isSystemLikeType(latestMessageType)
     ) {
+      lastSmartReplyMessageIdRef.current = smartReplySourceKey;
+      setSmartReplies([]);
+
       const fetchSuggestions = async () => {
         setIsSmartReplyLoading(true);
         try {
@@ -2478,65 +2702,44 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             ? activeConversation._id.replace('VIRTUAL_CONV_', '')
             : activeConversation._id;
 
-          console.log("[AI Debug] Fetching smart replies for conversation:", aiConvId);
-          const suggestions = await AiService.getSmartReplies(aiConvId);
-
-          // Vì BE đã dùng JSON Mode và lọc kỹ, FE chỉ cần filter cơ bản
-          setSmartReplies((suggestions || []).slice(0, 3));
+          const suggestions = await AiService.getSmartReplies(aiConvId, normalizedUserId);
+          if (!cancelled) {
+            setSmartReplies(suggestions || []);
+          }
 
         } catch (error) {
           console.error("Error fetching smart replies:", error);
         } finally {
-          setIsSmartReplyLoading(false);
+          if (!cancelled) {
+            setIsSmartReplyLoading(false);
+          }
         }
       };
 
       fetchSuggestions();
     } else {
       setSmartReplies([]);
+      setIsSmartReplyLoading(false);
+      if (smartReplySourceKey) {
+        lastSmartReplyMessageIdRef.current = smartReplySourceKey;
+      }
     }
-  }, [messages.length, messages[messages.length - 1]?._id, activeConversation._id, normalizedUserId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeConversation._id,
+    activeConversation.last_message?.msg_id,
+    activeConversation.last_message?.sender_id,
+    activeConversation.last_message?.type,
+    normalizedUserId,
+  ]);
 
   // Tự động đóng gợi ý khi chuyển cuộc hội thoại
   useEffect(() => {
     setIsSmartReplyOpen(false);
   }, [activeConversation._id]);
-
-  // AI Translation Logic - Auto translate new messages
-  useEffect(() => {
-    if (!isTranslating) return;
-
-    // Dịch 3 tin nhắn gần nhất nếu chưa được dịch
-    const recentMessages = messages.slice(-3);
-
-    recentMessages.forEach(async (msg) => {
-      if (
-        msg &&
-        msg.type === "text" &&
-        String(msg.sender_id) !== String(normalizedUserId) &&
-        !translatedMessages[msg._id]
-      ) {
-        const rawContent = msg.content;
-        let textToTranslate = "";
-
-        if (Array.isArray(rawContent)) {
-          const first = rawContent[0];
-          textToTranslate = typeof first === "string" ? first : (first as any)?.text || "";
-        } else {
-          textToTranslate = typeof rawContent === "string" ? rawContent : (rawContent as any)?.text || "";
-        }
-
-        if (!textToTranslate) return;
-
-        try {
-          const translated = await AiService.translateText(textToTranslate);
-          setTranslatedMessages(prev => ({ ...prev, [msg._id]: translated }));
-        } catch (error) {
-          console.error("Translation error for message:", msg._id, error);
-        }
-      }
-    });
-  }, [messages.length, isTranslating, normalizedUserId]);
 
   const handleSelectSmartReply = (reply: string) => {
     setSmartReplies([]);
@@ -2551,7 +2754,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         ? activeConversation._id.replace('VIRTUAL_CONV_', '')
         : activeConversation._id;
 
-      const summary = await AiService.summarizeConversation(aiConvId);
+      const summary = await AiService.summarizeConversation(aiConvId, normalizedUserId);
       setSummaryResult(summary);
 
     } catch (error) {
@@ -2560,10 +2763,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     } finally {
       setIsSummarizing(false);
     }
-  };
-
-  const handleToggleTranslation = () => {
-    setIsTranslating(!isTranslating);
   };
 
   useEffect(() => {
@@ -2808,8 +3007,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           onToggleSidebar={toggleSidebar}
           onSummarize={handleSummarize}
           isSummarizing={isSummarizing}
-          isTranslating={isTranslating}
-          onToggleTranslation={handleToggleTranslation}
           hideCallActions={
             Boolean(activeConversation?.is_self_conversation) ||
             !isParticipant ||
@@ -3154,7 +3351,6 @@ isExpanded && (
                       onPin={handlePinMessage}
                        onForward={handleForwardMessage}
                       conversation={activeConversation}
-                      translatedText={translatedMessages[msg._id]}
                     />
                   </div>
                  </React.Fragment>
@@ -3221,51 +3417,10 @@ isExpanded && (
 
         {isParticipant && !isDissolved && !isInvited && relationshipStatus?.status !== "BLOCKED" ? (
           <>
-            {/* AI Smart Replies - Premium Glassmorphism UI */}
-            {isSmartReplyOpen && smartReplies.length > 0 && (
-              <div className="px-4 py-3 flex items-center gap-3 animate-slide-up relative z-10 bg-white/40 backdrop-blur-sm border-t border-primary-100/20">
-                <div className="flex-1 flex flex-wrap gap-2.5">
-                  {smartReplies.map((reply, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        handleSelectSmartReply(reply);
-                        setIsSmartReplyOpen(false); // Đóng sau khi chọn
-                      }}
-                      className="px-4 py-2 bg-white/80 backdrop-blur-md border border-primary-100/50 rounded-2xl text-[13px] font-medium text-primary-800 hover:text-white hover:bg-primary-500 hover:border-primary-500 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 group"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 group-hover:bg-white transition-colors" />
-                      {reply}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 pl-2 border-l border-primary-100/30">
-                  <button
-                    onClick={() => setIsSmartReplyOpen(false)}
-                    className="p-2 text-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-all rounded-full"
-                    title="Đóng gợi ý"
-                  >
-                    <X size={18} />
-                  </button>
-                 </div>
-              </div>
-            )}
-
-            <div className="relative bg-white border-t border-slate-100">
-              {/* Nút "Gợi ý AI" kiểu Pill - Hiện phía trên input bên phải */}
-              {smartReplies.length > 0 && !isSmartReplyOpen && (
-                 <button
-                  onClick={() => setIsSmartReplyOpen(true)}
-                  className="absolute -top-12 right-6 px-4 py-2 bg-white border border-primary-100 text-primary-600 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 z-20 group animate-in fade-in slide-in-from-bottom-2"
-                >
-                  <div className="relative">
-                    <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
-                  </div>
-                  <span className="text-xs font-bold tracking-wide">Gợi ý trả lời (AI)</span>
-                </button>
-              )}
-
+            <div
+              ref={composerContainerRef}
+              className="relative bg-white border-t border-slate-100"
+            >
               <div className="w-full">
                 <ChatInput
                   key={
@@ -3284,16 +3439,26 @@ isExpanded && (
                   onUploadSuccess={handleImageSendSuccess}
                   onUploadError={handleImageSendError}
                   onConversationCreated={(newConv) => {
+                    const createdConversation = newConv as any;
                     window.dispatchEvent(new CustomEvent("chat:open-conversation", {
                       detail: {
-                        conversationId: newConv.conversation?._id || newConv._id,
-                        conversation: newConv.conversation || newConv
+                        conversationId: createdConversation.conversation?._id || createdConversation._id,
+                        conversation: createdConversation.conversation || createdConversation
                       }
                     }));
                   }}
                   replyToMessage={replyToMessage}
                   onCancelReply={() => setReplyToMessage(null)}
                   conversationType={activeConversation?.type}
+                  smartReplies={smartReplies}
+                  isSmartReplyLoading={isSmartReplyLoading}
+                  isSmartReplyOpen={isSmartReplyOpen}
+                  onSmartReplyToggle={() => setIsSmartReplyOpen((open) => !open)}
+                  onSmartReplyClose={() => setIsSmartReplyOpen(false)}
+                  onSmartReplySelect={(reply) => {
+                    handleSelectSmartReply(reply);
+                    setIsSmartReplyOpen(false);
+                  }}
                 />
               </div>
             </div>
@@ -3451,7 +3616,7 @@ setForwardingMessage(null);
         message={
           <div className="text-left py-2">
              <div className="bg-white rounded-2xl p-5 border border-primary-100 shadow-inner max-h-[60vh] overflow-y-auto space-y-4">
-              {summaryResult?.split('\n').map((line, i) => {
+              {summaryResult?.summary.split('\n').map((line, i) => {
                 const cleanLine = line.trim();
                 if (!cleanLine) return null;
 const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*');
@@ -3471,11 +3636,59 @@ const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*');
                   </div>
                  );
 })}
+              {summaryResult?.highlights?.length ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+                  <div className="mb-2 text-[12px] font-bold uppercase text-slate-500">
+                    Ý chính
+                  </div>
+                  <div className="space-y-2">
+                    {summaryResult.highlights.map((item, index) => (
+                      <div key={`highlight-${index}`} className="flex items-start gap-2">
+                        <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" />
+                        <p className="text-sm leading-relaxed text-slate-700">{item}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {summaryResult?.actionItems?.length ? (
+                <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
+                  <div className="mb-2 text-[12px] font-bold uppercase text-amber-700">
+                    Việc cần làm
+                  </div>
+                  <div className="space-y-2">
+                    {summaryResult.actionItems.map((item, index) => (
+                      <div key={`action-${index}`} className="text-sm leading-relaxed text-slate-700">
+                        <span className="font-semibold text-slate-800">{item.owner || "Chưa rõ"}: </span>
+                        {item.task}
+                        {item.due ? <span className="text-amber-700"> ({item.due})</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {summaryResult?.questions?.length ? (
+                <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3">
+                  <div className="mb-2 text-[12px] font-bold uppercase text-sky-700">
+                    Còn bỏ ngỏ
+                  </div>
+                  <div className="space-y-2">
+                    {summaryResult.questions.map((item, index) => (
+                      <p key={`question-${index}`} className="text-sm leading-relaxed text-slate-700">
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         }
         confirmText="Đóng"
         hideCancelButton
+        maxWidthClassName="max-w-lg"
         onConfirm={() => setSummaryResult(null)}
         onCancel={() => setSummaryResult(null)}
       />

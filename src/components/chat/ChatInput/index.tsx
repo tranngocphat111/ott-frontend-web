@@ -34,6 +34,8 @@ import {
 import { socketService } from "../../../services";
 import { getFullUrl } from "../../../utils";
 import { getFileNameFromUrl } from "../../../utils";
+import { compressImageFile } from "../../../utils/imageCompression";
+import { useToast } from "../../../contexts/ToastContext";
 import { EmojiPicker } from "./EmojiPicker";
 import { ImageInput } from "./ImageInput";
 import { FileInput } from "./FileInput";
@@ -156,6 +158,10 @@ const createUploadClientId = () =>
 const MB = 1024 * 1024;
 const DEFAULT_MAX_FILE_SIZE = 50 * MB;
 const VIDEO_MAX_FILE_SIZE = 100 * MB;
+const IMAGE_UPLOAD_MAX_SIZE_MB = 1.6;
+const IMAGE_UPLOAD_MAX_EDGE = 1920;
+const S3_MEDIA_VIOLATION_PATTERN =
+  /vi phạm|vi pham|policy|moderation|unsafe|malware|virus|accessdenied|access denied|explicit deny/i;
 
 const getMaxUploadSize = (file: File) => {
   if (file.type.startsWith("video/")) {
@@ -180,6 +186,36 @@ const validateUploadFiles = (files: File[]) => {
   return { valid, invalid };
 };
 
+type ConversationCreateResult = {
+  _id?: string;
+  conversation?: {
+    _id?: string;
+  };
+};
+
+const shouldConvertImageToJpegForModeration = (file: File) => {
+  const type = file.type.toLowerCase();
+  return (
+    type.startsWith("image/") &&
+    type !== "image/gif" &&
+    type !== "image/svg+xml" &&
+    type !== "image/png" &&
+    type !== "image/jpeg" &&
+    type !== "image/jpg"
+  );
+};
+
+const optimizeImageForUpload = (file: File) =>
+  compressImageFile(file, {
+    maxSizeMB: IMAGE_UPLOAD_MAX_SIZE_MB,
+    maxWidthOrHeight: IMAGE_UPLOAD_MAX_EDGE,
+    fileType: shouldConvertImageToJpegForModeration(file)
+      ? "image/jpeg"
+      : file.type,
+    initialQuality: 0.82,
+    useWebWorker: true,
+  });
+
 const buildInvalidFilesMessage = (
   invalid: Array<{ file: File; maxSizeMb: number }>,
 ) => {
@@ -199,7 +235,14 @@ export const ChatInput = ({
   replyToMessage,
   onCancelReply,
   conversationType,
+  smartReplies = [],
+  isSmartReplyLoading = false,
+  isSmartReplyOpen = false,
+  onSmartReplyToggle,
+  onSmartReplyClose,
+  onSmartReplySelect,
 }: ChatInputProps): ReactElement => {
+  const { showToast } = useToast();
   const [text, setText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -219,6 +262,8 @@ export const ChatInput = ({
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
   const [isSTTMode, setIsSTTMode] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [dismissedSmartReplySignature, setDismissedSmartReplySignature] =
+    useState("");
   const textInputRef = useRef<TextInputHandle>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -593,12 +638,28 @@ export const ChatInput = ({
     return fallback;
   };
 
+  const showUploadFailure = useCallback(
+    (message: string) => {
+      if (S3_MEDIA_VIOLATION_PATTERN.test(message)) {
+        showToast(message, "warning", "Không tải được media", 4500);
+        return;
+      }
+
+      alert(`Gửi tin nhắn thất bại: ${message}`);
+    },
+    [showToast],
+  );
+
   const getRealConversationId = useCallback(async () => {
     if (conversationId.startsWith("VIRTUAL_CONV_")) {
       const targetUserId = conversationId.replace("VIRTUAL_CONV_", "");
       try {
         const result = await ConversationService.getOrCreatePrivateConversation(senderId, targetUserId);
-        const realId = (result as any).conversation?._id || (result as any)._id;
+        const conversationResult = result as ConversationCreateResult;
+        const realId = conversationResult.conversation?._id || conversationResult._id;
+        if (!realId) {
+          throw new Error("Không thể tạo hội thoại");
+        }
         if (onConversationCreated) {
           onConversationCreated(result);
         }
@@ -746,8 +807,12 @@ export const ChatInput = ({
     onUploadStart?.(draft);
 
     try {
+      const optimizedFiles = await Promise.all(
+        files.map((file) => optimizeImageForUpload(file)),
+      );
+
       const keys = await Promise.all(
-        files.map(async (file) => {
+        optimizedFiles.map(async (file) => {
           const mimeType = resolveMimeType(file);
           const { uploadUrl, key } = await MessageService.getPresignedUrl(
             file.name,
@@ -771,7 +836,7 @@ export const ChatInput = ({
         senderId,
         keys,
         "image",
-        0,
+        optimizedFiles.reduce((sum, file) => sum + file.size, 0),
         undefined,
         replyToMsgId,
         undefined,
@@ -796,7 +861,7 @@ export const ChatInput = ({
       );
       console.error(error);
       onUploadError?.({ clientMessageId, error: errorMessage });
-      alert(`Gửi tin nhắn thất bại: ${errorMessage}`);
+      showUploadFailure(errorMessage);
     } finally {
       previewUrls.forEach((url) => {
         if (url.startsWith("blob:")) {
@@ -811,6 +876,7 @@ export const ChatInput = ({
     onUploadProgress,
     onUploadSuccess,
     onUploadError,
+    showUploadFailure,
     onCancelReply,
     getRealConversationId,
   ]);
@@ -906,7 +972,7 @@ export const ChatInput = ({
       );
       console.error(err);
       onUploadError?.({ clientMessageId, error: errorMessage });
-      alert(`Gửi tin nhắn thất bại: ${errorMessage}`);
+      showUploadFailure(errorMessage);
     } finally {
       if (previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
@@ -919,6 +985,7 @@ export const ChatInput = ({
     onUploadProgress,
     onUploadSuccess,
     onUploadError,
+    showUploadFailure,
     onCancelReply,
     onSendSuccess,
     getRealConversationId,
@@ -987,9 +1054,11 @@ export const ChatInput = ({
           }
           await onSendSuccess(sentMessage);
           if (replyToMsgId) onCancelReply?.();
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Lỗi gửi tin nhắn:", error);
-          alert(`Gửi tin nhắn thất bại: ${error.message || "Lỗi không xác định"}`);
+          const message =
+            error instanceof Error ? error.message : "Lỗi không xác định";
+          alert(`Gửi tin nhắn thất bại: ${message}`);
         }
       }
     } finally {
@@ -1105,9 +1174,14 @@ export const ChatInput = ({
       streamRef.current = stream;
 
       // Tạo AudioContext để xử lý âm lượng
-      const audioContext = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
+      const AudioContextConstructor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!AudioContextConstructor) {
+        throw new Error("Trình duyệt không hỗ trợ AudioContext");
+      }
+      const audioContext = new AudioContextConstructor();
       audioContextRef.current = audioContext;
 
       // Tạo các node để xử lý âm thanh
@@ -1357,6 +1431,49 @@ export const ChatInput = ({
 
   const canSend =
     (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
+  const smartReplySignature = smartReplies.join("\u001f");
+  const shouldShowSmartReplyCue =
+    smartReplies.length > 0 &&
+    smartReplySignature !== dismissedSmartReplySignature &&
+    text.trim().length === 0 &&
+    pendingFiles.length === 0 &&
+    !replyToMessage &&
+    !showEmojiPicker &&
+    !isUploading &&
+    !isRecordingVoice &&
+    !isSmartReplyLoading;
+  const shouldShowSmartReplyLoading =
+    isSmartReplyLoading &&
+    text.trim().length === 0 &&
+    pendingFiles.length === 0 &&
+    !replyToMessage &&
+    !showEmojiPicker &&
+    !isUploading &&
+    !isRecordingVoice;
+  const visibleSmartReplies = isSmartReplyOpen
+    ? smartReplies.slice(0, 5)
+    : smartReplies.slice(0, 3);
+  const hiddenSmartReplyCount = Math.max(
+    0,
+    smartReplies.length - visibleSmartReplies.length,
+  );
+
+  const handleSmartReplySelect = (reply: string) => {
+    onSmartReplySelect?.(reply);
+  };
+
+  const handleSmartReplyToggle = () => {
+    if (isSmartReplyOpen) {
+      onSmartReplyClose?.();
+    } else {
+      onSmartReplyToggle?.();
+    }
+  };
+
+  const handleDismissSmartReplies = () => {
+    setDismissedSmartReplySignature(smartReplySignature);
+    onSmartReplyClose?.();
+  };
 
   const handleTextKeyDown = async (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1451,6 +1568,65 @@ export const ChatInput = ({
             onClick={onCancelReply}
             className="self-center p-1 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
             title="Huỷ trả lời"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {shouldShowSmartReplyLoading && (
+        <div
+          className="mb-4 flex h-7 items-center gap-2 rounded-2xl bg-white px-2"
+          title="Đang tạo gợi ý trả lời"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary-500">
+            <Sparkles size={14} />
+          </span>
+          <div className="flex flex-1 items-center gap-2">
+            <Loader2 size={14} className="animate-spin text-primary-500" />
+            <div className="h-2 w-24 rounded-full bg-slate-100" />
+            <div className="h-2 w-16 rounded-full bg-slate-100" />
+            <div className="h-2 w-20 rounded-full bg-slate-100" />
+          </div>
+        </div>
+      )}
+
+      {shouldShowSmartReplyCue && (
+        <div className="mb-4 flex h-7 items-center gap-2 overflow-hidden rounded-2xl  bg-white px-2 ">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary-500">
+            <Sparkles size={14} />
+          </span>
+
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleSmartReplies.map((reply, index) => (
+              <button
+                key={`${reply}-${index}`}
+                type="button"
+                onClick={() => handleSmartReplySelect(reply)}
+                className="h-7  shrink-0 truncate rounded-full border border-slate-200 bg-slate-50 px-3 text-left text-[13px] font-medium text-slate-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-800"
+                title={reply}
+              >
+                {reply}
+              </button>
+            ))}
+
+            {smartReplies.length > 3 && (
+              <button
+                type="button"
+                onClick={handleSmartReplyToggle}
+                className="h-7 shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                title={isSmartReplyOpen ? "Thu gọn gợi ý" : "Xem thêm gợi ý"}
+              >
+                {isSmartReplyOpen ? "Thu gọn" : `+${hiddenSmartReplyCount}`}
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDismissSmartReplies}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-50 hover:text-slate-600"
+            title="Ẩn gợi ý"
           >
             <X size={14} />
           </button>
