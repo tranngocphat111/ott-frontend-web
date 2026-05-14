@@ -413,26 +413,27 @@ export async function updatePost(
             form.append("accessControls", JSON.stringify(accessControls));
         }
 
-        const existingMedias = media
-            .filter((m) => !m.file)
-            .map((m, index) => ({
-                type: m.type === "video" ? "VIDEO_MEDIA" : "IMAGE_MEDIA",
-                url: m.url,
-                caption: m.caption ?? null,
-                orderIndex: index,
-            }));
+        // --- Unified Media List ---
+        // We send ALL media items (old and new) in the correct order.
+        // The backend will distinguish them by URL: 
+        //   - S3 URL => Existing
+        //   - Non-S3 (blob/temporary) => New (matches with a file in 'files' array)
+        const allMediaRequests = media.map((m, index) => ({
+            type: m.type === "video" ? "VIDEO_MEDIA" : "IMAGE_MEDIA",
+            url: m.url, // For new files, this is the blob URL
+            caption: m.caption ?? null,
+            orderIndex: index,
+        }));
 
-        if (existingMedias.length > 0) {
-            form.append("existingMedias", JSON.stringify(existingMedias));
-        }
+        form.append("existingMedias", JSON.stringify(allMediaRequests));
 
-        const newMedia = media.filter((m) => m.file) as Array<
-            PostMediaItem & { file: File }
-        >;
-        newMedia.forEach((m) => {
-            const file = m.file;
-            form.append("files", file);
-            form.append("captions", m.caption ?? "");
+        // --- Binary Files ---
+        // Append actual files in the order they appear in the media list
+        media.forEach((m) => {
+            if (m.file) {
+                form.append("files", m.file);
+                form.append("captions", m.caption ?? "");
+            }
         });
 
         const res = await authFetch(`${API_MEDIA_SERVER_URL}/posts/${postId}`, {

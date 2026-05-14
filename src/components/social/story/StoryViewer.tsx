@@ -201,9 +201,47 @@ const StoryViewer: React.FC<Props> = ({
 
             {/* Media Content */}
             <div className="absolute inset-0 flex items-center justify-center px-6 pt-12 pb-10">
-              <div className="w-full h-full rounded-3xl bg-white/80 shadow-xl overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center">
-                  {activeStory.contentType === "IMAGE" && activeStory.imageUrl ? (
+                <div className="w-full h-full flex items-center justify-center relative">
+                  {activeStory.items && activeStory.items.length > 0 ? (
+                    activeStory.items
+                      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+                      .map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="absolute"
+                          style={{
+                            left: `${item.positionX * 100}%`,
+                            top: `${item.positionY * 100}%`,
+                            transform: `translate(-50%, -50%) scale(${item.scale}) rotate(${item.rotation}deg)`,
+                            zIndex: item.zIndex,
+                            width: item.type === "TEXT" ? "auto" : "100%",
+                            height: item.type === "TEXT" ? "auto" : "100%",
+                          }}
+                        >
+                          {item.type === "IMAGE" && item.url ? (
+                            <img src={item.url} alt="" className="w-full h-full object-contain" />
+                          ) : item.type === "VIDEO" && item.url ? (
+                            <video
+                              src={item.url}
+                              className="w-full h-full object-contain"
+                              autoPlay
+                              muted
+                              playsInline
+                              loop
+                            />
+                          ) : item.type === "TEXT" && item.textContent ? (
+                            <div
+                              className="px-4 py-2 rounded-lg"
+                              style={{ backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.5)" }}
+                            >
+                              <p className="text-white text-lg font-semibold leading-tight whitespace-pre-wrap break-words">
+                                {item.textContent}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))
+                  ) : activeStory.contentType === "IMAGE" && activeStory.imageUrl ? (
                     <img src={activeStory.imageUrl} alt={activeStory.name} className="w-full h-full object-contain" />
                   ) : activeStory.contentType === "VIDEO" && activeStory.videoUrl ? (
                     <video
@@ -238,7 +276,6 @@ const StoryViewer: React.FC<Props> = ({
                     </>
                   )}
                 </div>
-              </div>
             </div>
 
             {/* Navigation Overlays */}

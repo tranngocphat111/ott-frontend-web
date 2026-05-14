@@ -85,6 +85,9 @@ const CreateStoryModal: React.FC<Props> = ({
   const [overlayText, setOverlayText] = useState("");
   const [alternativeText, setAlternativeText] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [items, setItems] = useState<StoryContentItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -131,11 +134,51 @@ const CreateStoryModal: React.FC<Props> = ({
   const handleChooseText = () => {
     setStep("text");
     setError(null);
+    // If not already has items, maybe add one?
+    if (items.length === 0) {
+      // Just keep textContent for now or convert to item
+    }
   };
 
-  const handleChooseImage = () => {
-    setStep("image");
-    setError(null);
+  const handleAddItem = (type: "TEXT" | "IMAGE" | "VIDEO", content?: string) => {
+    const newItem: StoryContentItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      type,
+      textContent: content,
+      positionX: 0.5,
+      positionY: 0.5,
+      scale: 1,
+      rotation: 0,
+      zIndex: items.length + 1,
+    };
+    setItems([...items, newItem]);
+    setSelectedItemId(newItem.id || null);
+    setStep("image"); // Switch to canvas view
+  };
+
+  const handleItemMove = (id: string, deltaX: number, deltaY: number) => {
+    setItems(prev => prev.map(item => 
+      item.id === id ? {
+        ...item,
+        positionX: Math.max(0, Math.min(1, item.positionX + deltaX)),
+        positionY: Math.max(0, Math.min(1, item.positionY + deltaY))
+      } : item
+    ));
+  };
+
+  const handleItemTransform = (id: string, scaleDelta: number, rotateDelta: number) => {
+    setItems(prev => prev.map(item => 
+      item.id === id ? {
+        ...item,
+        scale: Math.max(0.2, Math.min(5, item.scale + scaleDelta)),
+        rotation: (item.rotation + rotateDelta) % 360
+      } : item
+    ));
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
+    if (selectedItemId === id) setSelectedItemId(null);
   };
 
   const handlePickImage = async (file?: File) => {
@@ -171,20 +214,32 @@ const CreateStoryModal: React.FC<Props> = ({
       video.src = localUrl;
     }
 
-    const uploaded = await uploadStoryMedia(file);
-    if (!uploaded) {
-      setError("Tải ảnh lên thất bại. Vui lòng thử lại.");
-      setUploadingImage(false);
-      return;
-    }
-
-    setUploadedImageKey(uploaded.fileKey);
     setUploadingImage(false);
+    setSelectedFile(file);
+    const blobUrl = localUrl;
+    setUploadedImageKey(blobUrl);
+
+    // Create a new item for the image/video
+    const newItem: StoryContentItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      type: nextType === "video" ? "VIDEO" : "IMAGE",
+      url: blobUrl,
+      positionX: 0.5,
+      positionY: 0.5,
+      scale: 1,
+      rotation: 0,
+      zIndex: items.length + 1,
+    };
+    setItems([...items, newItem]);
+    setSelectedItemId(newItem.id || null);
   };
 
   useEffect(() => {
     if (editingStory && isOpen) {
-      if (editingStory.contentType === "TEXT") {
+      if (editingStory.items && editingStory.items.length > 0) {
+        setItems(editingStory.items);
+        setStep("image"); // Default to canvas view if multiple items exist
+      } else if (editingStory.contentType === "TEXT") {
         setStep("text");
         setTextContent(editingStory.textContent || "");
       } else if (editingStory.contentType === "IMAGE" || editingStory.contentType === "VIDEO") {
@@ -211,8 +266,24 @@ const CreateStoryModal: React.FC<Props> = ({
     setError(null);
 
     try {
-      const storyItems =
-        step === "text" ?
+      const finalStoryItems = items.length > 0 ? 
+        items.map(item => ({
+          type: item.type === "IMAGE" ? "IMAGE_ITEM" : item.type === "VIDEO" ? "VIDEO_ITEM" : "TEXT_ITEM",
+          imageItem: item.type === "IMAGE" ? { ...BASE_STORY_ITEM, url: item.url } : null,
+          videoItem: item.type === "VIDEO" ? { ...BASE_STORY_ITEM, url: item.url } : null,
+          textItem: item.type === "TEXT" ? { 
+            ...BASE_STORY_ITEM, 
+            content: item.textContent, 
+            backgroundColor: item.textBackgroundColor 
+          } : null,
+          isPrimary: item.zIndex === 1,
+          zIndex: item.zIndex,
+          positionX: item.positionX,
+          positionY: item.positionY,
+          scale: item.scale,
+          rotation: item.rotation,
+        }))
+        : (step === "text" ?
           [
             {
               type: "TEXT_ITEM",
@@ -224,6 +295,12 @@ const CreateStoryModal: React.FC<Props> = ({
                 backgroundColor: "#111827",
                 alignment: "CENTER",
               },
+              isPrimary: true,
+              zIndex: 1,
+              positionX: 0.5,
+              positionY: 0.5,
+              scale: 1,
+              rotation: 0,
             },
           ]
         : [
@@ -238,6 +315,12 @@ const CreateStoryModal: React.FC<Props> = ({
                   width: imageWidth,
                   height: imageHeight,
                 },
+                isPrimary: true,
+                zIndex: 1,
+                positionX: 0.5,
+                positionY: 0.5,
+                scale: 1,
+                rotation: 0,
               }
             : {
                 type: "IMAGE_ITEM",
@@ -247,6 +330,12 @@ const CreateStoryModal: React.FC<Props> = ({
                   width: imageWidth,
                   height: imageHeight,
                 },
+                isPrimary: true,
+                zIndex: 1,
+                positionX: 0.5,
+                positionY: 0.5,
+                scale: 1,
+                rotation: 0,
               },
             ...(overlayText.trim() && mediaType !== "video" ?
               [
@@ -262,18 +351,28 @@ const CreateStoryModal: React.FC<Props> = ({
                     backgroundColor: "transparent",
                     alignment: "CENTER",
                   },
+                  isPrimary: false,
+                  zIndex: 2,
+                  positionX: 0.5,
+                  positionY: 0.8,
+                  scale: 1,
+                  rotation: 0,
                 },
               ]
             : []),
-          ];
+          ]);
 
       if (editingStory) {
-        const saved = await updateStory(editingStory.id, {
-          userId: currentUserId,
-          visibility,
-          storyItems,
-          expireAt: editingStory.expireAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        });
+        const saved = await updateStory(
+          editingStory.id,
+          {
+            userId: currentUserId,
+            visibility,
+            storyItems: finalStoryItems,
+            expireAt: editingStory.expireAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          },
+          selectedFile ? [selectedFile] : undefined
+        );
         if (!saved) {
           setError("Không thể cập nhật story. Vui lòng thử lại.");
           setSubmitting(false);
@@ -286,7 +385,7 @@ const CreateStoryModal: React.FC<Props> = ({
           isHighlight: false,
           highlightName: null,
           expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          storyItems,
+          storyItems: finalStoryItems,
           musics: [],
           hashTags: alternativeText.trim() ? [alternativeText.trim()] : [],
         });
@@ -306,62 +405,110 @@ const CreateStoryModal: React.FC<Props> = ({
     }
   };
 
-  const phoneCanvas =
-    step === "text" ?
-      <div className="w-[310px] h-[550px] rounded-lg relative overflow-hidden shadow-lg border border-white/20">
-        <div className={`absolute inset-0 ${TEXT_BACKGROUNDS[selectedBg]}`} />
-        <div className="absolute inset-0 flex items-center justify-center p-6">
-          <p className="text-white text-2xl font-semibold text-center break-words whitespace-pre-wrap">
-            {textContent || "Nhập nội dung story"}
-          </p>
-        </div>
-        <Smile className="absolute bottom-3 right-3 size-6 text-white/70" />
-      </div>
-    : <div
-        className={`w-[310px] h-[550px] rounded-2xl relative overflow-hidden shadow-lg border border-white/30 bg-emerald-100 flex items-center justify-center transition ${
-          isDragActive ? "ring-4 ring-white/70" : ""
-        }`}
-        onDragOver={(event) => {
+  const dragStartPos = useRef<{ x: number, y: number } | null>(null);
+
+  const phoneCanvas = (
+    <div 
+      className="w-[310px] h-[550px] rounded-2xl relative overflow-hidden shadow-lg border border-white/30 bg-[#111418] flex items-center justify-center transition"
+      onDragOver={(event) => {
           event.preventDefault();
           setIsDragActive(true);
-        }}
-        onDragLeave={() => setIsDragActive(false)}
-        onDrop={(event) => {
+      }}
+      onDrop={(event) => {
           event.preventDefault();
           setIsDragActive(false);
           handlePickImage(event.dataTransfer.files?.[0]);
-        }}>
-        {imagePreviewUrl ?
-          mediaType === "video" ?
-            <video
-              src={imagePreviewUrl}
-              className="w-full h-full object-contain"
-              controls
-            />
-          : <img
-              src={imagePreviewUrl}
-              alt="story preview"
-              style={{
-                transform: `scale(${imageScale}) rotate(${imageRotation}deg)`,
-                maxWidth: "100%",
-                maxHeight: "100%",
-                objectFit: "contain",
-              }}
-            />
-
-        : <div className="text-center space-y-3">
-            <div className="text-sm text-emerald-900/80 font-medium">
-              Kéo ảnh hoặc video vào đây
-            </div>
-            <button
-              type="button"
-              className="px-4 py-2 rounded-full bg-white text-sm text-gray-800 shadow"
-              onClick={() => fileInputRef.current?.click()}>
-              Chọn file
-            </button>
+      }}
+    >
+      {items.length === 0 && step === "text" && (
+        <>
+          <div className={`absolute inset-0 ${TEXT_BACKGROUNDS[selectedBg]}`} />
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <p className="text-white text-2xl font-semibold text-center break-words whitespace-pre-wrap">
+              {textContent || "Nhập nội dung story"}
+            </p>
           </div>
-        }
-      </div>;
+          <Smile className="absolute bottom-3 right-3 size-6 text-white/70" />
+        </>
+      )}
+
+      {items.length === 0 && step === "image" && !imagePreviewUrl && (
+        <div className="text-center space-y-3">
+          <div className="text-sm text-emerald-900/80 font-medium">
+            Kéo ảnh hoặc video vào đây
+          </div>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-full bg-white text-sm text-gray-800 shadow"
+            onClick={() => fileInputRef.current?.click()}>
+            Chọn file
+          </button>
+        </div>
+      )}
+
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className={`absolute cursor-move select-none ${selectedItemId === item.id ? "ring-2 ring-blue-500 rounded-lg p-1" : ""}`}
+          style={{
+            left: `${item.positionX * 100}%`,
+            top: `${item.positionY * 100}%`,
+            transform: `translate(-50%, -50%) scale(${item.scale}) rotate(${item.rotation}deg)`,
+            zIndex: item.zIndex,
+            width: item.type === "TEXT" ? "auto" : "100%",
+            height: item.type === "TEXT" ? "auto" : "100%",
+          }}
+          onMouseDown={(e) => {
+            const id = item.id!;
+            setSelectedItemId(id);
+            dragStartPos.current = { x: e.clientX, y: e.clientY };
+            const onMouseMove = (moveEvent: MouseEvent) => {
+               if (!dragStartPos.current) return;
+               const dx = (moveEvent.clientX - dragStartPos.current.x) / 310;
+               const dy = (moveEvent.clientY - dragStartPos.current.y) / 550;
+               handleItemMove(id, dx, dy);
+               dragStartPos.current = { x: moveEvent.clientX, y: moveEvent.clientY };
+            };
+            const onMouseUp = () => {
+               window.removeEventListener('mousemove', onMouseMove);
+               window.removeEventListener('mouseup', onMouseUp);
+               dragStartPos.current = null;
+            };
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+          }}
+        >
+          {item.type === "IMAGE" && item.url && (
+            <img src={item.url} alt="" className="w-full h-full object-contain pointer-events-none" />
+          )}
+          {item.type === "VIDEO" && item.url && (
+            <video src={item.url} className="w-full h-full object-contain pointer-events-none" autoPlay muted loop />
+          )}
+          {item.type === "TEXT" && item.textContent && (
+            <div
+              className="px-4 py-2 rounded-lg"
+              style={{ backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.5)" }}
+            >
+              <p className="text-white text-lg font-semibold leading-tight whitespace-pre-wrap break-words">
+                {item.textContent}
+              </p>
+            </div>
+          )}
+          {selectedItemId === item.id && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveItem(item.id!);
+              }}
+              className="absolute -top-3 -right-3 size-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 
   if (!isOpen) return null;
 
@@ -521,9 +668,20 @@ const CreateStoryModal: React.FC<Props> = ({
 
                 <button
                   type="button"
+                  className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 flex items-center gap-3 text-sm font-semibold text-slate-700 hover:border-slate-300 transition"
+                  onClick={() => {
+                    const text = prompt("Nhập nội dung text:");
+                    if (text) handleAddItem("TEXT", text);
+                  }}>
+                  <Type className="size-5" />
+                  Thêm text mới
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:border-slate-300 transition">
-                  {uploadingImage ? "Đang tải file..." : "Chọn file khác"}
+                  {uploadingImage ? "Đang tải file..." : "Thêm ảnh/video mới"}
                 </button>
               </div>
             )}
@@ -555,7 +713,7 @@ const CreateStoryModal: React.FC<Props> = ({
             <div className="h-full flex flex-wrap items-center justify-center gap-6">
               <button
                 type="button"
-                onClick={handleChooseImage}
+                onClick={() => setStep("image")}
                 className="group w-[260px] h-[380px] rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-700 to-sky-400 text-white shadow-xl flex flex-col items-center justify-between p-6 transition hover:-translate-y-1">
                 <span className="size-12 rounded-2xl bg-white/90 text-slate-900 inline-flex items-center justify-center">
                   <ImageIcon className="size-6" />
@@ -597,37 +755,37 @@ const CreateStoryModal: React.FC<Props> = ({
               <div className="rounded-3xl bg-[#111418] min-h-[610px] flex flex-col items-center justify-center relative px-4 py-8 shadow-inner">
                 {phoneCanvas}
 
-                {step === "image" && (
+                {selectedItemId && (
                   <div className="w-full max-w-[760px] mt-4 flex items-center gap-4">
                     <button
                       type="button"
                       className="text-white text-3xl"
                       onClick={() =>
-                        setImageScale((v) => Math.max(0.6, v - 0.1))
+                        handleItemTransform(selectedItemId, -0.1, 0)
                       }>
                       -
                     </button>
                     <input
                       type="range"
-                      min={0.6}
-                      max={2}
+                      min={0.2}
+                      max={5}
                       step={0.1}
-                      value={imageScale}
-                      onChange={(e) => setImageScale(Number(e.target.value))}
+                      value={items.find(it => it.id === selectedItemId)?.scale || 1}
+                      onChange={(e) => handleItemTransform(selectedItemId, Number(e.target.value) - (items.find(it => it.id === selectedItemId)?.scale || 1), 0)}
                       className="flex-1"
                     />
                     <button
                       type="button"
                       className="text-white text-3xl"
                       onClick={() =>
-                        setImageScale((v) => Math.min(2, v + 0.1))
+                        handleItemTransform(selectedItemId, 0.1, 0)
                       }>
                       +
                     </button>
                     <button
                       type="button"
                       className="h-10 px-3 rounded-lg bg-gray-200 inline-flex items-center gap-2 text-gray-900 text-sm"
-                      onClick={() => setImageRotation((r) => (r + 90) % 360)}>
+                      onClick={() => handleItemTransform(selectedItemId, 0, 90)}>
                       <RotateCw className="size-4" />
                       Rotate
                     </button>
