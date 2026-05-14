@@ -40,6 +40,8 @@ export interface ApiStoryReelItem {
     id: string;
     accountAvatarUrl: string | null;
     storyItems?: ApiStoryItemResponse[];
+    totalViews?: number;
+    musics?: any[];
 }
 
 export interface ApiStoryItemResponse {
@@ -183,6 +185,8 @@ function mapStoryGroups(raw: ApiStoryGroup[]): StoryUserGroup[] {
                 textBackgroundColor,
                 imageUrl,
                 videoUrl,
+                totalViews: story.totalViews,
+                musics: story.musics,
             };
         }),
     }));
@@ -299,5 +303,41 @@ export async function deleteStory(storyId: string): Promise<boolean> {
         return res.ok;
     } catch {
         return false;
+    }
+}
+
+export async function viewStory(storyId: string, accountId: string): Promise<void> {
+    try {
+        await authFetch(`${API_MEDIA_SERVER_URL}/stories/${storyId}/view?accountId=${accountId}`, {
+            method: "PUT",
+        });
+    } catch {
+        // Ignore view errors.
+    }
+}
+
+export async function fetchStoryViewers(storyId: string): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/stories/${storyId}/viewers`);
+        if (!res.ok) return [];
+        return unwrapList<any>(await res.json());
+    } catch {
+        return [];
+    }
+}
+
+export async function updateStory(storyId: string, request: StoryCreateRequest): Promise<ApiStory | null> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/stories/${storyId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(request),
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return unwrapApiResult<ApiStory>(json);
+    } catch {
+        return null;
     }
 }

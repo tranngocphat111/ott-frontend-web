@@ -10,7 +10,7 @@ import {
   Type,
   X,
 } from "lucide-react";
-import { createStory, uploadStoryMedia } from "../../../services/story.service";
+import { createStory, updateStory, uploadStoryMedia } from "../../../services/story.service";
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +19,7 @@ interface Props {
   currentUserName: string;
   currentUserAvatar: string;
   onCreated?: () => Promise<void> | void;
+  editingStory?: StoryItem | null;
 }
 
 type Step = "picker" | "text" | "image";
@@ -61,6 +62,7 @@ const CreateStoryModal: React.FC<Props> = ({
   currentUserName,
   currentUserAvatar,
   onCreated,
+  editingStory,
 }) => {
   const [step, setStep] = useState<Step>("picker");
   const [submitting, setSubmitting] = useState(false);
@@ -181,6 +183,20 @@ const CreateStoryModal: React.FC<Props> = ({
   };
 
   useEffect(() => {
+    if (editingStory && isOpen) {
+      if (editingStory.contentType === "TEXT") {
+        setStep("text");
+        setTextContent(editingStory.textContent || "");
+      } else if (editingStory.contentType === "IMAGE" || editingStory.contentType === "VIDEO") {
+        setStep("image");
+        setImagePreviewUrl(editingStory.imageUrl || editingStory.videoUrl || "");
+        setUploadedImageKey(editingStory.imageUrl || editingStory.videoUrl || "");
+        setMediaType(editingStory.contentType === "VIDEO" ? "video" : "image");
+      }
+    }
+  }, [editingStory, isOpen]);
+
+  useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -251,21 +267,35 @@ const CreateStoryModal: React.FC<Props> = ({
             : []),
           ];
 
-      const saved = await createStory({
-        userId: currentUserId,
-        visibility,
-        isHighlight: false,
-        highlightName: null,
-        expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        storyItems,
-        musics: [],
-        hashTags: alternativeText.trim() ? [alternativeText.trim()] : [],
-      });
+      if (editingStory) {
+        const saved = await updateStory(editingStory.id, {
+          userId: currentUserId,
+          visibility,
+          storyItems,
+          expireAt: editingStory.expireAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        });
+        if (!saved) {
+          setError("Không thể cập nhật story. Vui lòng thử lại.");
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        const saved = await createStory({
+          userId: currentUserId,
+          visibility,
+          isHighlight: false,
+          highlightName: null,
+          expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          storyItems,
+          musics: [],
+          hashTags: alternativeText.trim() ? [alternativeText.trim()] : [],
+        });
 
-      if (!saved) {
-        setError("Không thể chia sẻ story. Vui lòng thử lại.");
-        setSubmitting(false);
-        return;
+        if (!saved) {
+          setError("Không thể chia sẻ story. Vui lòng thử lại.");
+          setSubmitting(false);
+          return;
+        }
       }
 
       if (onCreated) await onCreated();
@@ -364,7 +394,7 @@ const CreateStoryModal: React.FC<Props> = ({
           <div className="px-5 py-5 border-b border-slate-200/70">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl leading-tight font-['Fraunces'] font-semibold text-slate-900">
-                Tạo story mới
+                {editingStory ? "Cập nhật story" : "Tạo story mới"}
               </h2>
               <button className="size-10 rounded-full bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center transition">
                 <Settings className="size-5 text-slate-600" />
@@ -514,7 +544,7 @@ const CreateStoryModal: React.FC<Props> = ({
                 onClick={handleShare}
                 disabled={!canShare}
                 className="flex-1 h-11 rounded-full bg-slate-900 disabled:bg-slate-300 text-sm font-semibold text-white disabled:text-slate-500 hover:bg-slate-800 transition">
-                {submitting ? "Đang đăng..." : "Đăng story"}
+                {submitting ? (editingStory ? "Đang lưu..." : "Đang đăng...") : (editingStory ? "Cập nhật" : "Đăng story")}
               </button>
             </div>
           )}

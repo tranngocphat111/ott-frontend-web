@@ -42,6 +42,8 @@ export interface StoryItem {
     textBackgroundColor?: string;
     imageUrl?: string;
     videoUrl?: string;
+    totalViews?: number;
+    musics?: any[];
 }
 
 export interface StoryUserGroup {
