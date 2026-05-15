@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import {
   Area,
   AreaChart,
-  Cell,
   CartesianGrid,
+  Cell,
   Legend,
   Pie,
   PieChart,
@@ -43,7 +43,7 @@ type ChartsProps = PieChartsProps | AreaChartsProps;
 
 const defaultColors = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6"];
 
-const formatNumber = new Intl.NumberFormat("vi-VN");
+const formatNumber = new Intl.NumberFormat("en-US");
 
 const Charts: React.FC<ChartsProps> = (props) => {
   const { title, variant, data } = props;
@@ -54,14 +54,14 @@ const Charts: React.FC<ChartsProps> = (props) => {
         ? [
             {
               key: "posts",
-              label: "Bài viết",
+              label: "Posts",
               stroke: "#6366f1",
               fillId: "fillPosts",
               gradientStop: "#6366f1",
             },
             {
               key: "messages",
-              label: "Tin nhắn",
+              label: "Messages",
               stroke: "#0ea5e9",
               fillId: "fillMessages",
               gradientStop: "#0ea5e9",
@@ -76,8 +76,13 @@ const Charts: React.FC<ChartsProps> = (props) => {
 
   if (isEmpty) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4">{title}</h3>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            No data points were returned for this range.
+          </p>
+        </div>
         <EmptyState />
       </div>
     );
@@ -88,9 +93,14 @@ const Charts: React.FC<ChartsProps> = (props) => {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
     >
-      <h3 className="text-sm font-semibold text-slate-700 mb-4">{title}</h3>
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Near real-time analytics aggregated from platform event streams.
+        </p>
+      </div>
       {variant === "pie" ? (
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -115,7 +125,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
               <Tooltip
                 formatter={(value) => [
                   formatNumber.format(Number(value ?? 0)),
-                  "Số lượng",
+                  "Count",
                 ]}
               />
               <Legend />
@@ -164,7 +174,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
                   areaSeries.find((series) => series.key === name)?.label ??
                     String(name),
                 ]}
-                labelFormatter={(label) => `Ngày ${label}`}
+                labelFormatter={(label) => `Date ${label}`}
               />
               <Legend
                 formatter={(value) =>

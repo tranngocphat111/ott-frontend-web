@@ -43,8 +43,8 @@ const AuditLogs: React.FC = () => {
           size: response.size,
         });
       } catch (err) {
-        console.error("Không thể tải nhật ký hệ thống", err);
-        setError("Không thể tải nhật ký hệ thống. Vui lòng thử lại.");
+        console.error("Failed to load audit logs", err);
+        setError("The audit log feed could not be loaded.");
       } finally {
         setLoading(false);
       }
@@ -57,7 +57,7 @@ const AuditLogs: React.FC = () => {
     () =>
       logs.map((log) => ({
         ...log,
-        timestamp: new Date(log.timestamp).toLocaleString("vi-VN"),
+        createdAt: new Date(log.createdAt).toLocaleString("en-GB"),
       })),
     [logs],
   );
@@ -69,7 +69,7 @@ const AuditLogs: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Nhật ký hệ thống không sẵn sàng"
+        title="Audit log view is unavailable"
         description={error}
         onRetry={() => setRetryNonce((current) => current + 1)}
       />
@@ -78,8 +78,8 @@ const AuditLogs: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center bg-white border shadow-sm min-h-80 rounded-xl border-slate-200 text-slate-500">
-        Đang tải nhật ký hệ thống...
+      <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
+        Loading audit logs...
       </div>
     );
   }
@@ -91,13 +91,16 @@ const AuditLogs: React.FC = () => {
       transition={{ duration: 0.25 }}
       className="space-y-4"
     >
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">
-            Nhật ký hệ thống
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            Audit
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            Audit Logs
           </h2>
-          <p className="text-sm text-slate-500">
-            {pagination.totalElements} bản ghi • Trang {pagination.page + 1}/
+          <p className="mt-2 text-sm text-slate-500">
+            {pagination.totalElements} records - page {pagination.page + 1} of{" "}
             {Math.max(pagination.totalPages, 1)}
           </p>
         </div>
@@ -105,11 +108,11 @@ const AuditLogs: React.FC = () => {
 
       <AdminTable
         columns={[
-          { key: "id", label: "ID" },
-          { key: "adminId", label: "Admin" },
-          { key: "actionType", label: "Hành động" },
-          { key: "targetId", label: "Đối tượng" },
-          { key: "timestamp", label: "Thời gian" },
+          { key: "id", label: "Log ID", className: "font-medium text-slate-900" },
+          { key: "adminId", label: "Actor" },
+          { key: "actionType", label: "Action" },
+          { key: "targetUserId", label: "Target User" },
+          { key: "createdAt", label: "Timestamp" },
         ]}
         rows={rows}
       />
@@ -121,11 +124,11 @@ const AuditLogs: React.FC = () => {
           disabled={page <= 0}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trang trước
+          Previous
         </button>
 
         <span className="text-sm text-slate-500">
-          Hiển thị {rows.length} / {pagination.totalElements} bản ghi
+          Showing {rows.length} of {pagination.totalElements} records
         </span>
 
         <button
@@ -136,7 +139,7 @@ const AuditLogs: React.FC = () => {
           }
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trang sau
+          Next
         </button>
       </div>
     </motion.section>

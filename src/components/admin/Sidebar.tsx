@@ -1,66 +1,110 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ShieldAlert, Users, ScrollText } from "lucide-react";
+import {
+  LayoutDashboard,
+  RadioTower,
+  ScrollText,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 import type { AdminNavItem } from "../../interfaces/admin.interface";
-import { useAuth } from "../../contexts/AuthContext";
 
 const navItems: Array<AdminNavItem & { icon: React.ReactNode }> = [
   {
-    label: "Tổng quan",
+    label: "Overview",
     path: "/admin",
-    icon: <LayoutDashboard className="w-4 h-4" />,
+    icon: <LayoutDashboard className="h-4 w-4" />,
   },
   {
-    label: "Kiểm duyệt nội dung",
+    label: "Moderation",
     path: "/admin/moderation",
-    icon: <ShieldAlert className="w-4 h-4" />,
+    icon: <ShieldAlert className="h-4 w-4" />,
   },
   {
-    label: "Quản lý người dùng",
+    label: "Users",
     path: "/admin/users",
-    icon: <Users className="w-4 h-4" />,
+    icon: <Users className="h-4 w-4" />,
   },
   {
-    label: "Nhật ký hệ thống",
+    label: "Audit Logs",
     path: "/admin/audit-logs",
-    icon: <ScrollText className="w-4 h-4" />,
+    icon: <ScrollText className="h-4 w-4" />,
   },
 ];
 
 const Sidebar: React.FC = () => {
-  const { userRole } = useAuth();
-
-  const filtered = navItems.filter((item) => {
-    // hide Content Moderation for ANALYST role
-    if (item.path === "/admin/moderation" && userRole === "ANALYST")
-      return false;
-    if (item.path === "/admin/audit-logs" && userRole !== "SUPER_ADMIN")
-      return false;
-    return true;
-  });
-
   return (
-    <aside className="w-64 p-4 border-r bg-slate-900 text-slate-100 border-slate-800">
-      <h2 className="mb-6 text-lg font-bold">Khu vực quản trị</h2>
-      <nav className="space-y-2">
-        {filtered.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === "/admin"}
-            className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-3 py-2 transition ${
-                isActive
-                  ? "bg-indigo-500 text-white"
-                  : "text-slate-300 hover:bg-slate-800"
-              }`
-            }
-          >
-            {item.icon}
-            <span className="text-sm">{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
+    <aside className="hidden w-72 flex-shrink-0 border-r border-slate-800 bg-slate-950 text-slate-100 lg:block">
+      <div className="flex h-full flex-col px-4 py-5">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300">
+              <RadioTower className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                OTT Admin
+              </p>
+              <h2 className="text-base font-semibold text-white">Analytics Console</h2>
+            </div>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Operational visibility for user growth, moderation, and platform activity.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Workspace
+          </p>
+        </div>
+
+        <nav className="mt-3 space-y-1.5">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/admin"}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-2.5 transition ${
+                  isActive
+                    ? "bg-indigo-500 text-white shadow-sm"
+                    : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                }`
+              }
+            >
+              {item.icon}
+              <span className="text-sm font-medium">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="mt-auto rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Data Sources
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+            <li className="flex items-center justify-between">
+              <span>User Service</span>
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+                Events
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span>RabbitMQ</span>
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+                Streaming
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span>PostgreSQL</span>
+              <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs text-sky-300">
+                Storage
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
     </aside>
   );
 };

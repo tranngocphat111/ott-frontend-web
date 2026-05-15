@@ -15,8 +15,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">
-        Đang kiểm tra quyền truy cập...
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
+        Checking admin access...
       </div>
     );
   }
@@ -25,17 +25,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (isAuthenticated && !isAdmin) {
+  if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-8 text-center">
-          <h1 className="text-4xl font-extrabold text-red-600 mb-2">403</h1>
-          <p className="text-lg text-slate-700 mb-4">
-            Bạn không có quyền truy cập khu vực quản trị.
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
+        <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 text-center shadow-2xl">
+          <h1 className="mb-2 text-4xl font-extrabold text-red-600">403</h1>
+          <p className="mb-4 text-lg text-slate-100">
+            You do not have permission to access the admin analytics console.
           </p>
-          <p className="text-sm text-slate-500">
-            Vai trò hiện tại: {userRole ?? "-"}
-          </p>
+          <p className="text-sm text-slate-400">Current role: {userRole ?? "-"}</p>
         </div>
       </div>
     );
@@ -43,18 +41,20 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   return (
     <AdminAnalyticsProvider>
-      <div className="h-screen w-screen overflow-hidden bg-slate-50 flex">
+      <div className="flex h-screen w-screen overflow-hidden bg-slate-950">
         <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
           <Header />
 
           <motion.main
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="flex-1 overflow-y-auto p-6"
+            className="flex-1 overflow-y-auto bg-slate-100 px-6 py-5"
           >
-            {children ?? <Outlet />}
+            <div className="mx-auto w-full max-w-[1600px]">
+              {children ?? <Outlet />}
+            </div>
           </motion.main>
         </div>
       </div>

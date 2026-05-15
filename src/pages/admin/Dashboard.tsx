@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  Activity,
+  Database,
+  FileText,
+  LogIn,
+  MessageSquareText,
+  Users,
+} from "lucide-react";
 import StatCard from "../../components/admin/StatCard";
 import Charts from "../../components/admin/Charts";
 import { useAdminAnalytics } from "../../components/admin/AdminAnalyticsContext";
@@ -64,19 +72,21 @@ const Dashboard: React.FC = () => {
     setError(null);
 
     try {
-      const [overviewData, messageTypesData] = await Promise.all([
-        adminService.getOverview(timeRange),
-        adminService.getMessageTypes(timeRange),
-      ]);
+      const [overviewData, messageTypesData, loginMethodsData, trendData] =
+        await Promise.all([
+          adminService.getOverview(timeRange),
+          adminService.getMessageTypes(timeRange),
+          adminService.getLoginMethods(timeRange),
+          adminService.getUserDailyTrend(timeRange),
+        ]);
+
       setOverview(overviewData);
       setMessageTypes(messageTypesData);
-      const loginMethodsData = await adminService.getLoginMethods(timeRange);
       setLoginMethods(loginMethodsData);
-      const trendData = await adminService.getUserDailyTrend(timeRange);
       setUserTrend(trendData);
     } catch (err) {
-      console.error("Không thể tải dữ liệu bảng điều khiển quản trị", err);
-      setError("Không thể tải dashboard analytics. Vui lòng thử lại.");
+      console.error("Failed to load admin dashboard", err);
+      setError("The dashboard could not load analytics data from the backend.");
     } finally {
       setLoading(false);
     }
@@ -84,16 +94,16 @@ const Dashboard: React.FC = () => {
 
   const messageChartData: EventReport[] = useMemo(
     () => [
-      { title: "Văn bản", value: messageTypes.text, color: "#6366f1" },
-      { title: "Hình ảnh", value: messageTypes.image, color: "#22c55e" },
-      { title: "Âm thanh", value: messageTypes.voice, color: "#f59e0b" },
+      { title: "Text", value: messageTypes.text, color: "#6366f1" },
+      { title: "Image", value: messageTypes.image, color: "#22c55e" },
+      { title: "Voice", value: messageTypes.voice, color: "#f59e0b" },
     ],
     [messageTypes],
   );
 
   const loginMethodChartData: EventReport[] = useMemo(() => {
     const labelMap: Record<string, string> = {
-      local: "Tài khoản",
+      local: "Local",
       google: "Google",
       qr_code: "QR Code",
       otp: "OTP",
@@ -173,8 +183,8 @@ const Dashboard: React.FC = () => {
       ["MAU", overview.mau],
       ["Registrations (Range)", totalRegistrationsInRange],
       ["Logins (Range)", totalLoginEventsInRange],
-      ["Avg Registrations/Day", avgDailyRegistrations],
-      ["Avg Logins/Day", avgDailyLogins],
+      ["Avg Registrations / Day", avgDailyRegistrations],
+      ["Avg Logins / Day", avgDailyLogins],
     ];
 
     if (peakRegistrationDay) {
@@ -216,7 +226,7 @@ const Dashboard: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Dashboard không sẵn sàng"
+        title="Dashboard is unavailable"
         description={error}
         onRetry={() => void load()}
       />
@@ -225,8 +235,8 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center bg-white border shadow-sm min-h-80 rounded-xl border-slate-200 text-slate-500">
-        Đang tải dữ liệu bảng điều khiển...
+      <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
+        Loading admin dashboard...
       </div>
     );
   }
@@ -238,128 +248,175 @@ const Dashboard: React.FC = () => {
       transition={{ duration: 0.25 }}
       className="space-y-5"
     >
-      <div className="flex flex-col gap-3 p-4 bg-white border shadow-sm rounded-xl border-slate-200 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">
-            Dashboard Analytics
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            Overview
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            OTT Platform Operations
           </h2>
-          <p className="text-sm text-slate-500">
-            Xuất dữ liệu hiện tại theo khoảng thời gian đã chọn.
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Monitor growth, engagement, and service health across the analytics
+            event pipeline.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white transition bg-indigo-600 rounded-lg hover:bg-indigo-700"
-        >
-          Xuất CSV
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Source: <span className="font-medium text-slate-900">analytic-service</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Tổng người dùng"
+          title="Total users"
           value={overview.totalUsers}
           delta={overview.userDelta ?? null}
+          description="Registered accounts in the selected range."
+          icon={<Users className="h-5 w-5" />}
+          tone="violet"
         />
         <StatCard
-          title="Tổng lượt đăng nhập"
+          title="Login events"
           value={overview.totalLogins}
           delta={overview.loginDelta ?? null}
+          description="Authentication activity captured by event consumers."
+          icon={<LogIn className="h-5 w-5" />}
+          tone="info"
         />
         <StatCard
-          title="Tổng tin nhắn"
+          title="Messages"
           value={overview.totalMessages}
           delta={overview.messageDelta ?? null}
+          description="Total message throughput ingested for analytics."
+          icon={<MessageSquareText className="h-5 w-5" />}
+          tone="success"
         />
         <StatCard
-          title="Tổng bài viết"
+          title="Posts"
           value={overview.totalPosts}
           delta={overview.postDelta ?? null}
+          description="Social content creation volume in the selected range."
+          icon={<FileText className="h-5 w-5" />}
+          tone="neutral"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <StatCard title="DAU (Hoạt động/ngày)" value={overview.dau} />
-        <StatCard title="MAU (Hoạt động/tháng)" value={overview.mau} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Đăng ký trong khoảng này"
+          title="Daily active users"
+          value={overview.dau}
+          description="Distinct users active per day."
+          icon={<Activity className="h-5 w-5" />}
+          tone="info"
+        />
+        <StatCard
+          title="Monthly active users"
+          value={overview.mau}
+          description="Distinct users active per month."
+          icon={<Database className="h-5 w-5" />}
+          tone="neutral"
+        />
+        <StatCard
+          title="Registrations in range"
           value={totalRegistrationsInRange}
+          description="New accounts aggregated from registration events."
         />
         <StatCard
-          title="Đăng nhập trong khoảng này"
+          title="Logins in range"
           value={totalLoginEventsInRange}
+          description="Authentication events inside the selected period."
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <StatCard title="TB Đăng ký/ngày" value={avgDailyRegistrations} />
-        <StatCard title="TB Đăng nhập/ngày" value={avgDailyLogins} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Avg registrations / day"
+          value={avgDailyRegistrations}
+          description="Average daily signups in this period."
+        />
+        <StatCard
+          title="Avg logins / day"
+          value={avgDailyLogins}
+          description="Average daily authentication load."
+        />
         {peakRegistrationDay && (
-          <div className="p-4 bg-white border shadow-sm rounded-xl border-slate-200">
-            <p className="text-sm text-slate-500">Ngày cao điểm đăng ký</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Peak registration day</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
               {peakRegistrationDay.registrations.toLocaleString()}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
-              {peakRegistrationDay.date}
-            </p>
+            <p className="mt-2 text-sm text-slate-400">{peakRegistrationDay.date}</p>
           </div>
         )}
         {peakLoginDay && (
-          <div className="p-4 bg-white border shadow-sm rounded-xl border-slate-200">
-            <p className="text-sm text-slate-500">Ngày cao điểm đăng nhập</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Peak login day</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
               {peakLoginDay.logins.toLocaleString()}
             </p>
-            <p className="mt-1 text-xs text-slate-400">{peakLoginDay.date}</p>
+            <p className="mt-2 text-sm text-slate-400">{peakLoginDay.date}</p>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Charts
-          title="Phân bố loại tin nhắn"
+          title="Message type distribution"
           data={messageChartData}
           variant="pie"
         />
         <Charts
-          title="Phân bố phương thức đăng nhập"
+          title="Login method distribution"
           data={loginMethodChartData}
           variant="pie"
         />
-        <div className="p-4 bg-white border shadow-sm rounded-xl border-slate-200">
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Trạng thái hệ thống
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">
+            Service posture
           </h3>
-          <ul className="space-y-2 text-sm text-slate-600">
-            <li>• API phân tích: Đang hoạt động</li>
-            <li>• Nguồn dữ liệu: analytic-service :8092</li>
-            <li>• Cập nhật: gần thời gian thực (theo sự kiện)</li>
+          <ul className="space-y-3 text-sm text-slate-600">
+            <li className="flex items-center justify-between">
+              <span>Analytics API</span>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                Online
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span>Data source</span>
+              <span className="font-medium text-slate-900">analytic-service :8092</span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span>Ingestion mode</span>
+              <span className="font-medium text-slate-900">RabbitMQ events</span>
+            </li>
           </ul>
         </div>
       </div>
 
       <Charts
-        title="Xu hướng đăng ký và đăng nhập theo ngày"
+        title="User registrations and logins by day"
         data={userTrendChartData}
         variant="area"
         series={[
           {
             key: "registrations",
-            label: "Đăng ký",
+            label: "Registrations",
             stroke: "#8b5cf6",
             fillId: "fillRegistrations",
             gradientStop: "#8b5cf6",
           },
           {
             key: "logins",
-            label: "Đăng nhập",
+            label: "Logins",
             stroke: "#06b6d4",
             fillId: "fillLogins",
             gradientStop: "#06b6d4",

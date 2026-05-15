@@ -22,8 +22,8 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-12 h-12 border-b-2 border-blue-600 rounded-full animate-spin"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -31,10 +31,6 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-/**
- * Application route configuration
- * Centralized route definitions for better maintainability
- */
 export const routes: RouteObject[] = [
   {
     path: "/chat",
@@ -126,9 +122,6 @@ export const routes: RouteObject[] = [
   },
 ];
 
-/**
- * Route paths constants for type-safe navigation
- */
 export const ROUTE_PATHS = {
   CHAT: "/chat",
   CONTACTS: "/contacts",

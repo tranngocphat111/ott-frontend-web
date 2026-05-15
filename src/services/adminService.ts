@@ -4,8 +4,9 @@ import type {
   DailyUserTrendPoint,
   LoginMethodCount,
   MessageTypesResponse,
-  PaginatedAuditLogsResponse,
+  ModerationDashboardResponse,
   OverviewResponse,
+  PaginatedAuditLogsResponse,
   PaginatedRecentUsersResponse,
   TimeRange,
   UserSummary,
@@ -24,11 +25,12 @@ class AdminApiError extends Error {
   }
 }
 
+function normalizeBaseUrl(baseUrl: string) {
+  return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+}
+
 function buildUrl(path: string, timeRange?: TimeRange) {
-  const baseUrl = ADMIN_ANALYTIC_BASE_URL.endsWith("/")
-    ? ADMIN_ANALYTIC_BASE_URL.slice(0, -1)
-    : ADMIN_ANALYTIC_BASE_URL;
-  const url = new URL(`${baseUrl}${path}`);
+  const url = new URL(`${normalizeBaseUrl(ADMIN_ANALYTIC_BASE_URL)}${path}`);
 
   if (timeRange) {
     url.searchParams.set("timeRange", timeRange);
@@ -41,10 +43,7 @@ function buildUrlWithParams(
   path: string,
   params?: Record<string, string | number | undefined>,
 ) {
-  const baseUrl = ADMIN_ANALYTIC_BASE_URL.endsWith("/")
-    ? ADMIN_ANALYTIC_BASE_URL.slice(0, -1)
-    : ADMIN_ANALYTIC_BASE_URL;
-  const url = new URL(`${baseUrl}${path}`);
+  const url = new URL(`${normalizeBaseUrl(ADMIN_ANALYTIC_BASE_URL)}${path}`);
 
   Object.entries(params ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && String(value).length > 0) {
@@ -56,10 +55,14 @@ function buildUrlWithParams(
 }
 
 async function getJson<T>(url: string): Promise<T> {
+  const token = localStorage.getItem("accessToken");
+
   const response = await fetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 
@@ -149,5 +152,10 @@ export const adminService = {
         page: params?.page ?? 0,
         size: params?.size ?? 10,
       }),
+    ),
+
+  getModerationDashboard: () =>
+    getJson<ModerationDashboardResponse>(
+      buildUrl("/api/v1/analytics/moderation/dashboard"),
     ),
 };

@@ -62,11 +62,14 @@ export interface DailyUserTrendPoint {
 }
 
 export interface AuditLog {
-  id: number;
+  id: string;
+  eventId: string;
   adminId: string;
   actionType: string;
-  targetId: string | null;
-  timestamp: string;
+  targetUserId: string | null;
+  reason: string | null;
+  durationMinutes: number | null;
+  createdAt: string;
 }
 
 export interface PaginatedAuditLogsResponse {
@@ -75,6 +78,11 @@ export interface PaginatedAuditLogsResponse {
   page: number;
   size: number;
   totalPages: number;
+}
+
+export interface ModerationDashboardResponse {
+  totalBannedUsers: number;
+  recentLogs: AuditLog[];
 }
 
 export interface AdminNavItem {

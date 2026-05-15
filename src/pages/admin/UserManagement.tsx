@@ -78,8 +78,8 @@ const UserManagement: React.FC = () => {
             size: response.size,
           });
         } catch (err) {
-          console.error("Không thể tải danh sách người dùng gần đây", err);
-          setError("Không thể tải danh sách người dùng. Vui lòng thử lại.");
+          console.error("Failed to load recent users", err);
+          setError("The recent users dataset could not be loaded.");
         } finally {
           setLoading(false);
         }
@@ -91,11 +91,13 @@ const UserManagement: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [timeRange, query, page, retryNonce]);
 
-  const emptyMessage = useMemo(() => {
-    return query.trim()
-      ? "Không tìm thấy người dùng phù hợp với từ khóa."
-      : "Không có người dùng gần đây trong khoảng thời gian này.";
-  }, [query]);
+  const emptyMessage = useMemo(
+    () =>
+      query.trim()
+        ? "No users matched the current search query."
+        : "No recent users were returned for the selected time range.",
+    [query],
+  );
 
   const goPrev = () => setPage((current) => Math.max(0, current - 1));
   const goNext = () =>
@@ -117,7 +119,7 @@ const UserManagement: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Danh sách người dùng không sẵn sàng"
+        title="Recent users view is unavailable"
         description={error}
         onRetry={() => setRetryNonce((current) => current + 1)}
       />
@@ -126,8 +128,8 @@ const UserManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center bg-white border shadow-sm min-h-80 rounded-xl border-slate-200 text-slate-500">
-        Đang tải danh sách người dùng...
+      <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
+        Loading recent users...
       </div>
     );
   }
@@ -139,36 +141,39 @@ const UserManagement: React.FC = () => {
       transition={{ duration: 0.25 }}
       className="space-y-4"
     >
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">
-            Quản lý người dùng
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            Users
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            Recent User Intake
           </h2>
-          <p className="text-sm text-slate-500">
-            {pagination.totalElements} kết quả • Trang {pagination.page + 1}/
+          <p className="mt-2 text-sm text-slate-500">
+            {pagination.totalElements} records - page {pagination.page + 1} of{" "}
             {Math.max(pagination.totalPages, 1)}
           </p>
         </div>
 
         <div className="flex w-full flex-col gap-3 md:flex-1 md:flex-row md:items-end md:justify-end">
           <label className="flex flex-1 flex-col gap-1 md:max-w-md">
-            <span className="text-sm font-medium text-slate-600">Tìm kiếm</span>
+            <span className="text-sm font-medium text-slate-600">Search</span>
             <input
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setPage(0);
               }}
-              placeholder="Tìm theo userId, email, hoặc họ tên"
+              placeholder="Search by user ID, email, or full name"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
             />
           </label>
           <button
             type="button"
             onClick={handleExportCsv}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Xuất CSV
+            Export CSV
           </button>
         </div>
       </div>
@@ -180,9 +185,13 @@ const UserManagement: React.FC = () => {
       ) : (
         <AdminTable
           columns={[
-            { key: "userId", label: "Mã người dùng" },
+            {
+              key: "userId",
+              label: "User ID",
+              className: "whitespace-nowrap font-medium text-slate-900",
+            },
             { key: "email", label: "Email" },
-            { key: "fullName", label: "Họ và tên" },
+            { key: "fullName", label: "Full Name" },
           ]}
           rows={users}
         />
@@ -195,11 +204,11 @@ const UserManagement: React.FC = () => {
           disabled={page <= 0}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trang trước
+          Previous
         </button>
 
         <span className="text-sm text-slate-500">
-          Hiển thị {users.length} / {pagination.totalElements} bản ghi
+          Showing {users.length} of {pagination.totalElements} records
         </span>
 
         <button
@@ -210,7 +219,7 @@ const UserManagement: React.FC = () => {
           }
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trang sau
+          Next
         </button>
       </div>
     </motion.section>
