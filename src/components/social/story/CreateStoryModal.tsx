@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronDown,
+  Film,
   Image as ImageIcon,
   Music2,
   RotateCw,
@@ -94,7 +95,7 @@ const CreateStoryModal: React.FC<Props> = ({
   const canShare = useMemo(() => {
     if (submitting || !currentUserId) return false;
     if (step === "text") return textContent.trim().length > 0;
-    if (step === "image") return Boolean(uploadedImageKey) && !uploadingImage;
+    if (step === "image") return (items.length > 0 || Boolean(uploadedImageKey)) && !uploadingImage;
     return false;
   }, [
     submitting,
@@ -103,6 +104,7 @@ const CreateStoryModal: React.FC<Props> = ({
     textContent,
     uploadedImageKey,
     uploadingImage,
+    items,
   ]);
 
   const resetState = () => {
@@ -181,6 +183,15 @@ const CreateStoryModal: React.FC<Props> = ({
     if (selectedItemId === id) setSelectedItemId(null);
   };
 
+  const handleUpdateItemZIndex = (id: string, delta: number) => {
+    setItems(prev => {
+      const item = prev.find(it => it.id === id);
+      if (!item) return prev;
+      const newZIndex = Math.max(1, item.zIndex + delta);
+      return prev.map(it => it.id === id ? { ...it, zIndex: newZIndex } : it);
+    });
+  };
+
   const handlePickImage = async (file?: File) => {
     if (!file) return;
 
@@ -192,24 +203,48 @@ const CreateStoryModal: React.FC<Props> = ({
     setUploadingImage(true);
     setUploadedImageKey("");
 
+    const finalizeItem = (w: number, h: number) => {
+      const newItem: StoryContentItem = {
+        id: Math.random().toString(36).substring(2, 9),
+        type: nextType === "video" ? "VIDEO" : "IMAGE",
+        url: blobUrl,
+        positionX: 0.5,
+        positionY: 0.5,
+        width: w,
+        height: h,
+        scale: 1,
+        rotation: 0,
+        zIndex: items.length + 1,
+        file: file,
+      };
+      setItems(prev => [...prev, newItem]);
+      setSelectedItemId(newItem.id || null);
+    };
+
     if (nextType === "image") {
       const img = new Image();
       img.onload = () => {
-        setImageWidth(img.naturalWidth || 1080);
-        setImageHeight(img.naturalHeight || 1920);
+        const w = img.naturalWidth || 1080;
+        const h = img.naturalHeight || 1920;
+        setImageWidth(w);
+        setImageHeight(h);
+        finalizeItem(w, h);
       };
       img.src = localUrl;
     } else {
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => {
-        setImageWidth(video.videoWidth || 720);
-        setImageHeight(video.videoHeight || 1280);
+        const w = video.videoWidth || 720;
+        const h = video.videoHeight || 1280;
+        setImageWidth(w);
+        setImageHeight(h);
         setVideoDuration(
           Number.isFinite(video.duration) ?
             Math.round(video.duration * 1000)
           : 15000,
         );
+        finalizeItem(w, h);
       };
       video.src = localUrl;
     }
@@ -218,20 +253,6 @@ const CreateStoryModal: React.FC<Props> = ({
     setSelectedFile(file);
     const blobUrl = localUrl;
     setUploadedImageKey(blobUrl);
-
-    // Create a new item for the image/video
-    const newItem: StoryContentItem = {
-      id: Math.random().toString(36).substring(2, 9),
-      type: nextType === "video" ? "VIDEO" : "IMAGE",
-      url: blobUrl,
-      positionX: 0.5,
-      positionY: 0.5,
-      scale: 1,
-      rotation: 0,
-      zIndex: items.length + 1,
-    };
-    setItems([...items, newItem]);
-    setSelectedItemId(newItem.id || null);
   };
 
   useEffect(() => {
@@ -240,14 +261,35 @@ const CreateStoryModal: React.FC<Props> = ({
         setItems(editingStory.items);
         setStep("image"); // Default to canvas view if multiple items exist
       } else if (editingStory.contentType === "TEXT") {
-        setStep("text");
-        setTextContent(editingStory.textContent || "");
+        setStep("image");
+        setItems([{
+          id: 'legacy-text-' + Math.random().toString(36).substring(2, 5),
+          type: 'TEXT',
+          textContent: editingStory.textContent,
+          textBackgroundColor: editingStory.textBackgroundColor,
+          positionX: 0.5,
+          positionY: 0.5,
+          scale: 1,
+          rotation: 0,
+          zIndex: 1
+        }]);
       } else if (editingStory.contentType === "IMAGE" || editingStory.contentType === "VIDEO") {
         setStep("image");
+        setItems([{
+          id: 'legacy-media-' + Math.random().toString(36).substring(2, 5),
+          type: editingStory.contentType,
+          url: editingStory.imageUrl || editingStory.videoUrl,
+          positionX: 0.5,
+          positionY: 0.5,
+          scale: 1,
+          rotation: 0,
+          zIndex: 1
+        }]);
         setImagePreviewUrl(editingStory.imageUrl || editingStory.videoUrl || "");
         setUploadedImageKey(editingStory.imageUrl || editingStory.videoUrl || "");
         setMediaType(editingStory.contentType === "VIDEO" ? "video" : "image");
       }
+      if (editingStory.visibility) setVisibility(editingStory.visibility);
     }
   }, [editingStory, isOpen]);
 
@@ -266,11 +308,25 @@ const CreateStoryModal: React.FC<Props> = ({
     setError(null);
 
     try {
-      const finalStoryItems = items.length > 0 ? 
-        items.map(item => ({
+      // 1. Upload all new media first
+      const processedItems = await Promise.all(items.map(async (item) => {
+        if (item.file && (item.type === "IMAGE" || item.type === "VIDEO")) {
+          // If it's a local blob URL, it needs to be uploaded
+          if (item.url?.startsWith("blob:")) {
+            const uploadRes = await uploadStoryMedia(item.file);
+            if (uploadRes) {
+              return { ...item, url: uploadRes.fileKey };
+            }
+          }
+        }
+        return item;
+      }));
+
+      const finalStoryItems = processedItems.length > 0 ? 
+        processedItems.map(item => ({
           type: item.type === "IMAGE" ? "IMAGE_ITEM" : item.type === "VIDEO" ? "VIDEO_ITEM" : "TEXT_ITEM",
-          imageItem: item.type === "IMAGE" ? { ...BASE_STORY_ITEM, url: item.url } : null,
-          videoItem: item.type === "VIDEO" ? { ...BASE_STORY_ITEM, url: item.url } : null,
+          imageItem: item.type === "IMAGE" ? { ...BASE_STORY_ITEM, url: item.url, width: item.width, height: item.height } : null,
+          videoItem: item.type === "VIDEO" ? { ...BASE_STORY_ITEM, url: item.url, width: item.width, height: item.height } : null,
           textItem: item.type === "TEXT" ? { 
             ...BASE_STORY_ITEM, 
             content: item.textContent, 
@@ -282,6 +338,7 @@ const CreateStoryModal: React.FC<Props> = ({
           positionY: item.positionY,
           scale: item.scale,
           rotation: item.rotation,
+          id: item.id,
         }))
         : (step === "text" ?
           [
@@ -479,31 +536,32 @@ const CreateStoryModal: React.FC<Props> = ({
           }}
         >
           {item.type === "IMAGE" && item.url && (
-            <img src={item.url} alt="" className="w-full h-full object-contain pointer-events-none" />
+            <div className="w-full h-full flex items-center justify-center">
+               <img src={item.url} alt="" className="max-w-full max-h-full object-contain pointer-events-none shadow-sm" />
+            </div>
           )}
           {item.type === "VIDEO" && item.url && (
-            <video src={item.url} className="w-full h-full object-contain pointer-events-none" autoPlay muted loop />
+            <div className="w-full h-full flex items-center justify-center">
+               <video src={item.url} className="max-w-full max-h-full object-contain pointer-events-none shadow-sm" autoPlay muted loop />
+            </div>
           )}
           {item.type === "TEXT" && item.textContent && (
             <div
-              className="px-4 py-2 rounded-lg"
-              style={{ backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.5)" }}
+              className="px-4 py-2 rounded-xl shadow-md"
+              style={{ backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
             >
-              <p className="text-white text-lg font-semibold leading-tight whitespace-pre-wrap break-words">
+              <p className="text-white text-lg font-bold leading-tight whitespace-pre-wrap break-words text-center">
                 {item.textContent}
               </p>
             </div>
           )}
           {selectedItemId === item.id && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveItem(item.id!);
-              }}
-              className="absolute -top-3 -right-3 size-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg"
-            >
-              <X className="size-3" />
-            </button>
+            <div className="absolute -inset-2 border-2 border-blue-500 rounded-lg pointer-events-none">
+              <div className="absolute -top-3 -right-3 size-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg cursor-pointer pointer-events-auto"
+                   onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id!); }}>
+                <X className="size-3" />
+              </div>
+            </div>
           )}
         </div>
       ))}
@@ -555,9 +613,29 @@ const CreateStoryModal: React.FC<Props> = ({
                 className="size-12 rounded-2xl object-cover"
               />
               <div>
-                <div className="text-sm text-slate-500">Đăng với</div>
-                <div className="text-lg font-semibold text-slate-900">
+                <div className="text-xs text-slate-500 font-medium">Đăng với tư cách</div>
+                <div className="text-base font-bold text-slate-900 leading-tight">
                   {currentUserName}
+                </div>
+                <div className="flex gap-1.5 mt-2">
+                  {[
+                    { val: "PUBLIC", label: "Công khai", icon: RotateCw }, // Using RotateCw as a globe placeholder if Globe isn't imported, but let's check imports
+                    { val: "FRIENDS", label: "Bạn bè", icon: Smile },
+                    { val: "PRIVATE", label: "Riêng tư", icon: X },
+                  ].map((v) => (
+                    <button
+                      key={v.val}
+                      onClick={() => setVisibility(v.val)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${
+                        visibility === v.val 
+                          ? "bg-slate-900 text-white shadow-sm scale-105" 
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {v.val === "PUBLIC" ? "🌍" : v.val === "FRIENDS" ? "👥" : "🔒"}
+                      {v.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -626,63 +704,152 @@ const CreateStoryModal: React.FC<Props> = ({
             )}
 
             {step === "image" && (
-              <div className="space-y-4">
-                <button
-                  type="button"
-                  className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 flex items-center gap-3 text-sm font-semibold text-slate-700 hover:border-slate-300 transition"
-                  onClick={() => {
-                    const next = overlayText ? "" : "Nhập text lên ảnh";
-                    setOverlayText(next);
-                  }}>
-                  <Type className="size-5" />
-                  Thêm text
-                </button>
+              <div className="space-y-6">
+                {selectedItemId && items.find(it => it.id === selectedItemId) && (() => {
+                  const item = items.find(it => it.id === selectedItemId)!;
+                  return (
+                    <div className="p-4 border border-blue-200 bg-blue-50/50 rounded-2xl space-y-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Chỉnh sửa {item.type === 'TEXT' ? 'Văn bản' : 'Phương tiện'}</h3>
+                        <button onClick={() => setSelectedItemId(null)} className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline decoration-blue-200">Bỏ chọn</button>
+                      </div>
 
-                {overlayText.length > 0 && (
-                  <input
-                    value={overlayText}
-                    onChange={(e) => setOverlayText(e.target.value)}
-                    placeholder="Nội dung text"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                  />
-                )}
+                      {item.type === 'TEXT' && (
+                        <div className="space-y-2">
+                          <label className="text-xs text-slate-500 font-bold uppercase">Nội dung</label>
+                          <textarea
+                            value={item.textContent || ""}
+                            onChange={(e) => {
+                              setItems(items.map(it => it.id === selectedItemId ? { ...it, textContent: e.target.value } : it));
+                            }}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 outline-none transition-shadow"
+                            placeholder="Nhập nội dung văn bản..."
+                            rows={3}
+                          />
+                        </div>
+                      )}
 
-                <button
-                  type="button"
-                  className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 flex items-center gap-3 text-sm font-semibold text-slate-700 hover:border-slate-300 transition">
-                  <Music2 className="size-5" />
-                  Thêm nhạc
-                </button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-slate-500 font-bold uppercase">Kích thước</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0.1}
+                              max={3}
+                              step={0.1}
+                              value={item.scale}
+                              onChange={(e) => handleItemTransform(selectedItemId!, Number(e.target.value) - item.scale, 0)}
+                              className="flex-1 accent-blue-600"
+                            />
+                            <span className="text-[10px] font-mono font-bold w-6 text-slate-600">{item.scale.toFixed(1)}x</span>
+                          </div>
+                        </div>
 
-                <div className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                  <ImageIcon className="size-5" />
-                  Alternative text
+                        <div className="space-y-2">
+                          <label className="text-xs text-slate-500 font-bold uppercase">Xoay</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0}
+                              max={360}
+                              step={5}
+                              value={item.rotation}
+                              onChange={(e) => handleItemTransform(selectedItemId!, 0, Number(e.target.value) - item.rotation)}
+                              className="flex-1 accent-blue-600"
+                            />
+                            <span className="text-[10px] font-mono font-bold w-8 text-slate-600">{item.rotation}°</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleUpdateItemZIndex(selectedItemId!, 1)}
+                          className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          Lên trên
+                        </button>
+                        <button
+                          onClick={() => handleUpdateItemZIndex(selectedItemId!, -1)}
+                          className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          Xuống dưới
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleRemoveItem(selectedItemId!)}
+                        className="w-full py-2 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition border border-red-100"
+                      >
+                        Xóa item này
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Thêm mới</p>
+                    {items.length > 0 && <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{items.length} items</span>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      className="rounded-2xl bg-white border border-slate-200 p-3 flex flex-col items-center gap-1 hover:border-blue-300 hover:shadow-md transition group"
+                      onClick={() => {
+                        const text = prompt("Nhập nội dung text:");
+                        if (text) handleAddItem("TEXT", text);
+                      }}>
+                      <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition">
+                        <Type className="size-5" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600">Thêm chữ</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-2xl bg-white border border-slate-200 p-3 flex flex-col items-center gap-1 hover:border-emerald-300 hover:shadow-md transition group">
+                      <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
+                        <ImageIcon className="size-5" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600">{uploadingImage ? "Đang tải..." : "Thêm ảnh/video"}</span>
+                    </button>
+                  </div>
                 </div>
 
-                <input
-                  value={alternativeText}
-                  onChange={(e) => setAlternativeText(e.target.value)}
-                  placeholder="Mô tả ảnh..."
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                />
-
-                <button
-                  type="button"
-                  className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 flex items-center gap-3 text-sm font-semibold text-slate-700 hover:border-slate-300 transition"
-                  onClick={() => {
-                    const text = prompt("Nhập nội dung text:");
-                    if (text) handleAddItem("TEXT", text);
-                  }}>
-                  <Type className="size-5" />
-                  Thêm text mới
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:border-slate-300 transition">
-                  {uploadingImage ? "Đang tải file..." : "Thêm ảnh/video mới"}
-                </button>
+                {items.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Danh sách items</p>
+                    <div className="max-h-[200px] overflow-auto space-y-1 pr-1 custom-scrollbar">
+                      {[...items].reverse().map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedItemId(item.id!)}
+                          className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition ${selectedItemId === item.id ? "bg-blue-600 text-white shadow-md" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
+                        >
+                          <div className={`size-8 rounded-lg flex items-center justify-center ${selectedItemId === item.id ? "bg-white/20" : "bg-white border border-slate-200"}`}>
+                            {item.type === 'TEXT' ? <Type className="size-4" /> : item.type === 'VIDEO' ? <Film className="size-4" /> : <ImageIcon className="size-4" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold truncate">
+                              {item.type === 'TEXT' ? (item.textContent || "Văn bản") : item.type === 'VIDEO' ? "Video" : "Ảnh"}
+                            </p>
+                            <p className={`text-[9px] ${selectedItemId === item.id ? "text-white/70" : "text-slate-400"}`}>Lớp {item.zIndex}</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id!); }}
+                            className={`p-1 rounded-md transition ${selectedItemId === item.id ? "hover:bg-white/20 text-white" : "hover:bg-red-50 text-slate-400 hover:text-red-500"}`}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

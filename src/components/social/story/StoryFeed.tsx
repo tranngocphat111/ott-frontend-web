@@ -13,6 +13,7 @@ import {
   deleteStory,
   viewStory,
   fetchStoryViewers,
+  mapStory,
 } from "../../../services/story.service";
 import CreateStoryModal from "./CreateStoryModal";
 import StoryViewer from "./StoryViewer";
@@ -216,6 +217,45 @@ export const StoryFeed: React.FC<Props> = ({
     },
     [closeViewer, selectedUserStories],
   );
+  
+  const handleStoryCreated = useCallback((apiStory: any) => {
+    if (!apiStory) return;
+    const newStory = mapStory(apiStory);
+    
+    setStoryGroups((prev) => {
+      const userGroupIndex = prev.findIndex((g) => g.userId === currentUserId);
+      if (userGroupIndex !== -1) {
+        const newGroups = [...prev];
+        const group = newGroups[userGroupIndex];
+        const storyIndex = group.stories.findIndex((s) => s.id === newStory.id);
+        
+        if (storyIndex !== -1) {
+          const newStories = [...group.stories];
+          newStories[storyIndex] = newStory;
+          newGroups[userGroupIndex] = { ...group, stories: newStories };
+        } else {
+          newGroups[userGroupIndex] = {
+            ...group,
+            stories: [newStory, ...group.stories],
+          };
+        }
+        return newGroups;
+      } else {
+        return [
+          {
+            userId: currentUserId,
+            name: currentUserName,
+            avatarUrl: currentUserAvatar,
+            stories: [newStory],
+          },
+          ...prev,
+        ];
+      }
+    });
+    
+    // Refresh background data
+    loadStories();
+  }, [currentUserId, currentUserName, currentUserAvatar, loadStories]);
 
   useEffect(() => {
     if (!isViewerOpen || !activeStory) return;
@@ -347,7 +387,7 @@ export const StoryFeed: React.FC<Props> = ({
         currentUserId={currentUserId}
         currentUserName={currentUserName}
         currentUserAvatar={currentUserAvatar}
-        onCreated={loadStories}
+        onCreated={handleStoryCreated}
         editingStory={editingStory}
       />
 

@@ -17,6 +17,7 @@ export interface ApiStory {
     totalViews?: number;
     musics?: any[];
     expireAt?: string;
+    visibility?: string;
 }
 
 export interface ApiSuggestedUser {
@@ -49,6 +50,7 @@ export interface ApiStoryReelItem {
 }
 
 export interface ApiStoryItemResponse {
+    id?: string;
     type: "TEXT_ITEM" | "IMAGE_ITEM" | "VIDEO_ITEM";
     imageItem?: {
         url?: string | null;
@@ -117,31 +119,38 @@ function unwrapList<T>(json: unknown): T[] {
         .filter((item) => item !== null) as T[];
 }
 
+export function mapStory(story: ApiStory): StoryItem {
+    const userId = story.accountId;
+    const name = story.accountDisplayName ?? story.accountUsername;
+    return {
+        id: story.id,
+        name,
+        isBirthday: false,
+        userId,
+        avatarUrl: story.accountAvatarUrl ?? undefined,
+        items: (story.storyItems || []).map((item: ApiStoryItemResponse) => ({
+            id: item.id || Math.random().toString(36).substring(2, 9),
+            type: item.type === "TEXT_ITEM" ? "TEXT" : item.type === "IMAGE_ITEM" ? "IMAGE" : "VIDEO",
+            url: item.imageItem?.url || item.videoItem?.url || undefined,
+            textContent: item.textItem?.content || undefined,
+            textBackgroundColor: item.textBackgroundColor || item.textItem?.backgroundColor || undefined,
+            positionX: item.positionX ?? 0.5,
+            positionY: item.positionY ?? 0.5,
+            scale: item.scale ?? 1,
+            rotation: item.rotation ?? 0,
+            zIndex: item.zIndex ?? 1
+        })),
+        expireAt: story.expireAt,
+        visibility: story.visibility
+    };
+}
+
 function groupStories(raw: ApiStory[]): StoryUserGroup[] {
     const groups = new Map<string, StoryUserGroup>();
 
     for (const story of raw) {
-        const userId = story.accountId;
-        const name = story.accountDisplayName ?? story.accountUsername;
-        const item: StoryItem = {
-            id: story.id,
-            name,
-            isBirthday: false,
-            userId,
-            avatarUrl: story.accountAvatarUrl ?? undefined,
-            items: (story.storyItems || []).map((item: ApiStoryItemResponse) => ({
-                type: item.type === "TEXT_ITEM" ? "TEXT" : item.type === "IMAGE_ITEM" ? "IMAGE" : "VIDEO",
-                url: item.imageItem?.url || item.videoItem?.url || undefined,
-                textContent: item.textItem?.content || undefined,
-                textBackgroundColor: item.textItem?.backgroundColor || undefined,
-                positionX: item.positionX ?? 0.5,
-                positionY: item.positionY ?? 0.5,
-                scale: item.scale ?? 1,
-                rotation: item.rotation ?? 0,
-                zIndex: item.zIndex ?? 1
-            })),
-            expireAt: story.expireAt
-        };
+        const item = mapStory(story);
+        const userId = item.userId;
 
         const existing = groups.get(userId);
         if (existing) {
@@ -208,10 +217,11 @@ function mapStoryGroups(raw: ApiStoryGroup[]): StoryUserGroup[] {
                 imageUrl,
                 videoUrl,
                 items: (story.storyItems || []).map((item: ApiStoryItemResponse) => ({
+                    id: item.id || Math.random().toString(36).substring(2, 9),
                     type: item.type === "TEXT_ITEM" ? "TEXT" : item.type === "IMAGE_ITEM" ? "IMAGE" : "VIDEO",
                     url: item.imageItem?.url || item.videoItem?.url || undefined,
                     textContent: item.textItem?.content || undefined,
-                    textBackgroundColor: item.textItem?.backgroundColor || undefined,
+                    textBackgroundColor: item.textBackgroundColor || item.textItem?.backgroundColor || undefined,
                     positionX: item.positionX ?? 0.5,
                     positionY: item.positionY ?? 0.5,
                     scale: item.scale ?? 1,

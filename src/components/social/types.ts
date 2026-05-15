@@ -39,9 +39,12 @@ export interface StoryContentItem {
     textBackgroundColor?: string;
     positionX: number;
     positionY: number;
+    width?: number;
+    height?: number;
     scale: number;
     rotation: number;
     zIndex: number;
+    file?: File;
 }
 
 export interface StoryItem {
@@ -59,6 +62,7 @@ export interface StoryItem {
     musics?: any[];
     items?: StoryContentItem[];
     expireAt?: string;
+    visibility?: string;
 }
 
 export interface StoryUserGroup {
