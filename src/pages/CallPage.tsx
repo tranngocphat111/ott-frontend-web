@@ -149,7 +149,8 @@ const CallPage: React.FC = () => {
 
   const conversationId = searchParams.get("conversationId") || "";
   const urlCallId = searchParams.get("callId") || "";
-  const callType = normalizeCallType(searchParams.get("type"));
+  const isGroupUrl = searchParams.get("isGroup") === "true";
+  const callType = isGroupUrl ? "video" : normalizeCallType(searchParams.get("type"));
   const action = searchParams.get("action") || "start";
   const conversationName = searchParams.get("name") || "Cuoc goi";
   const remoteDisplayName = String(conversationName || "Cuoc goi").trim();
@@ -260,8 +261,6 @@ const CallPage: React.FC = () => {
 
     startedRef.current = true;
 
-    const isGroupUrl = searchParams.get("isGroup") === "true";
-
     if (action === "join") {
       joinExistingCall(callType, isGroupUrl, urlCallId).catch((error) => {
         console.error("Khong the tham gia cuoc goi:", error);
@@ -279,6 +278,7 @@ const CallPage: React.FC = () => {
     action,
     callType,
     conversationId,
+    isGroupUrl,
     joinExistingCall,
     normalizedUserId,
     startCall,
@@ -332,7 +332,7 @@ const CallPage: React.FC = () => {
         return;
       }
 
-      const isGroupFromUrl = searchParams.get("isGroup") === "true";
+      const isGroupFromUrl = isGroupUrl;
       const actualIsGroup = isGroup || isGroupFromUrl;
 
       console.log(`[CALL] Received decline from ${payload.userId}. isGroup(state): ${isGroup}, isGroup(url): ${isGroupFromUrl}`);
@@ -372,7 +372,7 @@ const CallPage: React.FC = () => {
       socketService.offCallDeclined(onDeclined);
       socketService.offCallEnded(onCallEnded);
     };
-  }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, urlCallId]);
+  }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, isGroupUrl, urlCallId]);
 
   const handleExit = async () => {
     await endCall();

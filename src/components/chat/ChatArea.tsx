@@ -230,7 +230,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   });
 
   const [isGroupCallModalOpen, setIsGroupCallModalOpen] = useState(false);
-  const [initialCallTypeForGroup, setInitialCallTypeForGroup] = useState<"voice" | "video">("voice");
 
   const [relationshipStatus, setRelationshipStatus] = useState<any>(null);
   const [isRelationshipLoading, setIsRelationshipLoading] = useState(false);
@@ -1256,13 +1255,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     }, 250);
   };
 
-  const handleGroupCallStart = (selectedUserIds: string[], callType: "voice" | "video") => {
+  const handleGroupCallStart = (selectedUserIds: string[]) => {
     setIsGroupCallModalOpen(false);
 
     const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
     const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
 
-    doOpenCallWindow(callType, "start", displayName, displayAvatar, selectedUserIds);
+    doOpenCallWindow("video", "start", displayName, displayAvatar, selectedUserIds);
   };
 
   const openCallWindow = (
@@ -1288,7 +1287,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
     // Nếu là bắt đầu gọi nhóm -> hiện modal chọn thành viên trước
     if (action === "start" && activeConversation.type === "group") {
-      setInitialCallTypeForGroup(type);
       setIsGroupCallModalOpen(true);
       return;
     }
@@ -3621,8 +3619,7 @@ setForwardingMessage(null);
           isOpen={isGroupCallModalOpen}
           onClose={() => setIsGroupCallModalOpen(false)}
           onStart={handleGroupCallStart}
-           conversationId={activeConversation._id}
-          initialCallType={initialCallTypeForGroup}
+          conversationId={activeConversation._id}
           currentUserId={normalizedUserId}
         />
       )}

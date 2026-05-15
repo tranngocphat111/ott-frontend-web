@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -15,7 +15,7 @@ import { Track } from "livekit-client";
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff,
   MonitorUp, Settings, Share2,
-  UserPlus, X, Search, Check
+  UserPlus, X, Search, Check, PanelRightClose, PanelRightOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ParticipantService, socketService } from "../../services";
@@ -129,7 +129,7 @@ const GroupCallContent = ({
       {/* Main Video Grid */}
       <div className="flex-1 p-6 md:p-10 overflow-hidden flex items-center justify-center">
         {participantCount > 0 ? (
-          <ConferenceGrid />
+          <ConferenceStage />
         ) : (
           <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-500">
             <div className="w-12 h-12 border-3 border-primary-700 border-t-primary-300 rounded-full animate-spin" />
@@ -222,8 +222,10 @@ const CallHeader = ({ name, avatar }: { name: string; avatar: string }) => {
   );
 };
 
-const ConferenceGrid = () => {
-  // We want to see all cameras. If someone is sharing screen, we show it too.
+const getTrackKey = (trackRef: TrackReferenceOrPlaceholder) =>
+  `${trackRef.participant.sid}-${trackRef.source}`;
+
+const ConferenceStage = () => {
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -231,46 +233,123 @@ const ConferenceGrid = () => {
     ],
     { onlySubscribed: false }
   );
+  const [focusedTrackKey, setFocusedTrackKey] = useState<string | null>(null);
+  const [isFilmstripVisible, setIsFilmstripVisible] = useState(true);
+
+  const mainTrack = useMemo(() => {
+    if (focusedTrackKey) {
+      const focusedTrack = tracks.find((trackRef) => getTrackKey(trackRef) === focusedTrackKey);
+      if (focusedTrack) return focusedTrack;
+    }
+
+    return (
+      tracks.find((trackRef) => trackRef.source === Track.Source.ScreenShare) ||
+      tracks.find((trackRef) => !trackRef.participant.isLocal && trackRef.source === Track.Source.Camera) ||
+      tracks[0]
+    );
+  }, [focusedTrackKey, tracks]);
+
+  if (!mainTrack) {
+    return (
+      <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-500">
+        <div className="w-12 h-12 border-3 border-primary-700 border-t-primary-300 rounded-full animate-spin" />
+        <p className="text-primary-300 font-medium text-sm tracking-widest uppercase">
+          Đang chờ camera...
+        </p>
+      </div>
+    );
+  }
+
+  const mainTrackKey = getTrackKey(mainTrack);
+  const sideTracks = tracks.filter((trackRef) => getTrackKey(trackRef) !== mainTrackKey);
 
   return (
-    <div className="h-full w-full relative">
-      <AnimatePresence mode="popLayout">
-        <div
-          className={`grid gap-6 h-full w-full transition-all duration-700 ${getGridLayoutClass(tracks.length)
-            }`}
+    <div className="relative h-full w-full">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={mainTrackKey}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ type: "spring", damping: 28, stiffness: 150 }}
+          className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/10 bg-primary-950/60 shadow-2xl group"
         >
-          {tracks.map((trackRef, index) => {
-            const isThirdInThree = tracks.length === 3 && index === 2;
-            return (
-              <motion.div
-                key={`${trackRef.participant.sid}-${trackRef.source}`}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ type: "spring", damping: 25, stiffness: 120 }}
-                className={`relative rounded-3xl overflow-hidden bg-primary-900/40 border border-white/5 shadow-2xl group ${isThirdInThree ? "md:col-span-2 md:w-1/2 md:justify-self-center" : ""
-                  }`}
-              >
-                <ParticipantTile
-                  trackRef={trackRef}
-                  className="h-full w-full !bg-transparent"
-                >
-                  {trackRef.publication && (
-                    <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
-                  )}
-                  <CustomParticipantUI trackRef={trackRef} />
-                </ParticipantTile>
-              </motion.div>
-            );
-          })}
-        </div>
+          <ParticipantTile
+            trackRef={mainTrack}
+            className="h-full w-full !bg-transparent"
+          >
+            {mainTrack.publication && (
+              <VideoTrack trackRef={mainTrack} className="h-full w-full object-cover" />
+            )}
+            <CustomParticipantUI trackRef={mainTrack} />
+          </ParticipantTile>
+        </motion.div>
       </AnimatePresence>
+
+      {sideTracks.length > 0 && (
+        isFilmstripVisible ? (
+          <div className="absolute bottom-3 left-3 right-3 z-30 rounded-2xl border border-white/10 bg-black/45 p-2 shadow-2xl backdrop-blur-2xl md:bottom-auto md:left-auto md:right-3 md:top-1/2 md:w-56 md:-translate-y-1/2">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
+                Camera ({tracks.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsFilmstripVisible(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                title="Ẩn danh sách camera"
+              >
+                <PanelRightClose size={16} />
+              </button>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 md:max-h-[calc(100vh-15rem)] md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0">
+              {sideTracks.map((trackRef) => {
+                const trackKey = getTrackKey(trackRef);
+                return (
+                  <button
+                    key={trackKey}
+                    type="button"
+                    onClick={() => setFocusedTrackKey(trackKey)}
+                    className="relative h-24 w-36 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-primary-900/70 text-left shadow-xl transition-all hover:border-primary-300/70 hover:ring-2 hover:ring-primary-300/30 md:w-full"
+                    title="Đưa camera này lên màn hình chính"
+                  >
+                    <ParticipantTile
+                      trackRef={trackRef}
+                      className="h-full w-full !bg-transparent"
+                    >
+                      {trackRef.publication && (
+                        <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+                      )}
+                      <CustomParticipantUI trackRef={trackRef} compact />
+                    </ParticipantTile>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsFilmstripVisible(true)}
+            className="absolute right-3 top-1/2 z-30 flex h-14 w-11 -translate-y-1/2 items-center justify-center rounded-l-2xl border border-white/10 bg-black/50 text-white/80 shadow-2xl backdrop-blur-2xl transition-all hover:bg-black/65 hover:text-white"
+            title="Hiện danh sách camera"
+          >
+            <PanelRightOpen size={20} />
+          </button>
+        )
+      )}
     </div>
   );
 };
 
-const CustomParticipantUI = ({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) => {
+const CustomParticipantUI = ({
+  trackRef,
+  compact = false,
+}: {
+  trackRef: TrackReferenceOrPlaceholder;
+  compact?: boolean;
+}) => {
   const { identity, name } = useParticipantInfo({ participant: trackRef.participant });
   const isSpeaking = trackRef.participant.isSpeaking;
 
@@ -289,32 +368,38 @@ const CustomParticipantUI = ({ trackRef }: { trackRef: TrackReferenceOrPlacehold
       </AnimatePresence>
 
       {/* Name Overlay - Styled like CallPage overlays */}
-      <div className="absolute bottom-5 left-5 z-20 flex items-center gap-2.5 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/5 transition-all group-hover:bg-black/60">
-        <div className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-[#00FF7F] animate-pulse" : "bg-emerald-500"}`} />
-        <span className="text-[13px] font-medium text-white/80 truncate max-w-[140px]">
+      <div className={`absolute z-20 flex items-center gap-2 bg-black/45 backdrop-blur-md rounded-xl border border-white/5 transition-all group-hover:bg-black/60 ${
+        compact ? "bottom-2 left-2 px-2 py-1" : "bottom-5 left-5 px-3.5 py-1.5"
+      }`}>
+        <div className={`rounded-full ${compact ? "h-1.5 w-1.5" : "h-1.5 w-1.5"} ${isSpeaking ? "bg-[#00FF7F] animate-pulse" : "bg-emerald-500"}`} />
+        <span className={`font-medium text-white/80 truncate ${compact ? "max-w-[90px] text-[11px]" : "max-w-[140px] text-[13px]"}`}>
           {name || identity}
           {trackRef.participant.isLocal && " (Bạn)"}
         </span>
       </div>
 
       {/* Connection Quality */}
+      {!compact && (
       <div className="absolute top-5 right-5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="bg-black/40 backdrop-blur-md p-2 rounded-xl border border-white/10">
           <ConnectionQualityIndicator className="!w-4 !h-4" />
         </div>
       </div>
+      )}
 
       {/* Mic Status Icon */}
       {!trackRef.participant.isMicrophoneEnabled && (
-        <div className="absolute bottom-5 right-5 z-20 bg-red-500/80 backdrop-blur-md p-2 rounded-xl border border-white/10 text-white shadow-lg">
-          <MicOff size={16} />
+        <div className={`absolute z-20 bg-red-500/80 backdrop-blur-md rounded-xl border border-white/10 text-white shadow-lg ${
+          compact ? "right-2 top-2 p-1.5" : "bottom-5 right-5 p-2"
+        }`}>
+          <MicOff size={compact ? 13 : 16} />
         </div>
       )}
 
       {/* Avatar Placeholder - Show if video is muted or not yet subscribed */}
       {(!trackRef.publication || trackRef.publication.isMuted || !trackRef.publication.isSubscribed) && (
         <div className="absolute inset-0 flex items-center justify-center bg-primary-800/60 backdrop-blur-sm z-0">
-          <div className="w-24 h-24 rounded-full bg-primary-700 flex items-center justify-center text-4xl font-bold text-white/30 border border-white/10 shadow-2xl">
+          <div className={`${compact ? "h-12 w-12 text-lg" : "h-24 w-24 text-4xl"} rounded-full bg-primary-700 flex items-center justify-center font-bold text-white/30 border border-white/10 shadow-2xl`}>
             {(name || identity || "U").charAt(0).toUpperCase()}
           </div>
         </div>
@@ -428,6 +513,14 @@ interface AddMemberCallModalProps {
   callId?: string;
 }
 
+interface CallMember {
+  user_id: string;
+  user?: {
+    name?: string;
+    avatar?: string;
+  } | null;
+}
+
 const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
   isOpen,
   onClose,
@@ -435,26 +528,22 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
   currentUserId,
   callId
 }) => {
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<CallMember[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const participants = useParticipants(); // To filter out people already in call
+  const inCallUserIds = useMemo(
+    () => participants.map((participant) => participant.identity),
+    [participants],
+  );
 
-  useEffect(() => {
-    if (isOpen) {
-      loadMembers();
-    }
-  }, [isOpen]);
-
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await ParticipantService.getConversationMembers(conversationId);
       // Filter out self AND people already in the call
-      const inCallUserIds = participants.map(p => p.identity);
-
-      const availableMembers = data.filter((m: any) =>
+      const availableMembers = data.filter((m: CallMember) =>
         m.user_id !== currentUserId && !inCallUserIds.includes(m.user_id)
       );
       setMembers(availableMembers);
@@ -463,7 +552,13 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [conversationId, currentUserId, inCallUserIds]);
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadMembers();
+    }
+  }, [isOpen, loadMembers]);
 
   const toggleSelect = (userId: string) => {
     setSelectedIds(prev =>
@@ -486,8 +581,10 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
 
   if (!isOpen) return null;
 
-  const filteredMembers = members.filter(m =>
-    m.user?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMembers = members.filter((member) =>
+    (member.user?.name || "Người dùng")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -538,7 +635,7 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
                 className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-colors group"
               >
                 <div className="relative">
-                  <Avatar src={member.user?.avatar} name={member.user?.name} size={40} />
+                  <Avatar src={member.user?.avatar} name={member.user?.name || "Người dùng"} size={40} />
                   {selectedIds.includes(member.user_id) && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#1a1a1a]">
                       <Check size={12} strokeWidth={3} />
@@ -546,7 +643,7 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{member.user?.name}</p>
+                  <p className="font-medium text-sm truncate">{member.user?.name || "Người dùng"}</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border-2 transition-all ${selectedIds.includes(member.user_id)
                   ? "bg-primary-500 border-primary-500"
@@ -579,15 +676,6 @@ const AddMemberCallModal: React.FC<AddMemberCallModalProps> = ({
       </motion.div>
     </div>
   );
-};
-
-const getGridLayoutClass = (count: number) => {
-  if (count <= 1) return "grid-cols-1 grid-rows-1";
-  if (count === 2) return "grid-cols-1 md:grid-cols-2";
-  if (count <= 4) return "grid-cols-2 grid-rows-2";
-  if (count <= 6) return "grid-cols-2 md:grid-cols-3 grid-rows-3 md:grid-rows-2";
-  if (count <= 9) return "grid-cols-3 grid-rows-3";
-  return "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
 };
 
 export default LiveKitGroupCall;
