@@ -2,6 +2,7 @@ import React from "react";
 import { Image } from "lucide-react";
 import type { Message } from "../../../../types";
 import { getFullUrl } from "../../../../utils";
+import { isMessageMediaFlagged } from "../../../../utils/mediaModeration";
 
 interface MediaGalleryProps {
   messages: Message[];
@@ -15,11 +16,6 @@ const getMediaKey = (content: unknown) => {
     return String((content as { url?: unknown }).url || "");
   }
   return "";
-};
-
-const isMediaFlagged = (message: Message, index: number) => {
-  const warnings = message.system_meta?.media_warnings || [];
-  return warnings.some((warning) => Number(warning.index || 0) === index);
 };
 
 const MediaGallery: React.FC<MediaGalleryProps> = ({
@@ -69,7 +65,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         type: type as "image" | "video",
         key,
         index,
-        isFlagged: isMediaFlagged(message, index),
+        isFlagged: isMessageMediaFlagged(message, index),
       });
     });
   });

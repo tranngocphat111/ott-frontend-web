@@ -236,6 +236,7 @@ export const ChatInput = ({
   onCancelReply,
   conversationType,
   smartReplies = [],
+  smartReplyContextKey = "",
   isSmartReplyLoading = false,
   isSmartReplyOpen = false,
   onSmartReplyToggle,
@@ -1432,9 +1433,10 @@ export const ChatInput = ({
   const canSend =
     (text.trim().length > 0 || pendingFiles.length > 0) && !isUploading;
   const smartReplySignature = smartReplies.join("\u001f");
+  const smartReplyDismissKey = smartReplyContextKey || smartReplySignature;
   const shouldShowSmartReplyCue =
     smartReplies.length > 0 &&
-    smartReplySignature !== dismissedSmartReplySignature &&
+    smartReplyDismissKey !== dismissedSmartReplySignature &&
     text.trim().length === 0 &&
     pendingFiles.length === 0 &&
     !replyToMessage &&
@@ -1471,7 +1473,7 @@ export const ChatInput = ({
   };
 
   const handleDismissSmartReplies = () => {
-    setDismissedSmartReplySignature(smartReplySignature);
+    setDismissedSmartReplySignature(smartReplyDismissKey);
     onSmartReplyClose?.();
   };
 

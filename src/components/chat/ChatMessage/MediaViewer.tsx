@@ -14,6 +14,7 @@ import type { Message } from "../../../types";
 import { getFullUrl } from "../../../utils";
 import { MessageService } from "../../../services";
 import { downloadChatMedia } from "./downloadMedia";
+import { isMessageMediaFlagged } from "../../../utils/mediaModeration";
 
 interface MediaItem {
   messageId: string;
@@ -39,11 +40,6 @@ const resolveContentKey = (item: unknown): string => {
     return String((item as { url?: string }).url || "");
   }
   return "";
-};
-
-const isMessageMediaFlagged = (message: Message, index: number) => {
-  const warnings = message.system_meta?.media_warnings || [];
-  return warnings.some((warning) => Number(warning.index || 0) === index);
 };
 
 export const MediaViewer = ({

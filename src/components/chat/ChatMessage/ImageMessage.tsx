@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Message } from "../../../types";
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
 import { MessageLayout } from "./MessageLayout";
+import { isMessageMediaFlagged } from "../../../utils/mediaModeration";
 
 const imagePreviewCache = new Map<string, string>();
 const PREVIEW_MAX_EDGE = 640;
@@ -119,14 +120,9 @@ export const ImageMessage = ({
     return previewMap[url] || imagePreviewCache.get(url) || url;
   };
 
-  const isMediaFlagged = (index: number) => {
-    const warnings = msg.system_meta?.media_warnings || [];
-    return warnings.some((warning) => Number(warning.index || 0) === index);
-  };
-
   const getImageClassName = (index: number, baseClassName: string) =>
     `${baseClassName} transition duration-200 ${
-      isMediaFlagged(index) ? "blur-md scale-105" : ""
+      isMessageMediaFlagged(msg, index) ? "blur-md scale-105" : ""
     }`;
 
   useEffect(() => {

@@ -29,6 +29,8 @@ type ChatMessageProps = {
   onDelete?: (msg: Message) => void;
   onPin?: (msg: Message) => void;
   onForward?: (msg: Message) => void;
+  onRecallCall?: (callType: "voice" | "video", msg: Message) => void;
+  disableRecallCall?: boolean;
   conversation?: Conversation;
   translatedText?: string;
 };
@@ -59,6 +61,8 @@ export const ChatMessage = memo(
     onDelete,
     onPin,
     onForward,
+    onRecallCall,
+    disableRecallCall,
     conversation,
     translatedText,
   }: ChatMessageProps) => {
@@ -247,6 +251,8 @@ export const ChatMessage = memo(
             isTopBoundary={isTopBoundary}
             onDelete={onDelete}
             conversation={conversation}
+            onRecall={onRecallCall}
+            disableRecall={disableRecallCall}
           />
         );
 
@@ -294,6 +300,14 @@ export const ChatMessage = memo(
     }
   },
   (prev, next) => {
+    const prevType = String(prev.msg.type || "").toLowerCase();
+    const nextType = String(next.msg.type || "").toLowerCase();
+    const isCallMessage =
+      prevType.startsWith("call_") || nextType.startsWith("call_");
+    if (isCallMessage) {
+      return false;
+    }
+
     const prevReactions = JSON.stringify(prev.msg.reactions || []);
     const nextReactions = JSON.stringify(next.msg.reactions || []);
     const prevReplyTo = JSON.stringify(prev.msg.reply_to || null);

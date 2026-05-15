@@ -29,7 +29,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   const handleAccept = async () => {
     if (!relationship?._id) return;
     setLoading(true);
-    const success = await acceptFriendRequestViaChat(relationship._id);
+    const success = await acceptFriendRequestViaChat(relationship._id, relationship);
     if (success) {
       onStatusChange();
     } else {
@@ -41,7 +41,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   const handleReject = async () => {
     if (!relationship?._id) return;
     setLoading(true);
-    const success = await rejectFriendRequestViaChat(relationship._id);
+    const success = await rejectFriendRequestViaChat(relationship._id, relationship);
     if (success) {
       onStatusChange();
     } else {
@@ -64,7 +64,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   const handleCancel = async () => {
     if (!relationship?._id) return;
     setLoading(true);
-    const success = await cancelFriendRequestViaChat(relationship._id);
+    const success = await cancelFriendRequestViaChat(relationship._id, relationship);
     if (success) {
       onStatusChange();
     } else {

@@ -5,6 +5,10 @@ import { useCall, type CallType } from "../hooks/useCall";
 import { socketService } from "../services";
 import { clearActiveCallLock, getFullUrl, setActiveCallLock } from "../utils";
 import {
+  AUTH_LOGOUT_EVENT,
+  isAuthLogoutStorageEvent,
+} from "../utils/authLogoutSignal";
+import {
   Mic,
   MicOff,
   Video,
@@ -149,7 +153,8 @@ const CallPage: React.FC = () => {
 
   const conversationId = searchParams.get("conversationId") || "";
   const urlCallId = searchParams.get("callId") || "";
-  const callType = normalizeCallType(searchParams.get("type"));
+  const isGroupUrl = searchParams.get("isGroup") === "true";
+  const callType = isGroupUrl ? "video" : normalizeCallType(searchParams.get("type"));
   const action = searchParams.get("action") || "start";
   const conversationName = searchParams.get("name") || "Cuoc goi";
   const remoteDisplayName = String(conversationName || "Cuoc goi").trim();
@@ -173,6 +178,7 @@ const CallPage: React.FC = () => {
   const hasRemoteAnsweredRef = useRef(false);
   const isClosingByNoAnswerRef = useRef(false);
   const isClosingByCancelRef = useRef(false);
+  const isClosingByLogoutRef = useRef(false);
 
   const {
     isInCall,
@@ -199,8 +205,11 @@ const CallPage: React.FC = () => {
     conversationId,
     userId: normalizedUserId,
   });
+  const prefersLiveKitGroup = searchParams.get("transport") === "livekit";
   const shouldUseLiveKitGroup =
-    isGroup && Boolean(livekitToken) && searchParams.get("transport") === "livekit";
+    prefersLiveKitGroup &&
+    (isGroup || isGroupUrl) &&
+    Boolean(livekitToken);
 
   // Release camera/mic for LiveKit when entering group mode
   useEffect(() => {
@@ -260,8 +269,6 @@ const CallPage: React.FC = () => {
 
     startedRef.current = true;
 
-    const isGroupUrl = searchParams.get("isGroup") === "true";
-
     if (action === "join") {
       joinExistingCall(callType, isGroupUrl, urlCallId).catch((error) => {
         console.error("Khong the tham gia cuoc goi:", error);
@@ -279,6 +286,7 @@ const CallPage: React.FC = () => {
     action,
     callType,
     conversationId,
+    isGroupUrl,
     joinExistingCall,
     normalizedUserId,
     startCall,
@@ -332,7 +340,7 @@ const CallPage: React.FC = () => {
         return;
       }
 
-      const isGroupFromUrl = searchParams.get("isGroup") === "true";
+      const isGroupFromUrl = isGroupUrl;
       const actualIsGroup = isGroup || isGroupFromUrl;
 
       console.log(`[CALL] Received decline from ${payload.userId}. isGroup(state): ${isGroup}, isGroup(url): ${isGroupFromUrl}`);
@@ -372,7 +380,7 @@ const CallPage: React.FC = () => {
       socketService.offCallDeclined(onDeclined);
       socketService.offCallEnded(onCallEnded);
     };
-  }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, urlCallId]);
+  }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, isGroupUrl, urlCallId]);
 
   const handleExit = async () => {
     await endCall();
@@ -383,6 +391,39 @@ const CallPage: React.FC = () => {
     }
     navigate("/chat");
   };
+
+  const handleLeaveForLogout = React.useCallback(() => {
+    if (isClosingByLogoutRef.current) return;
+    isClosingByLogoutRef.current = true;
+
+    if (conversationId) {
+      clearActiveCallLock(conversationId);
+    }
+
+    void endCall(true).finally(() => {
+      if (window.opener) {
+        window.close();
+        return;
+      }
+      navigate("/login");
+    });
+  }, [conversationId, endCall, navigate]);
+
+  useEffect(() => {
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleLeaveForLogout);
+
+    const handleStorage = (event: StorageEvent) => {
+      if (isAuthLogoutStorageEvent(event)) {
+        handleLeaveForLogout();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(AUTH_LOGOUT_EVENT, handleLeaveForLogout);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [handleLeaveForLogout]);
 
   useEffect(() => {
     if (!isConnecting && !isInCall) {
@@ -570,18 +611,40 @@ const CallPage: React.FC = () => {
 
       {isGroup && callType === "video" && remoteStreams.length > 1 && (
         <div className="absolute left-6 right-6 bottom-28 z-20 flex gap-3 overflow-x-auto pb-1">
-          {remoteStreams.slice(1).map((item) => (
-            <div
-              key={item.userId}
-              className="h-24 w-36 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-primary-800 shadow-xl"
-            >
-              <StreamVideo
-                stream={item.stream}
-                muted
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ))}
+          {remoteStreams.slice(1).map((item, index) => {
+            const hasRemoteVideo = item.stream
+              .getVideoTracks()
+              .some((track) => track.readyState === "live" && !track.muted);
+            const isRemoteCameraOff =
+              remoteCameraStates[item.userId] === true || !hasRemoteVideo;
+
+            return (
+              <div
+                key={item.userId}
+                className="relative h-24 w-36 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-primary-900 shadow-xl"
+              >
+                {isRemoteCameraOff ? (
+                  <div className="flex h-full w-full items-center justify-center bg-radial from-primary-800 to-primary-950">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-primary-700 text-xs font-bold text-white">
+                      {getAvatarInitial(`${index + 1}`)}
+                    </div>
+                  </div>
+                ) : (
+                  <StreamVideo
+                    stream={item.stream}
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                )}
+
+                {isRemoteCameraOff && (
+                  <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur">
+                    <VideoOff size={13} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

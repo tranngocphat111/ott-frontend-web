@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { authApi, profileApi, userApi } from '../services/api';
 import type { UserProfileResponse } from '../types';
+import { emitAuthLogoutSignal } from '../utils/authLogoutSignal';
 
 interface AuthContextType {
   user: UserProfileResponse | null;
@@ -126,19 +127,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (action === 'ALL') {
         clearLocalSession();
-        window.dispatchEvent(new Event('auth:logout'));
+        emitAuthLogoutSignal();
         window.location.href = '/login';
       } else if (action === 'SPECIFIC' && payload.deviceId && myDeviceId === payload.deviceId) {
         clearLocalSession();
-        window.dispatchEvent(new Event('auth:logout'));
+        emitAuthLogoutSignal();
         window.location.href = '/login';
       } else if (action === 'OTHERS' && myDeviceId && payload.revokedDeviceIds?.includes(myDeviceId)) {
         clearLocalSession();
-        window.dispatchEvent(new Event('auth:logout'));
+        emitAuthLogoutSignal();
         window.location.href = '/login';
       } else if (action === 'SPECIFIC' || action === 'OTHERS') {
         fetchUser().catch(() => {
-          window.dispatchEvent(new Event('auth:logout'));
+          emitAuthLogoutSignal();
           window.location.href = '/login';
         });
       }
@@ -276,6 +277,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log('AuthContext: Logout initiated');
+    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    const logoutUserId = rawUser?.id || rawUser?.user_id || rawUser?._id || "";
+    emitAuthLogoutSignal();
+
+    const socketCleanupPromise = import('../services/socket.service')
+      .then(async ({ socketService }) => {
+        if (logoutUserId) {
+          await socketService.leaveAllCallsForLogout(logoutUserId);
+        }
+        return socketService;
+      })
+      .catch((err) => {
+        console.error("Could not notify call logout cleanup:", err);
+        return null;
+      });
 
     try {
       const token = localStorage.getItem('accessToken');
@@ -287,9 +303,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('AuthContext: Logout error:', error);
     } finally {
       // Ngắt kết nối socket ngay lập tức để backend ghi nhận trạng thái offline
-      import('../services/socket.service').then(({ socketService }) => {
-        socketService.disconnect();
-      }).catch(err => console.error("Could not disconnect socket:", err));
+      const socketService = await socketCleanupPromise;
+      socketService?.disconnect();
       
       clearLocalSession();
       console.log('AuthContext: Logout completed, tokens cleared');

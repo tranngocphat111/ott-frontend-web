@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Message } from "../../../types";
 import { MessageLayout } from "./MessageLayout";
 import { downloadChatMedia } from "./downloadMedia";
+import { isMessageMediaFlagged } from "../../../utils/mediaModeration";
 
 export const VideoMessage = ({
   msg,
@@ -64,9 +65,7 @@ export const VideoMessage = ({
   const isUploadSuccess = msg.local_status === "success";
   const isUploadError = msg.local_status === "error";
   const hasUploadState = isUploading || isUploadSuccess || isUploadError;
-  const isFlagged = (msg.system_meta?.media_warnings || []).some(
-    (warning) => Number(warning.index || 0) === 0,
-  );
+  const isFlagged = isMessageMediaFlagged(msg, 0);
 
   useEffect(() => {
     const video = videoRef.current;

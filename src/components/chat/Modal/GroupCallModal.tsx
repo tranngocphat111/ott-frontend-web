@@ -1,15 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, Phone, Search, Users, Video, X } from "lucide-react";
+import { Check, Search, Users, Video, X } from "lucide-react";
 import Avatar from "../../common/Avatar";
 import { ParticipantService } from "../../../services/participant.service";
-import type { CallType } from "../../../hooks/useCall";
 
 interface GroupCallModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStart: (selectedUserIds: string[], callType: CallType) => void;
+  onStart: (selectedUserIds: string[]) => void;
   conversationId: string;
-  initialCallType: CallType;
   currentUserId: string;
 }
 
@@ -28,21 +26,18 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
   onClose,
   onStart,
   conversationId,
-  initialCallType,
   currentUserId,
 }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [callType, setCallType] = useState<CallType>(initialCallType);
   const [showLimitHint, setShowLimitHint] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !conversationId) return;
 
     const loadMembers = async () => {
-      setCallType(initialCallType);
       setSearchQuery("");
       setShowLimitHint(false);
       setIsLoading(true);
@@ -66,7 +61,7 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
     };
 
     void loadMembers();
-  }, [conversationId, currentUserId, initialCallType, isOpen]);
+  }, [conversationId, currentUserId, isOpen]);
 
   const filteredMembers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -123,7 +118,7 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        className="absolute inset-0 bg-slate-950/45  transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
 
@@ -168,32 +163,6 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-white p-1 ring-1 ring-slate-200">
-            <button
-              type="button"
-              onClick={() => setCallType("voice")}
-              className={`flex h-10 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-all ${
-                callType === "voice"
-                  ? "bg-primary-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Phone size={16} />
-              Gọi thoại
-            </button>
-            <button
-              type="button"
-              onClick={() => setCallType("video")}
-              className={`flex h-10 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-all ${
-                callType === "video"
-                  ? "bg-primary-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Video size={16} />
-              Gọi video
-            </button>
-          </div>
 
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="text-slate-600">
@@ -212,13 +181,13 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
           </div>
 
           {selectedMembers.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center gap-2 overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {selectedMembers.map((member) => (
                 <button
                   key={member.user_id}
                   type="button"
                   onClick={() => toggleSelect(member.user_id)}
-                  className="group relative shrink-0"
+                  className="group relative shrink-0 cursor-pointer"
                   title={`Bỏ chọn ${member.user?.name || "Người dùng"}`}
                 >
                   <Avatar
@@ -308,11 +277,11 @@ const GroupCallModal: React.FC<GroupCallModalProps> = ({
         <div className="border-t border-slate-100 bg-white p-4 sm:px-6">
           <button
             type="button"
-            onClick={() => onStart(selectedIds, callType)}
+            onClick={() => onStart(selectedIds)}
             disabled={!canStartCall}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary-700 px-4 text-sm font-bold text-white shadow-lg shadow-primary-700/20 transition-all hover:bg-primary-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
-            {callType === "video" ? <Video size={18} /> : <Phone size={18} />}
+            <Video size={18} />
             Bắt đầu cuộc gọi
           </button>
         </div>

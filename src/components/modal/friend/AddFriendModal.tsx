@@ -154,7 +154,7 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
 
     setIsProcessing(true);
     try {
-      const success = await acceptFriendRequestViaChat(relationship._id);
+      const success = await acceptFriendRequestViaChat(relationship._id, relationship);
       if (success) {
         setIsAlreadyFriends(true);
         setIsIncomingRequest(false);
@@ -178,7 +178,7 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose }) => {
 
     setIsProcessing(true);
     try {
-      const success = await cancelFriendRequestViaChat(relationship._id);
+      const success = await cancelFriendRequestViaChat(relationship._id, relationship);
       if (success) {
         setRequestSent(false);
         setRelationship(null);

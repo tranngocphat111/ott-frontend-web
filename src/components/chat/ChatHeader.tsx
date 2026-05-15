@@ -151,9 +151,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     conversation.type === "group" && Boolean(conversation.is_calling);
   const isVideoCallDisabled =
     disableCallActions ||
-    (Boolean(conversation.is_calling) && conversation.type !== "group");
+    Boolean(conversation.is_calling);
   const videoCallTitle = isGroupActiveCall
-    ? "Tham gia cuộc gọi nhóm"
+    ? "Đang có cuộc gọi nhóm diễn ra"
     : conversation.is_calling
       ? "Đang có cuộc gọi diễn ra"
       : conversation.type === "group"
@@ -164,9 +164,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     : conversation.type === "group"
       ? "Gọi nhóm"
       : "Gọi video";
-  const ActiveCallIcon =
-    conversation.active_call_type === "voice" ? Phone : Video;
-
   return (
     <div className="relative flex-none z-10">
       <div className="px-3 py-2.5 sm:px-6 sm:py-3 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between">
@@ -318,13 +315,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         <div className="px-3 py-2 sm:px-6 bg-emerald-50/80 backdrop-blur-md border-b border-emerald-100 flex items-center justify-between gap-3 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-200">
-              <ActiveCallIcon size={16} fill="currentColor" />
+              <Video size={16} fill="currentColor" />
             </div>
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-[13px] font-bold text-emerald-700">
-                {conversation.active_call_type === "voice"
-                  ? "Cuộc gọi thoại nhóm"
-                  : "Cuộc gọi video nhóm"}
+                Cuộc gọi video nhóm
               </p>
               <p className="text-[11px] text-emerald-600/80 font-medium">
                 {conversation.call_participant_count ?? 1} người đang tham gia

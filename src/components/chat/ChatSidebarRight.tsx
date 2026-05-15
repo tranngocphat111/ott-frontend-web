@@ -742,7 +742,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       const rel = await fetchRelationshipStatusViaChat(currentUser.id, userId);
       if (rel && rel._id) {
         const { acceptFriendRequestViaChat } = await import("../../services/social.service");
-        const success = await acceptFriendRequestViaChat(rel._id);
+        const success = await acceptFriendRequestViaChat(rel._id, rel);
         if (success) {
           // Update local state
           setFriendIds(prev => new Set([...prev, userId]));

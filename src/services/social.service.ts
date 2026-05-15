@@ -23,6 +23,14 @@ export interface ApiUser {
 }
 
 type ApiEnvelope<T> = { result?: T; message?: string };
+type ChatRelationshipLike = {
+    _id?: string;
+    requester_id?: string;
+    receiver_id?: string;
+    requesterId?: string;
+    receiverId?: string;
+    status?: string;
+};
 
 type UserServiceProfile = {
     bio?: string | null;
@@ -55,6 +63,57 @@ const unwrapApiResult = <T,>(payload: unknown): T | null => {
     if (typeof payload !== "object") return null;
     if ("result" in (payload as any)) return (payload as any).result ?? null;
     return payload as T;
+};
+
+const CHAT_RELATIONSHIP_MUTATION_TIMEOUT_MS = 15_000;
+
+const getRelationshipRequesterId = (relationship?: ChatRelationshipLike | null) =>
+    String(relationship?.requester_id || relationship?.requesterId || "").trim();
+
+const getRelationshipReceiverId = (relationship?: ChatRelationshipLike | null) =>
+    String(relationship?.receiver_id || relationship?.receiverId || "").trim();
+
+const isRelationshipStatus = (
+    relationship: ChatRelationshipLike | null,
+    expectedStatuses: string[],
+) => {
+    if (!relationship?.status) return false;
+    const normalizedStatus = String(relationship.status).toUpperCase();
+    return expectedStatuses.some((status) => status.toUpperCase() === normalizedStatus);
+};
+
+const verifyRelationshipMutation = async (
+    relationship: ChatRelationshipLike | null | undefined,
+    expectedStatuses: string[],
+    relationshipId?: string,
+) => {
+    const requesterId = getRelationshipRequesterId(relationship);
+    const receiverId = getRelationshipReceiverId(relationship);
+    if (!requesterId || !receiverId) return false;
+
+    const latest = await fetchRelationshipStatusViaChat(requesterId, receiverId);
+    if (!latest) return false;
+
+    const sameRelationship =
+        !relationshipId ||
+        String(latest._id || latest.relationship_id || "") === String(relationshipId);
+
+    return sameRelationship && isRelationshipStatus(latest, expectedStatuses);
+};
+
+const verifySentFriendRequest = async (requesterId: string, receiverId: string) => {
+    const latest = await fetchRelationshipStatusViaChat(requesterId, receiverId);
+    if (!latest) return null;
+
+    const sameDirection =
+        getRelationshipRequesterId(latest) === String(requesterId) &&
+        getRelationshipReceiverId(latest) === String(receiverId);
+
+    if (sameDirection && isRelationshipStatus(latest, ["PENDING", "ACCEPTED"])) {
+        return latest;
+    }
+
+    return null;
 };
 
 function unwrapList<T>(json: unknown): T[] {
@@ -302,15 +361,17 @@ export async function acceptFriendRequest(
  */
 export async function acceptFriendRequestViaChat(
     relationshipId: string,
+    relationship?: ChatRelationshipLike | null,
 ): Promise<boolean> {
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/accept/${relationshipId}`,
-            { method: "POST", signal: AbortSignal.timeout(5_000) },
+            { method: "POST", signal: AbortSignal.timeout(CHAT_RELATIONSHIP_MUTATION_TIMEOUT_MS) },
         );
-        return res.ok;
+        if (res.ok) return true;
+        return await verifyRelationshipMutation(relationship, ["ACCEPTED"], relationshipId);
     } catch {
-        return false;
+        return await verifyRelationshipMutation(relationship, ["ACCEPTED"], relationshipId);
     }
 }
 
@@ -319,15 +380,17 @@ export async function acceptFriendRequestViaChat(
  */
 export async function rejectFriendRequestViaChat(
     relationshipId: string,
+    relationship?: ChatRelationshipLike | null,
 ): Promise<boolean> {
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/reject/${relationshipId}`,
-            { method: "POST", signal: AbortSignal.timeout(5_000) },
+            { method: "POST", signal: AbortSignal.timeout(CHAT_RELATIONSHIP_MUTATION_TIMEOUT_MS) },
         );
-        return res.ok;
+        if (res.ok) return true;
+        return await verifyRelationshipMutation(relationship, ["REMOVED"], relationshipId);
     } catch {
-        return false;
+        return await verifyRelationshipMutation(relationship, ["REMOVED"], relationshipId);
     }
 }
 
@@ -336,15 +399,17 @@ export async function rejectFriendRequestViaChat(
  */
 export async function cancelFriendRequestViaChat(
     relationshipId: string,
+    relationship?: ChatRelationshipLike | null,
 ): Promise<boolean> {
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/cancel/${relationshipId}`,
-            { method: "POST", signal: AbortSignal.timeout(5_000) },
+            { method: "POST", signal: AbortSignal.timeout(CHAT_RELATIONSHIP_MUTATION_TIMEOUT_MS) },
         );
-        return res.ok;
+        if (res.ok) return true;
+        return await verifyRelationshipMutation(relationship, ["REMOVED"], relationshipId);
     } catch {
-        return false;
+        return await verifyRelationshipMutation(relationship, ["REMOVED"], relationshipId);
     }
 }
 
@@ -492,12 +557,18 @@ export async function sendFriendRequestViaChat(
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ requesterId, receiverId }),
-                signal: AbortSignal.timeout(5_000)
+                signal: AbortSignal.timeout(CHAT_RELATIONSHIP_MUTATION_TIMEOUT_MS)
             },
         );
-        if (!res.ok) throw new Error("Gửi kết bạn qua Chat thất bại.")
+        if (!res.ok) {
+            const verified = await verifySentFriendRequest(requesterId, receiverId);
+            if (verified) return verified;
+            throw new Error("Gửi kết bạn qua Chat thất bại.")
+        }
         return await res.json();
     } catch (error) {
+        const verified = await verifySentFriendRequest(requesterId, receiverId);
+        if (verified) return verified;
         console.error(error)
         return null;
     }

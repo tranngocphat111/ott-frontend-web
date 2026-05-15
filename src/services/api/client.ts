@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { type ApiResponse, type ApiError, DeviceType } from '../../types';
 import { API_CONFIG } from '../../config/api';
+import { emitAuthLogoutSignal } from '../../utils/authLogoutSignal';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_CONFIG.BASE_URL,
@@ -109,7 +110,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         refreshSubscribers = [];
         isRefreshing = false;
-        window.dispatchEvent(new Event('auth:logout'));
+        emitAuthLogoutSignal();
         redirectToLogin();
         return Promise.reject(apiError);
       } finally {

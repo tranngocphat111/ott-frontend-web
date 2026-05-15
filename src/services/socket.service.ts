@@ -479,6 +479,24 @@ class SocketService {
     }, 1500);
   }
 
+  leaveAllCallsForLogout(userId: string) {
+    return this.emitWithAck<{ ok?: boolean }>("dang_xuat", { userId }, 1200);
+  }
+
+  inviteGroupCallMembers(
+    conversationId: string,
+    callId: string | null | undefined,
+    callerId: string,
+    targetUserIds: string[],
+  ) {
+    this.emitWhenConnected("moi_them_thanh_vien_goi", {
+      conversationId,
+      callId,
+      callerId,
+      targetUserIds,
+    });
+  }
+
   async endCall(
     conversationId: string,
     userId: string,

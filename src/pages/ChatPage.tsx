@@ -120,9 +120,10 @@ const ChatContent: React.FC = () => {
 
   // Helper thực sự mở cửa sổ gọi (sau khi đã xác nhận sẵn sàng)
   const doOpenCallWindow = (payload: IncomingCallPayload, action: "join" | "start", displayName: string, displayAvatar: string) => {
+    const effectiveCallType = payload.isGroup ? "video" : payload.callType;
     const params = new URLSearchParams({
       conversationId: payload.conversationId,
-      type: payload.callType,
+      type: effectiveCallType,
       action,
       name: displayName || "Cuoc goi",
       // Tránh truyền base64 quá dài gây lỗi HTTP 431
@@ -133,6 +134,7 @@ const ChatContent: React.FC = () => {
     }
     if (payload.isGroup) {
       params.set("isGroup", "true");
+      params.set("transport", "livekit");
     }
 
     const callWindow = window.open(
@@ -276,6 +278,24 @@ const ChatContent: React.FC = () => {
     const onIncomingCall = (payload: IncomingCallPayload) => {
       console.log("onIncomingCall received:", payload);
       if (payload.callerId === normalizedUserId) return;
+
+      const blockReason = getCallOpenBlockReason(payload.conversationId);
+      if (blockReason === "other") {
+        if (normalizedUserId) {
+          socketService.declineCall(
+            payload.conversationId,
+            normalizedUserId,
+            payload.callerId,
+            payload.callId,
+          );
+        }
+        return;
+      }
+
+      if (blockReason === "same") {
+        return;
+      }
+
       setIncomingCall(payload);
     };
 
@@ -415,7 +435,7 @@ const ChatContent: React.FC = () => {
             <div className="px-6 pt-8 pb-8 flex flex-col items-center">
               {/* Label */}
               <p className="text-[11px] font-medium tracking-widest uppercase text-amber-400/80 mb-2">
-                {incomingCall.callType === "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"}
+                {incomingCall.isGroup || incomingCall.callType === "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"}
               </p>
 
               {/* Avatar */}
@@ -446,7 +466,7 @@ const ChatContent: React.FC = () => {
                 {callerName}
               </h3>
               <p className="text-sm text-stone-400 mt-1">
-                {incomingCall.callType === "video" ? "Đang gọi video..." : "Đang gọi cho bạn..."}
+                {incomingCall.isGroup || incomingCall.callType === "video" ? "Đang gọi video..." : "Đang gọi cho bạn..."}
               </p>
 
               {/* Action buttons */}
@@ -470,7 +490,7 @@ const ChatContent: React.FC = () => {
                     className="h-16 w-16 rounded-full flex items-center justify-center bg-green-500 text-white transition-all duration-200 hover:bg-green-600 hover:scale-105 active:scale-95 shadow-lg shadow-green-500/30"
                     title="Chấp nhận"
                   >
-                    {incomingCall.callType === "video" ? <Video size={24} /> : <Phone size={24} />}
+                    {incomingCall.isGroup || incomingCall.callType === "video" ? <Video size={24} /> : <Phone size={24} />}
                   </button>
                   <span className="text-xs font-medium text-stone-400">Chấp nhận</span>
                 </div>
