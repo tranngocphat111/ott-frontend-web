@@ -8,6 +8,7 @@ import { UnpinNotification } from "./UnpinNotification";
 import { DefaultNotification } from "./DefaultNotification";
 import { PollNotification } from "./PollNotification";
 import { FriendRequestNotification } from "./FriendRequestNotification";
+import { CallJoinNotification } from "./CallJoinNotification";
 
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -51,8 +52,9 @@ export const ChatNotification: React.FC<ChatNotificationProps> = ({
       return <PinNotification content={displayContent} />;
     case "system_unpin":
       return <UnpinNotification content={displayContent} />;
-    case "call_start":
     case "call_join":
+      return <CallJoinNotification content={displayContent} />;
+    case "call_start":
     case "call_end":
     case "call_cancel":
     case "call_no_answer":

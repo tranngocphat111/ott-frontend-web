@@ -23,22 +23,6 @@ const Avatar: React.FC<AvatarProps> = ({
       .slice(0, 2);
   };
 
-  const getGradientColor = (name: string = ""): string => {
-    const colors = [
-      'from-primary-500 to-primary-400',
-      'from-primary-400 to-primary-300',
-      'from-primary-300 to-primary-200',
-      'from-primary-200 to-primary-500',
-    ];
-
-    if (!name || name.length === 0) {
-      return colors[0]; // Default color
-    }
-
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
-
   const [imgError, setImgError] = React.useState(false);
 
   // Reset error when src changes
@@ -64,9 +48,7 @@ const Avatar: React.FC<AvatarProps> = ({
       }}
       onClick={onClick}
     >
-      <div
-        className={`absolute inset-0 flex items-center justify-center text-white font-semibold bg-gradient-to-br ${getGradientColor(name)}`}
-      >
+      <div className="absolute inset-0 flex items-center justify-center bg-slate-200 font-semibold text-slate-600">
         {src === "SPECIAL_AVATAR_SELF" ||
           name?.toLowerCase().includes("my documents") ||
           name?.toLowerCase().includes("truyền file") ||
@@ -80,7 +62,7 @@ const Avatar: React.FC<AvatarProps> = ({
               {getInitials(name)}
             </span>
           ) : (
-            <User className="text-white/70" style={{ width: size * 0.5, height: size * 0.5 }} />
+            <User className="text-slate-500" style={{ width: size * 0.5, height: size * 0.5 }} />
           )}
       </div>
 
