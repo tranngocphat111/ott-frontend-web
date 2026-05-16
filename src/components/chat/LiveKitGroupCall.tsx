@@ -518,7 +518,7 @@ const VideoTile: React.FC<VideoTileProps> = ({
             >
               {isScreenShare ? `${displayName} chia sẻ` : displayName}
             </span>
-            {isMicrophoneExplicitlyMuted && (
+            {!compact && isMicrophoneExplicitlyMuted && (
               <span
                 className={`flex shrink-0 items-center justify-center rounded-full bg-red-500/90 text-white ${
                   compact ? "h-6 w-6" : "h-7 w-7"
@@ -531,7 +531,7 @@ const VideoTile: React.FC<VideoTileProps> = ({
         </div>
       )}
 
-      {showInfo && !isScreenShare && isCameraExplicitlyMuted && (
+      {showInfo && !compact && !isScreenShare && isCameraExplicitlyMuted && (
         <div
           className={`absolute right-2 top-2 flex items-center justify-center rounded-full bg-black/55 font-semibold text-white/90 backdrop-blur ${
             compact ? "h-7 w-7" : "gap-1 px-2 py-1 text-[11px]"
@@ -773,6 +773,13 @@ const GroupCallStage: React.FC<GroupCallStageProps> = ({
       (trackRef) => getTrackKey(trackRef) === defaultPrimaryTrackKey,
     ) ||
     videoTracks[0];
+  const isTwoPersonLayout = videoTracks.length === 2;
+  const secondaryTrack =
+    isTwoPersonLayout && primaryTrack
+      ? videoTracks.find(
+          (trackRef) => getTrackKey(trackRef) !== getTrackKey(primaryTrack),
+        ) || null
+      : null;
 
   const handleInviteMembers = async (targetUserIds: string[]) => {
     if (!conversationId || !userId || targetUserIds.length === 0 || !canInviteMembers) return;
@@ -822,6 +829,19 @@ const GroupCallStage: React.FC<GroupCallStageProps> = ({
 
       <div className="pointer-events-none absolute inset-0 z-0 bg-linear-to-b from-primary-950/70 via-transparent to-primary-950/80" />
 
+      {isTwoPersonLayout && secondaryTrack && (
+        <div className="absolute right-6 top-24 z-20 h-36 w-52 overflow-hidden rounded-xl shadow-2xl">
+          <VideoTile
+            trackRef={secondaryTrack}
+            memberById={memberById}
+            currentUserId={userId}
+            compact
+            isSelected={false}
+            onClick={() => setPrimaryTrackKey(getTrackKey(secondaryTrack))}
+          />
+        </div>
+      )}
+
       <div className="absolute top-6 left-6 right-6 z-10 flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex min-w-0 items-center gap-3">
@@ -857,17 +877,6 @@ const GroupCallStage: React.FC<GroupCallStageProps> = ({
           )}
           <button
             type="button"
-            onClick={() => setIsInviteOpen(true)}
-            disabled={!canInviteMembers}
-            className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 ${
-              canInviteMembers ? "hover:bg-white/20" : "cursor-not-allowed opacity-35"
-            }`}
-            title={canInviteMembers ? "Mời thêm thành viên" : "Cuộc gọi đã đủ 8 người"}
-          >
-            <UserPlus size={18} />
-          </button>
-          <button
-            type="button"
             onClick={() => setIsFilmstripVisible((visible) => !visible)}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-white/20"
             title={isFilmstripVisible ? "Ẩn danh sách camera" : "Hiện danh sách camera"}
@@ -877,7 +886,7 @@ const GroupCallStage: React.FC<GroupCallStageProps> = ({
         </div>
       </div>
 
-      {isFilmstripVisible && videoTracks.length > 0 && (
+      {isFilmstripVisible && !isTwoPersonLayout && videoTracks.length > 0 && (
         <div className="absolute left-6 right-6 bottom-28 z-20 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {videoTracks.map((trackRef) => {
             const trackKey = getTrackKey(trackRef);

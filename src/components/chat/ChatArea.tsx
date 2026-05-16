@@ -85,6 +85,7 @@ const REVOKE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REVOKE_EXPIRED_MESSAGE =
   "Bạn chỉ có thể thu hồi tin nhắn trong vòng 24 giờ";
 const GROUP_CALL_PENDING_LOCK_MS = 15000;
+const MAX_GROUP_CALL_PARTICIPANTS = 8;
 
 const isRevokeWindowExpired = (msg: Message) => {
   const rawTime = msg.created_at || msg.createdAt;
@@ -1400,6 +1401,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
     // Nếu cuộc gọi đang diễn ra -> Chuyển sang join luôn, không hiện modal chọn người
     if (activeConversation.is_calling && activeConversation.type === "group") {
+      const activeParticipantCount = Number(
+        activeConversation.call_participant_count || 0,
+      );
+      if (activeParticipantCount >= MAX_GROUP_CALL_PARTICIPANTS) {
+        setCallBlockModal({
+          title: "Cuộc gọi đã đủ người",
+          message: `Cuộc gọi nhóm tối đa ${MAX_GROUP_CALL_PARTICIPANTS} người tham gia.`,
+        });
+        return;
+      }
+
       const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
       const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
       doOpenCallWindow(
