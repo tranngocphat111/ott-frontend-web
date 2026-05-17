@@ -236,9 +236,12 @@ export async function fetchUserById(id: string): Promise<ApiUser | null> {
     }
 }
 
-export async function fetchFriends(userId: string): Promise<FriendOption[]> {
+export async function fetchFriends(userId: string, page?: number, size?: number): Promise<FriendOption[]> {
     try {
-        const url = `${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`;
+        let url = `${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`;
+        if (page !== undefined && size !== undefined) {
+            url += `?page=${page}&size=${size}`;
+        }
         const res = await authFetch(url, {
             signal: AbortSignal.timeout(5_000),
         });
@@ -336,9 +339,15 @@ export async function cancelRelationship(id: string | null): Promise<boolean> {
 
 export async function fetchPendingRequests(
     userId: string,
+    page?: number,
+    size?: number,
 ): Promise<FriendRequestOption[]> {
     try {
-        const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/pending/${userId}`, {
+        let url = `${API_MEDIA_SERVER_URL}/relationships/pending/${userId}`;
+        if (page !== undefined && size !== undefined) {
+            url += `?page=${page}&size=${size}`;
+        }
+        const res = await authFetch(url, {
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return [];
@@ -745,4 +754,65 @@ export async function updateUserProfile(
         location: result?.location ?? null,
         relationshipStatus: result?.relationshipStatus ?? null,
     };
+}
+
+// --- VIEW HISTORY & SAVED CONTENTS ---
+
+export async function toggleSaveContent(contentId: string, isSaved: boolean): Promise<boolean> {
+    try {
+        const method = isSaved ? "POST" : "DELETE";
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?contentId=${contentId}`, { method });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function checkIsSaved(contentId: string): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved/check?contentId=${contentId}`);
+        if (!res.ok) return false;
+        return await res.json();
+    } catch {
+        return false;
+    }
+}
+
+export async function fetchSavedContents(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function recordViewHistory(contentId: string): Promise<void> {
+    try {
+        await authFetch(`${API_MEDIA_SERVER_URL}/history?contentId=${contentId}`, { method: "POST" });
+    } catch (e) {
+        // fail silently
+    }
+}
+
+export async function fetchViewHistory(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function clearViewHistory(): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history`, { method: "DELETE" });
+        return res.ok;
+    } catch {
+        return false;
+    }
 }

@@ -1,6 +1,6 @@
 // src/components/Chat/ChatHeader.tsx
 import React, { useEffect } from "react";
-import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles } from "lucide-react";
+import { ArrowLeft, Phone, Video, PanelRightOpen, PanelRightClose, Sparkles } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
 import {
@@ -20,6 +20,7 @@ interface ChatHeaderProps extends ChatAreaProps {
   hideCallActions?: boolean;
   onSummarize?: () => void;
   isSummarizing?: boolean;
+  onBackToList?: () => void;
 }
 
 // ─── Helper: format last seen ────────────────────────────────────────────────
@@ -90,6 +91,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   hideCallActions = false,
   onSummarize,
   isSummarizing = false,
+  onBackToList,
 }) => {
   const { isUserOnline, getLastSeen, watchUsers } = usePresence();
 
@@ -159,16 +161,21 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       : conversation.type === "group"
         ? "Gọi nhóm"
         : "Gọi video";
-  const videoActionLabel = isGroupActiveCall
-    ? "Tham gia"
-    : conversation.type === "group"
-      ? "Gọi nhóm"
-      : "Gọi video";
   return (
     <div className="relative flex-none z-10">
-      <div className="px-3 py-2.5 sm:px-6 sm:py-3 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-gray-100 bg-white px-2.5 py-2.5 shadow-sm sm:px-6 sm:py-3">
         {/* Left Section: Avatar & Info */}
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          {onBackToList && (
+            <button
+              type="button"
+              onClick={onBackToList}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-50 md:hidden"
+              title="Quay lại"
+            >
+              <ArrowLeft size={21} />
+            </button>
+          )}
           <Avatar
             src={getConversationAvatar()}
             name={getConversationName()}
@@ -203,7 +210,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         {/* Right Section: Actions */}
         <div className="flex shrink-0 items-center gap-1 text-gray-600">
           {canShowCallActions && (
-            <div className="hidden items-center gap-1 sm:flex">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {/* Voice Call Button - Hidden for Groups */}
               {conversation.type !== "group" && (
                 <button
@@ -232,7 +239,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           )}
 
           {canShowCallActions && (
-            <div className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />
+            <div className="mx-0.5 h-6 w-px bg-gray-200 sm:mx-1" />
           )}
 
           {/* AI Tools */}
@@ -271,44 +278,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </button>
         </div>
       </div>
-
-      {canShowCallActions && (
-        <div className="border-b border-gray-100 bg-white px-3 py-2 sm:hidden">
-          <div
-            className={`grid gap-2 ${
-              conversation.type !== "group" ? "grid-cols-2" : "grid-cols-1"
-            }`}
-          >
-            {conversation.type !== "group" && (
-              <button
-                type="button"
-                onClick={onStartVoiceCall}
-                disabled={disableCallActions}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700 transition-colors active:scale-[0.99] disabled:opacity-45"
-                title="Gọi thoại"
-              >
-                <Phone size={17} />
-                Gọi thoại
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onStartVideoCall}
-              disabled={isVideoCallDisabled}
-              className={`flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors active:scale-[0.99] disabled:opacity-45 ${
-                isGroupActiveCall
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border border-gray-200 bg-gray-50 text-gray-700"
-              }`}
-              title={videoCallTitle}
-            >
-              <Video size={17} />
-              {videoActionLabel}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Active Call Banner (Group Call) */}
       {conversation.type === "group" && conversation.is_calling && (

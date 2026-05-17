@@ -4,18 +4,21 @@ import {
   Clock,
   Bookmark,
   Clapperboard,
+  History
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { PostUser } from "../types";
 import UserAvatar from "../UserAvatar";
 
 const NAV_ITEMS = [
-  { icon: <Clock className="size-6 text-primary-400" />, label: "Kỷ niệm" },
-  { icon: <Bookmark className="size-6 text-primary-600" />, label: "Đã lưu" },
-  { icon: <Users className="size-6 text-primary-700" />, label: "Nhóm" },
+  { icon: <Clock className="size-6 text-primary-400" />, label: "Kỷ niệm", route: "/social" },
+  { icon: <Bookmark className="size-6 text-primary-600" />, label: "Đã lưu", route: "/social/saved" },
+  { icon: <History className="size-6 text-blue-500" />, label: "Lịch sử xem", route: "/social/history" },
+  { icon: <Users className="size-6 text-primary-700" />, label: "Nhóm", route: "/social" },
   {
     icon: <Clapperboard className="size-6 text-primary-500" />,
     label: "Reels",
+    route: "/social",
   },
 ];
 
@@ -43,7 +46,7 @@ const SocialLeftContent: React.FC<Props> = ({ currentUser, onItemClick }) => {
           <UserAvatar user={currentUser} size="size-9" />
         </div>
         <span className="font-semibold text-gray-800">
-          {currentUser.displayName}
+          {currentUser?.displayName}
         </span>
       </div>
 
@@ -52,7 +55,10 @@ const SocialLeftContent: React.FC<Props> = ({ currentUser, onItemClick }) => {
         {NAV_ITEMS.map((item, i) => (
           <div
             key={i}
-            onClick={() => onItemClick?.()}
+            onClick={() => {
+              if (item.route) navigate(item.route);
+              onItemClick?.();
+            }}
             className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-200 cursor-pointer transition">
             {item.icon}
             <span className="font-medium text-gray-700">{item.label}</span>

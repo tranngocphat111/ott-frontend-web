@@ -621,3 +621,24 @@
     border: 1px solid rgba(223, 192, 164, 0.3);
   }
 }
+
+@media (max-width: 640px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  .chat-composer-bar {
+    border-radius: 20px;
+  }
+
+  .chat-composer-bar > button {
+    padding: 0.42rem;
+  }
+
+  .chat-composer-bar svg {
+    width: 18px;
+    height: 18px;
+  }
+}

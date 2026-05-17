@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { getReactionByKey, type ReactionKey } from "./post/reactions";
 import PostHeader from "./post/PostHeader";
 import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
+import { checkIsSaved, toggleSaveContent, recordViewHistory } from "../../services/social.service";
 
 interface Props {
   post: Post;
@@ -65,6 +66,12 @@ const PostCard: React.FC<Props> = ({
   const [modalShowComments, setModalShowComments] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
   const [isReactionsListModalOpen, setIsReactionsListModalOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const hasRecordedView = useRef(false);
+
+  useEffect(() => {
+    checkIsSaved(post.id).then(setIsSaved);
+  }, [post.id]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -82,12 +89,18 @@ const PostCard: React.FC<Props> = ({
   useEffect(() => {
     if (!cardRef.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setIsInView(entry.isIntersecting),
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+        if (entry.isIntersecting && !hasRecordedView.current) {
+          hasRecordedView.current = true;
+          recordViewHistory(post.id);
+        }
+      },
       { threshold: 0.4 },
     );
     observer.observe(cardRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [post.id]);
 
   useEffect(() => {
     const handleActivity = (payload: PostActivityPayload) => {
@@ -173,6 +186,15 @@ const PostCard: React.FC<Props> = ({
 
     // Khóa bấm trong 500ms để tránh spam API
     setTimeout(() => setIsLiking(false), 500);
+  };
+
+  const handleToggleSave = async () => {
+    const newState = !isSaved;
+    setIsSaved(newState);
+    const success = await toggleSaveContent(post.id, newState);
+    if (!success) {
+      setIsSaved(!newState); // revert if failed
+    }
   };
 
   const onMouseEnterLike = () => {
@@ -267,6 +289,8 @@ const PostCard: React.FC<Props> = ({
             }
             showComments={false}
             showPicker={showPicker}
+            isSaved={isSaved}
+            onToggleSave={handleToggleSave}
             onLikeClick={handleLikeButtonClick}
             onToggleComments={() => openModal(true)}
             onSelectReaction={handleReactionClick}

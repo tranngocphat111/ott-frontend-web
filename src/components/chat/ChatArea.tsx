@@ -72,6 +72,7 @@ import type { Message } from "../../types";
 interface ExtendedChatAreaProps extends ChatAreaProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  onBackToList?: () => void;
 }
 
 const isSystemLikeType = (type?: string) =>
@@ -86,6 +87,7 @@ const REVOKE_EXPIRED_MESSAGE =
   "Bạn chỉ có thể thu hồi tin nhắn trong vòng 24 giờ";
 const GROUP_CALL_PENDING_LOCK_MS = 15000;
 const MAX_GROUP_CALL_PARTICIPANTS = 8;
+const RIGHT_SIDEBAR_DOCK_MIN_WIDTH = 1536;
 
 const isRevokeWindowExpired = (msg: Message) => {
   const rawTime = msg.created_at || msg.createdAt;
@@ -101,6 +103,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   conversation,
   isSidebarOpen = false,
   onToggleSidebar,
+  onBackToList,
 }) => {
   const { showToast } = useToast();
   const { user: currentUser } = useAuth();
@@ -546,12 +549,57 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   // Sidebar state (Internal fallback nếu không truyền từ props)
   const [internalSidebarOpen, setInternalSidebarOpen] = useState(false);
   const sidebarOpen = onToggleSidebar ? isSidebarOpen : internalSidebarOpen;
+  const sidebarResponsiveCloseQueuedRef = useRef(false);
+
+  useEffect(() => {
+    if (!sidebarOpen) {
+      sidebarResponsiveCloseQueuedRef.current = false;
+      return;
+    }
+
+    let lastWindowWidth =
+      typeof window === "undefined"
+        ? RIGHT_SIDEBAR_DOCK_MIN_WIDTH
+        : window.innerWidth;
+
+    const closeSidebarWhenEnteringCrowdedLayout = () => {
+      if (
+        typeof window === "undefined" ||
+        sidebarResponsiveCloseQueuedRef.current
+      ) {
+        return;
+      }
+
+      const currentWindowWidth = window.innerWidth;
+      const enteredCrowdedLayout =
+        lastWindowWidth >= RIGHT_SIDEBAR_DOCK_MIN_WIDTH &&
+        currentWindowWidth < RIGHT_SIDEBAR_DOCK_MIN_WIDTH;
+      lastWindowWidth = currentWindowWidth;
+
+      if (!enteredCrowdedLayout) return;
+
+      sidebarResponsiveCloseQueuedRef.current = true;
+      if (onToggleSidebar) {
+        onToggleSidebar();
+      } else {
+        setInternalSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", closeSidebarWhenEnteringCrowdedLayout);
+    return () => {
+      window.removeEventListener(
+        "resize",
+        closeSidebarWhenEnteringCrowdedLayout,
+      );
+    };
+  }, [onToggleSidebar, sidebarOpen]);
 
   const toggleSidebar = () => {
     if (onToggleSidebar) {
       onToggleSidebar();
     } else {
-      setInternalSidebarOpen(!internalSidebarOpen);
+      setInternalSidebarOpen((open) => !open);
     }
   };
 
@@ -3154,14 +3202,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   }, [showPinnedMenu]);
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden relative">
+    <div className="relative flex h-full min-w-0 flex-1 overflow-hidden">
       {/* Main Chat Area */}
       <div
-        className={`flex-1 flex flex-col bg-[#F2F4F7] h-full overflow-hidden transition-all duration-300 ${sidebarOpen ? "mr-80" : ""}`}
+        className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#F2F4F7] transition-all duration-300 ${
+          sidebarOpen ? "2xl:mr-80" : ""
+        }`}
       >
         <ChatHeader
           conversation={activeConversation}
           currentUserId={normalizedUserId}
+          onBackToList={onBackToList}
           onStartVoiceCall={() => openCallWindow("voice")}
           onStartVideoCall={() => openCallWindow("video")}
           disableCallActions={
@@ -3194,7 +3245,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
         <div
           ref={messagesContainerRef}
-          className="flex-1 px-4 pt-2 pb-2 gap-2 overflow-y-auto custom-scrollbar flex flex-col relative overflow-hidden"
+          className="custom-scrollbar relative flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-2 pb-2 pt-2 sm:px-4"
           style={{
             ["overflowAnchor" as any]: "none",
           }}
@@ -3576,8 +3627,9 @@ isExpanded && (
           {showScrollButton && (
             <button
               onClick={scrollToBottom}
-              className={`fixed ${sidebarOpen ? "right-[344px]" : "right-6"
-                } bottom-32 bg-primary-500 hover:bg-primary-600 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-[110]`}
+              className={`fixed bottom-28 right-4 z-[110] rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600 md:bottom-32 ${
+                sidebarOpen ? "md:right-6 2xl:right-[344px]" : "md:right-6"
+              }`}
               title="Scroll to bottom"
             >
               <ChevronDown size={24} strokeWidth={2} />
@@ -3589,7 +3641,7 @@ isExpanded && (
           <>
             <div
               ref={composerContainerRef}
-              className="relative bg-white border-t border-slate-100"
+              className="relative border-t border-slate-100 bg-white"
             >
               <div className="w-full">
                 <ChatInput

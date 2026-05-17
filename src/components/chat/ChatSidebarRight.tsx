@@ -763,11 +763,13 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
 
   if (loading) {
     return (
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 overflow-y-auto custom-scrollbar">
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+      <>
+        <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] 2xl:z-40 2xl:w-80 2xl:max-w-none 2xl:shadow-lg">
+          <div className="flex h-full items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-500"></div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -812,7 +814,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">×</button>
         </div>
       )}
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 z-40 overflow-y-auto custom-scrollbar">
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] 2xl:z-40 2xl:w-80 2xl:max-w-none 2xl:shadow-none">
         {/* MAIN VIEW */}
         {viewMode === "main" && (
           <>

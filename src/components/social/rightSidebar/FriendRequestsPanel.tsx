@@ -48,6 +48,7 @@ interface Props {
   busyRequestId: string | null;
   onAccept: (relationshipId: string) => void;
   onReject: (relationshipId: string) => void;
+  onViewAll?: () => void;
 }
 
 const FriendRequestsPanel: React.FC<Props> = ({
@@ -56,6 +57,7 @@ const FriendRequestsPanel: React.FC<Props> = ({
   busyRequestId,
   onAccept,
   onReject,
+  onViewAll,
 }) => {
   const navigate = useNavigate();
   const goProfile = (userId: string) => {
@@ -67,7 +69,10 @@ const FriendRequestsPanel: React.FC<Props> = ({
     <div className="border-t border-primary-200 pt-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-primary-800">Lời mời kết bạn</h3>
-        <button className="text-primary-500 font-medium text-sm hover:underline">
+        <button 
+          onClick={onViewAll}
+          className="text-primary-500 font-medium text-sm hover:underline"
+        >
           Xem tất cả
         </button>
       </div>

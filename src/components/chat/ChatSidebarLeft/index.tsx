@@ -20,6 +20,7 @@ import useChatSearch from "../../../hooks/useChatSearch";
 const ChatSidebarLeft: React.FC<SidebarProps> = ({
   onConversationSelect,
   selectedConversationId,
+  className = "",
 }) => {
   const { user: currentUser } = useAuth();
   const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
@@ -261,7 +262,11 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
 
   return (
     <>
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+      <div
+        className={`flex h-full flex-col border-r border-gray-200 bg-white ${
+          className || "w-80"
+        }`}
+      >
         <SidebarHeader
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}

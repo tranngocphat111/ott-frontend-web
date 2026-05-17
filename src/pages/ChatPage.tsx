@@ -118,6 +118,10 @@ const ChatContent: React.FC = () => {
     setSelectedConversation(item.conversation);
   };
 
+  const handleBackToConversationList = () => {
+    setSelectedConversation(null);
+  };
+
   // Helper thực sự mở cửa sổ gọi (sau khi đã xác nhận sẵn sàng)
   const doOpenCallWindow = (payload: IncomingCallPayload, action: "join" | "start", displayName: string, displayAvatar: string) => {
     const effectiveCallType = payload.isGroup ? "video" : payload.callType;
@@ -421,8 +425,13 @@ const ChatContent: React.FC = () => {
   const callerAvatarSrc = callerAvatarRaw ? getFullUrl(callerAvatarRaw) : "";
   const callerInitial = (callerName || "U").charAt(0).toUpperCase();
 
+  const hasSelectedConversation = Boolean(selectedConversation);
+
   return (
-    <div className="flex h-full w-full bg-white" style={{ zoom: 0.9 }}>
+    <div
+      className="relative flex h-full min-h-0 w-full overflow-hidden bg-white"
+      style={{ zoom: 0.9 }}
+    >
 
       {/* ── INCOMING CALL MODAL (Modern Warm Brown Theme) ─────────────── */}
       {incomingCall && (
@@ -516,14 +525,24 @@ const ChatContent: React.FC = () => {
 
       {/* ── SIDEBAR ─────────────── */}
       <Sidebar
+        className={`w-full shrink-0 md:w-80 ${
+          hasSelectedConversation ? "hidden md:flex" : "flex"
+        }`}
         onConversationSelect={handleConversationSelect}
         selectedConversationId={selectedConversation?._id}
       />
 
       {/* ── MAIN CHAT AREA / EMPTY STATE ─────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/50">
+      <div
+        className={`min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/50 ${
+          hasSelectedConversation ? "flex" : "hidden md:flex"
+        }`}
+      >
         {selectedConversation ? (
-          <ChatArea conversation={selectedConversation} />
+          <ChatArea
+            conversation={selectedConversation}
+            onBackToList={handleBackToConversationList}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-sm mx-auto p-8 flex flex-col items-center animate-fade-in">
