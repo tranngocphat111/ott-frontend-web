@@ -14,13 +14,21 @@ import type {
   UserSummary,
 } from "../interfaces/admin.interface";
 
-const ADMIN_ANALYTIC_BASE_URL =
-  (import.meta.env.VITE_ADMIN_ANALYTIC_BASE_URL as string | undefined) ??
-  "http://localhost:8092";
+const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
+
+const resolveGatewayBaseUrl = (): string => {
+  const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+
+  if (!apiUrl) {
+    return "http://localhost:8080/riff/api";
+  }
+
+  return normalizeBaseUrl(apiUrl);
+};
 
 // 1. Khởi tạo Axios Instance
 const adminApiClient = axios.create({
-  baseURL: ADMIN_ANALYTIC_BASE_URL,
+  baseURL: resolveGatewayBaseUrl(),
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",

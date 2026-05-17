@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { AccountType } from "../types";
+import { isAdminAccountType } from "../types";
 
 export const RequireAuth: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -31,7 +31,7 @@ export const RequireAdmin: React.FC<{ children: React.ReactNode }> = ({
     );
   }
 
-  const isAdmin = user?.accountType === AccountType.ADMIN;
+  const isAdmin = isAdminAccountType(user?.accountType);
   return isAuthenticated && isAdmin ? (
     <>{children}</>
   ) : (
