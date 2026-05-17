@@ -1,4 +1,4 @@
-import { resolveApiBaseUrl, resolveFrontendUrl } from "./runtime";
+import { cleanEnvValue, resolveApiBaseUrl, resolveFrontendUrl } from "./runtime";
 
 export const API_CONFIG = {
   BASE_URL: resolveApiBaseUrl(),
@@ -10,7 +10,7 @@ export const API_CONFIG = {
 };
 
 export const GOOGLE_CONFIG = {
-  CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  CLIENT_ID: cleanEnvValue(import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined),
   REDIRECT_URI: `${resolveFrontendUrl()}/auth/google/callback`,
   SCOPE: "openid profile email",
 };
