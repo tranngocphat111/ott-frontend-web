@@ -68,7 +68,7 @@ const NotificationMenu: React.FC = () => {
   };
 
   return (
-    <div className="relative z-[300]" ref={menuRef}>
+    <div className="relative z-[120]" ref={menuRef}>
       <button
         onClick={() => setShowMenu((value) => !value)}
         className={`p-3 rounded-xl transition-all duration-200 relative ${
@@ -83,7 +83,7 @@ const NotificationMenu: React.FC = () => {
       </button>
 
       {showMenu && (
-        <div className="absolute bottom-12 left-0 z-[300] w-80 overflow-hidden rounded-2xl border border-[#ead9cc] bg-white shadow-xl">
+        <div className="absolute bottom-12 left-0 z-[120] w-80 overflow-hidden rounded-2xl border border-[#ead9cc] bg-white shadow-xl">
           <div className="flex items-center justify-between border-b border-[#f1e4d7] px-4 py-3 bg-[#fffaf6]">
             <p className="text-sm font-semibold text-[#5f432c]">Thông báo</p>
           </div>

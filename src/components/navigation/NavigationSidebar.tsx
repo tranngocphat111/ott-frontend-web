@@ -68,7 +68,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   ];
 
   return (
-    <div className="relative z-[200] flex h-full w-16 shrink-0 flex-col items-center overflow-visible border-r border-gray-200 bg-white py-4">
+    <div className="relative z-30 flex h-full w-16 shrink-0 flex-col items-center overflow-visible border-r border-gray-200 bg-white py-4">
       {/* User Avatar với Logout */}
       <UserProfile />
 
@@ -92,7 +92,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </button>
 
           {showSettingsMenu && (
-            <div className="absolute bottom-12 left-0 z-[300] w-52 overflow-hidden rounded-2xl border border-[#ead9cc] bg-white shadow-xl">
+            <div className="absolute bottom-12 left-0 z-[120] w-52 overflow-hidden rounded-2xl border border-[#ead9cc] bg-white shadow-xl">
               <div className="flex items-center gap-2 border-b border-[#f1e4d7] px-4 py-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#f1e4d7] bg-[#fffaf6] shadow-sm">
                   <img src={logo} alt="Riff" className="h-5 w-5 object-contain" />
