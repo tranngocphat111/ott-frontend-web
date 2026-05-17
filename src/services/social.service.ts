@@ -116,6 +116,17 @@ const verifySentFriendRequest = async (requesterId: string, receiverId: string) 
     return null;
 };
 
+const normalizeRelationshipResponse = (relationship: any) => {
+    if (!relationship || typeof relationship !== "object") return relationship;
+
+    return {
+        ...relationship,
+        id: relationship.id || relationship._id || relationship.relationship_id,
+        requesterId: relationship.requesterId || relationship.requester_id,
+        receiverId: relationship.receiverId || relationship.receiver_id,
+    };
+};
+
 function unwrapList<T>(json: unknown): T[] {
     const data = unwrapApiResult<T[]>(json);
     if (!Array.isArray(data)) {
@@ -306,6 +317,10 @@ export async function fetchRelationshipStatusViaChat(
 
 export async function cancelRelationship(id: string | null): Promise<boolean> {
     if (!id) return false;
+
+    const cancelledViaChat = await cancelFriendRequestViaChat(id);
+    if (cancelledViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${id}/cancel`,
@@ -345,6 +360,9 @@ export async function fetchPendingRequests(
 export async function acceptFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {
+    const acceptedViaChat = await acceptFriendRequestViaChat(relationshipId);
+    if (acceptedViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/accept`,
@@ -514,6 +532,9 @@ export async function unblockUserViaChat(
 export async function rejectFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {
+    const rejectedViaChat = await rejectFriendRequestViaChat(relationshipId);
+    if (rejectedViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/reject`,
@@ -529,6 +550,11 @@ export async function sendFriendRequest(
     requesterId: string,
     receiverId?: string,
 ): Promise<any> {
+    if (receiverId) {
+        const result = await sendFriendRequestViaChat(requesterId, receiverId);
+        if (result) return normalizeRelationshipResponse(result);
+    }
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/send?requesterId=${requesterId}&receiverId=${receiverId}`,
@@ -536,7 +562,7 @@ export async function sendFriendRequest(
         );
         if (!res.ok) throw new Error("Gửi kết bạn thất bại.")
         const json = await res.json();
-        return unwrapApiResult<any>(json);
+        return normalizeRelationshipResponse(unwrapApiResult<any>(json));
     } catch (error) {
         console.error(error)
         return null;
@@ -562,13 +588,13 @@ export async function sendFriendRequestViaChat(
         );
         if (!res.ok) {
             const verified = await verifySentFriendRequest(requesterId, receiverId);
-            if (verified) return verified;
+            if (verified) return normalizeRelationshipResponse(verified);
             throw new Error("Gửi kết bạn qua Chat thất bại.")
         }
-        return await res.json();
+        return normalizeRelationshipResponse(await res.json());
     } catch (error) {
         const verified = await verifySentFriendRequest(requesterId, receiverId);
-        if (verified) return verified;
+        if (verified) return normalizeRelationshipResponse(verified);
         console.error(error)
         return null;
     }

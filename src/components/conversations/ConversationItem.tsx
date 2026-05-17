@@ -470,9 +470,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <h3
                   className={`
-                font-semibold truncate transition-colors duration-200 select-none text-sm
+                truncate transition-colors duration-200 select-none text-sm
                 ${isSelected ? "text-primary-500" : "text-gray-900"}
                 ${isHovered ? "text-primary-500" : ""}
+                ${hasUnreadMessage ? "font-bold" : "font-semibold"}
               `}
                 >
                   {getConversationName()}

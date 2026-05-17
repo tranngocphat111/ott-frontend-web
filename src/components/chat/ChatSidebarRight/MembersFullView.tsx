@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, UserPlus, Crown, MoreHorizontal, UserCheck, Loader2, ShieldAlert, UserX, UserMinus } from "lucide-react";
+import {
+  ArrowLeft,
+  UserPlus,
+  Crown,
+  MoreHorizontal,
+  UserCheck,
+  Loader2,
+  ShieldAlert,
+  UserX,
+  UserMinus,
+} from "lucide-react";
 import Avatar from "../../common/Avatar";
 import { ConfirmModal } from "../../modal/ConfirmModal";
 import type { MembersFullViewProps } from "../../../interfaces";
@@ -28,20 +38,32 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   const [activeTab, setActiveTab] = useState<"members" | "blocked">("members");
   const [blockedMembers, setBlockedMembers] = useState<any[]>([]);
   const [loadingBlocked, setLoadingBlocked] = useState(false);
-  const [menuOpenForUserId, setMenuOpenForUserId] = useState<string | null>(null);
+  const [menuOpenForUserId, setMenuOpenForUserId] = useState<string | null>(
+    null,
+  );
   const [transferConfirmOpen, setTransferConfirmOpen] = useState(false);
-  const [transferTarget, setTransferTarget] = useState<{ id: string; name: string } | null>(null);
-  const [acceptingFriendId, setAcceptingFriendId] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [acceptingFriendId, setAcceptingFriendId] = useState<string | null>(
+    null,
+  );
   const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const validMembers = (members || []).filter(member => member && member.user_id);
+  const validMembers = (members || []).filter(
+    (member) => member && member.user_id,
+  );
 
   const fetchBlockedMembers = async () => {
     if (!conversationId || !currentUserId) return;
     setLoadingBlocked(true);
     try {
-      const data = await ConversationService.getBlockedMembers(conversationId, currentUserId);
+      const data = await ConversationService.getBlockedMembers(
+        conversationId,
+        currentUserId,
+      );
       setBlockedMembers(data || []);
     } catch (err) {
       console.error("Failed to fetch blocked members:", err);
@@ -60,7 +82,11 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   const handleBlockMember = async (userId: string) => {
     try {
       setBlockingUserId(userId);
-      await ConversationService.blockMember(conversationId, userId, currentUserId);
+      await ConversationService.blockMember(
+        conversationId,
+        userId,
+        currentUserId,
+      );
       showToast("Đã chặn thành viên khỏi nhóm", "success");
       if (onMemberBlocked) onMemberBlocked(userId);
       setMenuOpenForUserId(null);
@@ -73,22 +99,30 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
 
   const handleUnblockMember = async (userId: string) => {
     try {
-      await ConversationService.unblockMember(conversationId, userId, currentUserId);
+      await ConversationService.unblockMember(
+        conversationId,
+        userId,
+        currentUserId,
+      );
       showToast("Đã bỏ chặn thành viên", "success");
-      setBlockedMembers(prev => prev.filter(m => m.user_id !== userId));
+      setBlockedMembers((prev) => prev.filter((m) => m.user_id !== userId));
     } catch (err: any) {
       showToast(err.message || "Không thể bỏ chặn", "error");
     }
   };
 
   const getDisplayName = (member: any) => {
-    return (member.nickname || "").trim() || member.name || `User ${member.user_id.slice(-4)}`;
+    return (
+      (member.nickname || "").trim() ||
+      member.name ||
+      `User ${member.user_id.slice(-4)}`
+    );
   };
 
   const getRoleLabel = (member: any) => {
     if (member.user_id === ownerId) return "Trưởng nhóm";
     if (member.role === "admin") return "Phó nhóm";
-    return "Thành viên";
+    return "";
   };
 
   const canManageMember = (member: any) => {
@@ -147,9 +181,13 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
           <div className="px-4 py-3 border-b border-gray-50 bg-gray-50/30">
             <div className="flex items-center gap-2 text-amber-600">
               <ShieldAlert size={16} />
-              <p className="text-xs font-semibold uppercase tracking-wider">Danh sách chặn</p>
+              <p className="text-xs font-semibold uppercase tracking-wider">
+                Danh sách chặn
+              </p>
             </div>
-            <p className="mt-1 text-[11px] text-gray-400">Người bị chặn không thể vào nhóm qua link mời.</p>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Người bị chặn không thể vào nhóm qua link mời.
+            </p>
           </div>
         )}
       </div>
@@ -177,36 +215,51 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {getDisplayName(member)}
-                        {isMe && <span className="text-primary-600 ml-1">(Bạn)</span>}
+                        {isMe && (
+                          <span className="text-primary-600 ml-1">(Bạn)</span>
+                        )}
                       </p>
-                      {(member.role === "admin" || member.user_id === ownerId) && (
+                      {(member.role === "admin" ||
+                        member.user_id === ownerId) && (
                         <Crown size={14} className="text-amber-500 shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
-                        member.user_id === ownerId ? "bg-amber-100 text-amber-700" :
-                        member.role === "admin" ? "bg-blue-100 text-blue-700" :
-                        "bg-gray-100 text-gray-600"
-                      }`}>
-                        {getRoleLabel(member)}
-                      </span>
+                      {getRoleLabel(member) && (
+                        <span
+                          className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${
+                            member.user_id === ownerId
+                              ? "bg-amber-100 text-amber-700"
+                              : member.role === "admin"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {getRoleLabel(member)}
+                        </span>
+                      )}
+
                       {member.joined_at && (
                         <span className="text-[11px] text-gray-400">
-                          • {new Date(member.joined_at).toLocaleDateString("vi-VN")}
+                          {" "}
+                          {new Date(member.joined_at).toLocaleDateString(
+                            "vi-VN",
+                          )}
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {!isMe && !isFriend && (
-                      pendingFriendRequestIds?.has(member.user_id) ? (
+                    {!isMe &&
+                      !isFriend &&
+                      (pendingFriendRequestIds?.has(member.user_id) ? (
                         <button
                           onClick={async () => {
                             setAcceptingFriendId(member.user_id);
                             try {
-                              if (onFriendAccepted) await onFriendAccepted(member.user_id);
+                              if (onFriendAccepted)
+                                await onFriendAccepted(member.user_id);
                               showToast("Đã chấp nhận lời mời", "success");
                             } catch {
                               showToast("Lỗi khi chấp nhận", "error");
@@ -232,13 +285,16 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                         >
                           <UserPlus size={18} />
                         </button>
-                      )
-                    )}
+                      ))}
 
                     {canManageMember(member) && (
                       <div className="relative">
                         <button
-                          onClick={() => setMenuOpenForUserId(prev => prev === member.user_id ? null : member.user_id)}
+                          onClick={() =>
+                            setMenuOpenForUserId((prev) =>
+                              prev === member.user_id ? null : member.user_id,
+                            )
+                          }
                           className="cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         >
                           <MoreHorizontal size={18} className="text-gray-600" />
@@ -249,34 +305,47 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
                             {currentUserId === ownerId && (
                               <button
                                 onClick={() => {
-                                  onMemberRoleUpdated(member.user_id, member.role === "admin" ? "user" : "admin");
+                                  onMemberRoleUpdated(
+                                    member.user_id,
+                                    member.role === "admin" ? "user" : "admin",
+                                  );
                                   setMenuOpenForUserId(null);
                                 }}
                                 className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                               >
-                                {member.role === "admin" ? "Gỡ phó nhóm" : "Thêm phó nhóm"}
+                                {member.role === "admin"
+                                  ? "Gỡ phó nhóm"
+                                  : "Thêm phó nhóm"}
                               </button>
                             )}
 
-                            {currentUserId === ownerId && onTransferOwnership && (
-                              <button
-                                onClick={() => {
-                                  setTransferTarget({ id: member.user_id, name: getDisplayName(member) });
-                                  setTransferConfirmOpen(true);
-                                  setMenuOpenForUserId(null);
-                                }}
-                                className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                Chuyển quyền trưởng nhóm
-                              </button>
-                            )}
+                            {currentUserId === ownerId &&
+                              onTransferOwnership && (
+                                <button
+                                  onClick={() => {
+                                    setTransferTarget({
+                                      id: member.user_id,
+                                      name: getDisplayName(member),
+                                    });
+                                    setTransferConfirmOpen(true);
+                                    setMenuOpenForUserId(null);
+                                  }}
+                                  className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  Chuyển quyền trưởng nhóm
+                                </button>
+                              )}
 
                             <button
                               onClick={() => handleBlockMember(member.user_id)}
                               disabled={blockingUserId === member.user_id}
                               className="w-full cursor-pointer px-4 py-2 text-left text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2"
                             >
-                              {blockingUserId === member.user_id ? <Loader2 size={14} className="animate-spin" /> : <UserX size={14} />}
+                              {blockingUserId === member.user_id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <UserX size={14} />
+                              )}
                               Chặn khỏi nhóm
                             </button>
 
@@ -315,10 +384,19 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
               </div>
             ) : (
               blockedMembers.map((user) => (
-                <div key={user.user_id} className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors">
-                  <Avatar src={getFullUrl(user.avatar || "")} name={user.name || "User"} size={48} />
+                <div
+                  key={user.user_id}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <Avatar
+                    src={getFullUrl(user.avatar || "")}
+                    name={user.name || "User"}
+                    size={48}
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {user.name}
+                    </p>
                     <p className="text-[11px] text-gray-400">Đã bị chặn</p>
                   </div>
                   <button
@@ -342,7 +420,8 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
         cancelText="Huỷ"
         isDangerous={true}
         onConfirm={() => {
-          if (transferTarget && onTransferOwnership) onTransferOwnership(transferTarget.id);
+          if (transferTarget && onTransferOwnership)
+            onTransferOwnership(transferTarget.id);
           setTransferConfirmOpen(false);
         }}
         onCancel={() => setTransferConfirmOpen(false)}

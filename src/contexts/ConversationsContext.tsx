@@ -228,6 +228,17 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     }
   }, []);
 
+  const isMessageCursorAfter = useCallback((left?: string, right?: string) => {
+    const normalizedLeft = String(left || "0").trim();
+    const normalizedRight = String(right || "0").trim();
+
+    try {
+      return BigInt(normalizedLeft || "0") > BigInt(normalizedRight || "0");
+    } catch {
+      return normalizedLeft > normalizedRight;
+    }
+  }, []);
+
   // Helper to apply dissolution logic to any incoming conversations array
   const applyDissolutionLogic = useCallback((
     newConversations: ConversationWithParticipant[],
@@ -298,8 +309,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
             // Nếu tin nhắn cuối cùng mới hơn tin nhắn vừa đọc -> giữ badge hoặc set về 1, ngược lại về 0
             mergedParticipant.unread_count =
-              lastMsgId !== "0" && BigInt(lastMsgId) > BigInt(lastReadId) ?
-                mergedParticipant.unread_count || 1
+              lastMsgId !== "0" && isMessageCursorAfter(lastMsgId, lastReadId) ?
+                Math.max(1, Number(mergedParticipant.unread_count || 0))
                 : 0;
           }
 
@@ -307,7 +318,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
         }),
       );
     },
-    [],
+    [isMessageCursorAfter],
   );
 
   // Add new conversation
