@@ -33,12 +33,12 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen h-[100dvh] overflow-hidden bg-gray-100">
+    <div className="fixed inset-0 flex overflow-hidden bg-gray-100">
       {/* Navigation Sidebar */}
       <NavigationSidebar activeItem={activeItem} onItemClick={handleItemClick} />
 
       {/* Main Content */}
-      <div className="min-w-0 flex-1 overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </div>
     </div>

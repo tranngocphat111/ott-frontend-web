@@ -12,11 +12,11 @@ const GroupInfoSection: React.FC<GroupInfoSectionProps> = ({
   onSearchChange
 }) => {
   return (
-    <div className="px-6 py-4 border-b border-gray-200">
-      <div className="flex items-center gap-4 mb-4">
+    <div className="shrink-0 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <div className="mb-3 flex items-center gap-3 sm:mb-4 sm:gap-4">
         <div className="relative group">
           <label className="cursor-pointer">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden group-hover:bg-gray-200 transition-colors">
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-gray-100 transition-colors group-hover:bg-gray-200 sm:h-12 sm:w-12">
               {groupAvatar ? (
                 <img src={groupAvatar} alt="Group avatar" className="w-full h-full object-cover" />
               ) : (
@@ -36,7 +36,7 @@ const GroupInfoSection: React.FC<GroupInfoSectionProps> = ({
           placeholder="Nhập tên nhóm..."
           value={groupName}
           onChange={(e) => onGroupNameChange(e.target.value)}
-          className="flex-1 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2
                    focus:border-primary-500 focus:outline-none transition-colors
                    text-gray-900 placeholder-gray-400"
           autoFocus
