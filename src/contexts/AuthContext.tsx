@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { authApi, profileApi, userApi } from "../services/api";
 import type { UserProfileResponse } from "../types";
-import { AccountType } from "../types/enums/user.enum";
+import { isAdminAccountType } from "../types/enums/user.enum";
 import type { AdminRole } from "../types";
 import { emitAuthLogoutSignal } from "../utils/authLogoutSignal";
 
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const inferredRole = (user as any)?.role ?? (user as any)?.adminRole ?? null;
   const userRole: AdminRole | null = inferredRole
     ? (inferredRole as AdminRole)
-    : user?.accountType === AccountType.ADMIN
+    : isAdminAccountType(user?.accountType)
       ? "ANALYST"
       : null;
   const isAdmin = userRole !== null;

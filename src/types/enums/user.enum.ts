@@ -7,6 +7,9 @@ export const AccountType = {
 export type AccountType =
   typeof AccountType[keyof typeof AccountType];
 
+export const isAdminAccountType = (
+  accountType?: AccountType | string | null,
+): boolean => String(accountType ?? "").toLowerCase() === AccountType.ADMIN;
 
 export const Gender = {
   MALE: 'MALE',
