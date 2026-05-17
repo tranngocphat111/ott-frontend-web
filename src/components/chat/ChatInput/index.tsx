@@ -1708,7 +1708,7 @@ export const ChatInput = ({
           </button>
         </div>
       ) : (
-        <div className="chat-composer-bar flex min-w-0 items-center gap-1 rounded-2xl border border-gray-200 bg-gray-50 px-1.5 py-1.5 sm:gap-2 sm:px-2">
+        <div className="chat-composer-bar flex min-w-0 items-center gap-0.5 rounded-2xl border border-gray-200 bg-gray-50 px-1.5 py-1.5 sm:gap-2 sm:px-2">
           <ImageInput
             disabled={isUploading}
             isUploading={isUploading}
@@ -1721,7 +1721,7 @@ export const ChatInput = ({
             <button
               onClick={() => setShowCreatePollModal(true)}
               disabled={isUploading}
-              className="shrink-0 p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+              className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-gray-600 disabled:opacity-50 sm:inline-flex"
               title="Tạo khảo sát"
             >
               <ListChecks size={20} />
@@ -1731,7 +1731,7 @@ export const ChatInput = ({
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             disabled={isUploading}
-            className="shrink-0 p-2 text-slate-400 hover:text-slate-600 disabled:opacity-50 transition-colors"
+            className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-slate-600 disabled:opacity-50 sm:inline-flex"
             title="Chọn emoji"
           >
             <Smile size={20} />
@@ -1740,7 +1740,7 @@ export const ChatInput = ({
           <button
             onClick={startVoiceRecording}
             disabled={isUploading}
-            className="shrink-0 p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+            className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-gray-600 disabled:opacity-50 sm:inline-flex"
             title="Gửi tin nhắn thoại"
           >
             <Mic size={20} />
@@ -1752,7 +1752,7 @@ export const ChatInput = ({
               startVoiceRecording();
             }}
             disabled={isUploading || isRecordingVoice}
-            className={`shrink-0 p-2 rounded-xl transition-all duration-200 ${isTranscribing ? "animate-pulse text-primary-500 bg-primary-50" : "text-slate-400 hover:text-primary-500 hover:bg-primary-50"
+            className={`hidden shrink-0 rounded-xl p-2 transition-all duration-200 sm:inline-flex ${isTranscribing ? "animate-pulse text-primary-500 bg-primary-50" : "text-slate-400 hover:text-primary-500 hover:bg-primary-50"
               }`}
             title="Nhập liệu bằng giọng nói"
           >

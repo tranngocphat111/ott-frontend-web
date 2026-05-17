@@ -534,7 +534,7 @@ const ChatContent: React.FC = () => {
 
       {/* ── MAIN CHAT AREA / EMPTY STATE ─────────────── */}
       <div
-        className={`min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/50 ${
+        className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/50 ${
           hasSelectedConversation ? "flex" : "hidden md:flex"
         }`}
       >

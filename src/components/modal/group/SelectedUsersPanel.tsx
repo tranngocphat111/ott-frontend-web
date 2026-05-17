@@ -10,8 +10,8 @@ const SelectedUsersPanel: React.FC<SelectedUsersPanelProps> = ({
   maxUsers = 100
 }) => {
   return (
-    <div className="w-80 flex flex-col bg-gray-50">
-      <div className="px-4 py-3 border-b border-gray-200">
+    <div className="flex max-h-36 shrink-0 flex-col border-t border-gray-200 bg-gray-50 md:max-h-none md:w-80 md:border-t-0">
+      <div className="shrink-0 border-b border-gray-200 px-4 py-2.5 md:py-3">
         <h3 className="text-sm font-semibold text-gray-700">
           Đã chọn{' '}
           <span className="text-primary-600">
@@ -19,21 +19,21 @@ const SelectedUsersPanel: React.FC<SelectedUsersPanelProps> = ({
           </span>
         </h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 md:overflow-y-auto md:p-4">
         {selectedUsers.length === 0 ? (
-          <div className="text-center text-gray-400 text-sm py-8">
+          <div className="py-3 text-center text-sm text-gray-400 md:py-8">
             Chưa chọn thành viên nào
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="flex gap-2 md:block md:space-y-2">
             {selectedUsers.map((user) => (
               <div
                 key={user.user_id || user._id}
-                className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm"
+                className="flex min-w-48 items-center gap-3 rounded-lg bg-white p-2 shadow-sm md:min-w-0"
               >
                 <Avatar name={user.display_name || user.name} src={getFullUrl(user.avatar)} size={32} />
                 <span className="flex-1 text-sm font-medium text-gray-900 truncate">
-                  {user.name}
+                  {user.display_name || user.name}
                 </span>
                 <button
                   onClick={() => onRemove(user.user_id)}
