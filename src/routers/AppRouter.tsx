@@ -13,6 +13,9 @@ import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import SocialPage from "../pages/SocialPage";
 import CallPage from "../pages/CallPage";
 import ProfilePage from "../pages/ProfilePage";
+import Dashboard from "../pages/admin/Dashboard";
+import ContentModeration from "../pages/admin/ContentModeration";
+import UserManagement from "../pages/admin/UserManagement";
 
 // Account settings pages
 import SetPasswordPage from "../pages/SetPasswordPage";
@@ -21,11 +24,14 @@ import ChangeEmailPage from "../pages/ChangeEmailPage";
 import ChangePhonePage from "../pages/ChangePhonePage";
 import TwoFactorAuthPage from "../pages/TwoFactorAuthPage";
 import DeleteAccountPage from "../pages/DeleteAccountPage";
+import AuditLogs from "../pages/admin/AuditLogs";
 
 // Layout
 import MainLayout from "../layouts/MainLayout";
+import AdminLayout from "../components/admin/AdminLayout";
 import { ChatPage } from "../pages";
 import JoinGroupPage from "../pages/JoinGroupPage";
+import { RequireAdmin } from "./guards";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -34,8 +40,8 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
 
   if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-b-2 border-blue-600 rounded-full animate-spin"></div>
       </div>
     );
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -46,8 +52,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-b-2 border-blue-600 rounded-full animate-spin"></div>
       </div>
     );
   return !isAuthenticated ? <>{children}</> : <Navigate to="/chat" replace />;
@@ -176,6 +182,21 @@ export const AppRouter: React.FC = () => {
 
       {/* Join group by invite link – accessible when logged in OR not */}
       <Route path="/join" element={<JoinGroupPage />} />
+
+      {/* Admin routes */}
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="moderation" element={<ContentModeration />} />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="audit-logs" element={<AuditLogs />} />
+      </Route>
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,23 +1,81 @@
 import React from "react";
-import { motion } from "framer-motion";
+import type { ReactNode } from "react";
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+} from "lucide-react";
 
 interface StatCardProps {
   title: string;
   value: number;
+  delta?: number | null;
+  description?: string;
+  icon?: ReactNode;
+  tone?: "neutral" | "danger" | "success" | "info" | "violet";
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value }) => {
+const toneStyles = {
+  neutral: "bg-slate-100 text-slate-700",
+  danger: "bg-red-50 text-red-700",
+  success: "bg-emerald-50 text-emerald-700",
+  info: "bg-sky-50 text-sky-700",
+  violet: "bg-violet-50 text-violet-700",
+};
+
+const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  delta = null,
+  description,
+  icon,
+  tone = "neutral",
+}) => {
+  const deltaClassName =
+    delta === null
+      ? "bg-slate-100 text-slate-600"
+      : delta > 0
+        ? "bg-emerald-50 text-emerald-700"
+        : delta < 0
+          ? "bg-red-50 text-red-700"
+          : "bg-slate-100 text-slate-600";
+
+  const DeltaIcon =
+    delta === null
+      ? ArrowRight
+      : delta > 0
+        ? ArrowUpRight
+        : delta < 0
+          ? ArrowDownRight
+          : ArrowRight;
+
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-    >
-      <p className="text-sm text-slate-500">{title}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">
-        {value.toLocaleString()}
-      </p>
-    </motion.div>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+            {value.toLocaleString()}
+          </p>
+          {description && <p className="mt-2 text-sm text-slate-500">{description}</p>}
+        </div>
+        {icon ? (
+          <div className={`rounded-lg p-3 ${toneStyles[tone]}`}>{icon}</div>
+        ) : null}
+      </div>
+
+      {delta !== null && (
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${deltaClassName}`}
+          >
+            <DeltaIcon className="h-3.5 w-3.5" />
+            {Math.abs(delta).toFixed(1)}%
+          </span>
+          <span className="text-xs text-slate-400">vs previous period</span>
+        </div>
+      )}
+    </div>
   );
 };
 

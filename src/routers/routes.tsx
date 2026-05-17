@@ -1,5 +1,4 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
 import ChatPage from "../pages/ChatPage";
 import ContactsPage from "../pages/ContactsPage";
 import SearchPage from "../pages/SearchPage";
@@ -13,27 +12,10 @@ import { SocialProfile } from "../pages/social";
 import Dashboard from "../pages/admin/Dashboard";
 import ContentModeration from "../pages/admin/ContentModeration";
 import UserManagement from "../pages/admin/UserManagement";
+import AuditLogs from "../pages/admin/AuditLogs";
 import AdminLayout from "../components/admin/AdminLayout";
-import { useAuth } from "../contexts/AuthContext";
+import { RequireAdmin, RequireAuth } from "./guards";
 
-const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-};
-
-/**
- * Application route configuration
- * Centralized route definitions for better maintainability
- */
 export const routes: RouteObject[] = [
   {
     path: "/chat",
@@ -90,24 +72,38 @@ export const routes: RouteObject[] = [
   {
     path: "/admin",
     element: (
-      <AdminLayout>
-        <Dashboard />
-      </AdminLayout>
+      <RequireAdmin>
+        <AdminLayout>
+          <Dashboard />
+        </AdminLayout>
+      </RequireAdmin>
     ),
   },
   {
     path: "/admin/moderation",
     element: (
-      <AdminLayout>
-        <ContentModeration />
-      </AdminLayout>
+      <RequireAdmin>
+        <AdminLayout>
+          <ContentModeration />
+        </AdminLayout>
+      </RequireAdmin>
     ),
   },
   {
     path: "/admin/users",
     element: (
+      <RequireAdmin>
+        <AdminLayout>
+          <UserManagement />
+        </AdminLayout>
+      </RequireAdmin>
+    ),
+  },
+  {
+    path: "/admin/audit-logs",
+    element: (
       <AdminLayout>
-        <UserManagement />
+        <AuditLogs />
       </AdminLayout>
     ),
   },
@@ -117,9 +113,6 @@ export const routes: RouteObject[] = [
   },
 ];
 
-/**
- * Route paths constants for type-safe navigation
- */
 export const ROUTE_PATHS = {
   CHAT: "/chat",
   CONTACTS: "/contacts",
@@ -131,8 +124,11 @@ export const ROUTE_PATHS = {
   SOCIAL: "/social",
   ADMIN: "/admin",
   ADMIN_MODERATION: "/admin/moderation",
+  ADMIN_USERS: "/admin/users",
+  ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   CALL: "/call",
-  SOCIAL_PROFILE: (userId?: string) => userId ? `/social/profile/${userId}` : "/social/profile",
+  SOCIAL_PROFILE: (userId?: string) =>
+    userId ? `/social/profile/${userId}` : "/social/profile/:userId",
 } as const;
 
 export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];

@@ -12,6 +12,13 @@ type CallSessionAck = {
   isGroup?: boolean;
   livekitToken?: string | null;
   participants?: string[];
+  participantDetails?: Array<{
+    userId?: string;
+    user_id?: string;
+    id?: string;
+    name?: string;
+    avatar?: string;
+  }>;
   targetUserId?: string;
 };
 

@@ -1,19 +1,42 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import { authApi, profileApi, userApi } from '../services/api';
-import type { UserProfileResponse } from '../types';
-import { emitAuthLogoutSignal } from '../utils/authLogoutSignal';
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
+import { authApi, profileApi, userApi } from "../services/api";
+import type { UserProfileResponse } from "../types";
+import { isAdminAccountType } from "../types/enums/user.enum";
+import type { AdminRole } from "../types";
+import { emitAuthLogoutSignal } from "../utils/authLogoutSignal";
 
 interface AuthContextType {
   user: UserProfileResponse | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  userRole: AdminRole | null;
   isLoading: boolean;
-  login: (identifier: string, password: string, otpCode?: string) => Promise<{ requires2FA?: boolean; tempToken?: string; requiresPhoneSetup?: boolean; authenticated?: boolean }>;
-  verify2FA: (tempToken: string, otpCode: string, isBackupCode: boolean) => Promise<{ authenticated: boolean }>;
+  login: (
+    identifier: string,
+    password: string,
+    otpCode?: string,
+  ) => Promise<{
+    requires2FA?: boolean;
+    tempToken?: string;
+    requiresPhoneSetup?: boolean;
+    authenticated?: boolean;
+  }>;
+  verify2FA: (
+    tempToken: string,
+    otpCode: string,
+    isBackupCode: boolean,
+  ) => Promise<{ authenticated: boolean }>;
   request2FAOtp: (identifier: string) => Promise<void>;
   loginWithToken: (token: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (phone: string, email: string, password: string, fullName: string, otp: string) => Promise<void>;
+  register: (
+    phone: string,
+    email: string,
+    password: string,
+    fullName: string,
+    otp: string,
+  ) => Promise<void>;
   updateProfile: (updates: Partial<UserProfileResponse>) => void;
   refreshUser: () => Promise<void>;
 }
@@ -24,26 +47,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!user && !!localStorage.getItem('accessToken');
+  const isAuthenticated = !!user && !!localStorage.getItem("accessToken");
+  // Determine admin role if available from profile, else fallback for existing ADMIN accountType
+  const inferredRole = (user as any)?.role ?? (user as any)?.adminRole ?? null;
+  const userRole: AdminRole | null = inferredRole
+    ? (inferredRole as AdminRole)
+    : isAdminAccountType(user?.accountType)
+      ? "ANALYST"
+      : null;
+  const isAdmin = userRole !== null;
 
   const fetchUser = async () => {
     try {
-      console.log('AuthContext: Fetching user profile...');
+      console.log("AuthContext: Fetching user profile...");
       const response = await profileApi.getCurrentProfile();
 
       if (response.result) {
-        console.log('AuthContext: User profile fetched:', response.result);
+        console.log("AuthContext: User profile fetched:", response.result);
         setUser(response.result);
         return response.result;
       } else {
-        console.error('AuthContext: No result in profile response');
-        throw new Error('No user data in response');
+        console.error("AuthContext: No result in profile response");
+        throw new Error("No user data in response");
       }
     } catch (error) {
-      console.error('AuthContext: Failed to fetch user:', error);
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setUser(null);
+      console.error("AuthContext: Failed to fetch user:", error);
+      clearLocalSession();
       throw error;
     } finally {
       setIsLoading(false);
@@ -51,14 +80,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem("accessToken");
     if (token) {
-      console.log('AuthContext: Found token in localStorage, fetching user...');
+      console.log("AuthContext: Found token in localStorage, fetching user...");
       fetchUser().catch(() => {
-        console.log('AuthContext: Initial fetch failed');
+        console.log("AuthContext: Initial fetch failed");
       });
     } else {
-      console.log('AuthContext: No token found');
+      console.log("AuthContext: No token found");
       setIsLoading(false);
     }
   }, []);
@@ -66,13 +95,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
-    let socketServiceRef: typeof import('../services/socket.service').socketService | null = null;
-    let presenceHeartbeatTimer: ReturnType<typeof window.setInterval> | null = null;
+    let socketServiceRef:
+      | typeof import("../services/socket.service").socketService
+      | null = null;
+    let presenceHeartbeatTimer: ReturnType<typeof window.setInterval> | null =
+      null;
     let disposed = false;
 
     const syncPresence = () => {
       if (!socketServiceRef || !user?.id) return;
-      if (document.visibilityState === 'hidden') return;
+      if (document.visibilityState === "hidden") return;
 
       socketServiceRef.connect();
       socketServiceRef.joinUserRoom(user.id);
@@ -80,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         syncPresence();
       }
     };
@@ -111,42 +143,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             bio: payload.bio ?? prevUser.bio,
             work: payload.work ?? prevUser.work,
             location: payload.location ?? prevUser.location,
-            relationshipStatus: payload.relationshipStatus ?? prevUser.relationshipStatus,
+            relationshipStatus:
+              payload.relationshipStatus ?? prevUser.relationshipStatus,
             email: payload.email ?? prevUser.email,
-            phone: payload.phone ?? prevUser.phone
+            phone: payload.phone ?? prevUser.phone,
           };
         }
         return prevUser;
       });
     };
 
-    const handleForceLogout = (payload: { action: string; deviceId?: string; revokedDeviceIds?: string[] }) => {
-      console.log('AuthContext: Received buoc_dang_xuat event', payload);
+    const handleForceLogout = (payload: {
+      action: string;
+      deviceId?: string;
+      revokedDeviceIds?: string[];
+    }) => {
+      console.log("AuthContext: Received buoc_dang_xuat event", payload);
       const { action } = payload;
-      const myDeviceId = localStorage.getItem('deviceId');
+      const myDeviceId = localStorage.getItem("deviceId");
 
-      if (action === 'ALL') {
+      if (action === "ALL") {
         clearLocalSession();
         emitAuthLogoutSignal();
-        window.location.href = '/login';
-      } else if (action === 'SPECIFIC' && payload.deviceId && myDeviceId === payload.deviceId) {
+        window.location.href = "/login";
+      } else if (
+        action === "SPECIFIC" &&
+        payload.deviceId &&
+        myDeviceId === payload.deviceId
+      ) {
         clearLocalSession();
         emitAuthLogoutSignal();
-        window.location.href = '/login';
-      } else if (action === 'OTHERS' && myDeviceId && payload.revokedDeviceIds?.includes(myDeviceId)) {
+        window.location.href = "/login";
+      } else if (
+        action === "OTHERS" &&
+        myDeviceId &&
+        payload.revokedDeviceIds?.includes(myDeviceId)
+      ) {
         clearLocalSession();
         emitAuthLogoutSignal();
-        window.location.href = '/login';
-      } else if (action === 'SPECIFIC' || action === 'OTHERS') {
+        window.location.href = "/login";
+      } else if (action === "SPECIFIC" || action === "OTHERS") {
         fetchUser().catch(() => {
           emitAuthLogoutSignal();
-          window.location.href = '/login';
+          window.location.href = "/login";
         });
       }
     };
 
-    import('../services/socket.service').then(({ socketService }) => {
+    import("../services/socket.service").then(({ socketService }) => {
       if (disposed) return;
+
       socketServiceRef = socketService;
 
       socketService.connect();
@@ -157,14 +203,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       socketService.onForceLogout(handleForceLogout);
 
       presenceHeartbeatTimer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') {
+        if (document.visibilityState === "visible") {
           socketService.refreshPresence(user.id);
         }
       }, 20000);
 
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('focus', handleWindowFocus);
-      window.addEventListener('online', handleWindowFocus);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("focus", handleWindowFocus);
+      window.addEventListener("online", handleWindowFocus);
     });
 
     return () => {
@@ -172,9 +218,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (presenceHeartbeatTimer) {
         window.clearInterval(presenceHeartbeatTimer);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('online', handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("online", handleWindowFocus);
 
       if (socketServiceRef) {
         socketServiceRef.offUserInfoUpdated(handleUserInfoUpdated);
@@ -184,70 +230,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [isAuthenticated, user?.id]);
 
   const clearLocalSession = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     setUser(null);
   };
 
-  const login = async (identifier: string, password: string, otpCode?: string) => {
+  const login = async (
+    identifier: string,
+    password: string,
+    otpCode?: string,
+  ) => {
     try {
-      const response = await authApi.localLogin({ identifier, password, otpCode });
+      const response = await authApi.localLogin({
+        identifier,
+        password,
+        otpCode,
+      });
       if (response.result) {
         if (response.result.requires2FA && response.result.tempToken) {
-          return { requires2FA: true, tempToken: response.result.tempToken, authenticated: false };
+          return {
+            requires2FA: true,
+            tempToken: response.result.tempToken,
+            authenticated: false,
+          };
         }
         if (response.result.token && response.result.refreshToken) {
-          localStorage.setItem('accessToken', response.result.token);
-          localStorage.setItem('refreshToken', response.result.refreshToken);
+          localStorage.setItem("accessToken", response.result.token);
+          localStorage.setItem("refreshToken", response.result.refreshToken);
           await fetchUser();
           return { authenticated: true };
         }
       }
-      throw new Error(response.message || 'Login failed');
+      throw new Error(response.message || "Login failed");
     } finally {
       // setIsLoading(false)
     }
   };
 
-  const verify2FA = async (tempToken: string, otpCode: string, isBackupCode = false) => {
-
-    // eslint-disable-next-line no-useless-catch
+  const verify2FA = async (
+    tempToken: string,
+    otpCode: string,
+    isBackupCode = false,
+  ) => {
     try {
-      const response = await authApi.verify2FAOtp({ tempToken, otpCode, isBackupCode });
+      const response = await authApi.verify2FAOtp({
+        tempToken,
+        otpCode,
+        isBackupCode,
+      });
       if (response.result?.token && response.result?.refreshToken) {
-        localStorage.setItem('accessToken', response.result.token);
-        localStorage.setItem('refreshToken', response.result.refreshToken);
+        localStorage.setItem("accessToken", response.result.token);
+        localStorage.setItem("refreshToken", response.result.refreshToken);
         await fetchUser();
         return { authenticated: true };
       }
-      throw new Error(response.message || '2FA verification failed');
+      throw new Error(response.message || "2FA verification failed");
     } catch (err) {
       throw err;
     }
   };
 
   const request2FAOtp = async (identifier: string) => {
-    console.log('AuthContext: Requesting 2FA OTP resend');
+    console.log("AuthContext: Requesting 2FA OTP resend");
 
     const response = await authApi.request2FAOtp({
       identifier,
     });
 
     if (!response.result) {
-      throw new Error(response.message || 'Failed to send OTP');
+      throw new Error(response.message || "Failed to send OTP");
     }
 
-    console.log('AuthContext: 2FA OTP sent successfully');
+    console.log("AuthContext: 2FA OTP sent successfully");
   };
 
   const loginWithToken = async (token: string, refreshToken: string) => {
     try {
-      localStorage.setItem('accessToken', token);
-      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem("accessToken", token);
+      localStorage.setItem("refreshToken", refreshToken);
       await fetchUser();
     } catch (error) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearLocalSession();
       throw error;
     }
   };
@@ -257,9 +320,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     email: string,
     password: string,
     fullName: string,
-    otp: string
+    otp: string,
   ) => {
-    console.log('AuthContext: Registration attempt');
+    console.log("AuthContext: Registration attempt");
 
     const response = await userApi.register({
       phone,
@@ -270,18 +333,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (response.result) {
-      console.log('AuthContext: Registration successful, auto-logging in');
+      console.log("AuthContext: Registration successful, auto-logging in");
       await login(phone, password); // Dùng phone khi đăng ký vì đăng ký yêu cầu phone
     }
   };
 
   const logout = async () => {
-    console.log('AuthContext: Logout initiated');
-    const rawUser = user as { id?: string; user_id?: string; _id?: string } | null;
+    console.log("AuthContext: Logout initiated");
+    const rawUser = user as {
+      id?: string;
+      user_id?: string;
+      _id?: string;
+    } | null;
     const logoutUserId = rawUser?.id || rawUser?.user_id || rawUser?._id || "";
     emitAuthLogoutSignal();
 
-    const socketCleanupPromise = import('../services/socket.service')
+    const socketCleanupPromise = import("../services/socket.service")
       .then(async ({ socketService }) => {
         if (logoutUserId) {
           await socketService.leaveAllCallsForLogout(logoutUserId);
@@ -294,32 +361,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
       if (token) {
         await authApi.logout({ token });
-        console.log('AuthContext: Logout API call successful');
+        console.log("AuthContext: Logout API call successful");
       }
     } catch (error) {
-      console.error('AuthContext: Logout error:', error);
+      console.error("AuthContext: Logout error:", error);
     } finally {
       // Ngắt kết nối socket ngay lập tức để backend ghi nhận trạng thái offline
       const socketService = await socketCleanupPromise;
       socketService?.disconnect();
-      
+
       clearLocalSession();
-      console.log('AuthContext: Logout completed, tokens cleared');
+      console.log("AuthContext: Logout completed, tokens cleared");
     }
   };
 
   const updateProfile = (updates: Partial<UserProfileResponse>) => {
     if (user) {
-      console.log('AuthContext: Updating profile locally');
+      console.log("AuthContext: Updating profile locally");
       setUser({ ...user, ...updates });
     }
   };
 
   const refreshUser = async () => {
-    console.log('AuthContext: Refreshing user data');
+    console.log("AuthContext: Refreshing user data");
     await fetchUser();
   };
 
@@ -328,6 +395,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         isAuthenticated,
+        isAdmin,
+        userRole,
         isLoading,
         login,
         verify2FA,
@@ -348,7 +417,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 };
