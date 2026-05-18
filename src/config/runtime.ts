@@ -1,6 +1,8 @@
 const RIFF_API_PATH = "/riff/api";
 const LOCAL_GATEWAY_ORIGIN = "http://localhost:8080";
 const LOCAL_FRONTEND_ORIGIN = "http://localhost:5173";
+const DEFAULT_SOCKET_TRANSPORTS = ["polling", "websocket"] as const;
+const VERCEL_PROXY_SOCKET_TRANSPORTS = ["polling"] as const;
 
 export const cleanEnvValue = (value?: string) =>
   (value || "").replace(/^\uFEFF/, "").trim();
@@ -41,6 +43,36 @@ export const resolveChatSocketUrl = () => {
   if (explicitSocket) return normalizeBaseUrl(explicitSocket);
 
   return resolveGatewayBaseUrl();
+};
+
+const isVercelOrigin = (url: string) => {
+  try {
+    const parsedUrl = new URL(url, getBrowserOrigin() || LOCAL_FRONTEND_ORIGIN);
+    return parsedUrl.hostname === "vercel.app" || parsedUrl.hostname.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+};
+
+export const resolveSocketTransports = (socketUrl: string) => {
+  const configuredTransports = cleanEnvValue(
+    import.meta.env.VITE_SOCKET_TRANSPORTS as string | undefined,
+  );
+
+  if (configuredTransports) {
+    const transports = configuredTransports
+      .split(",")
+      .map((transport) => transport.trim())
+      .filter((transport): transport is "polling" | "websocket" =>
+        transport === "polling" || transport === "websocket",
+      );
+
+    if (transports.length > 0) return transports;
+  }
+
+  return import.meta.env.PROD && isVercelOrigin(socketUrl)
+    ? [...VERCEL_PROXY_SOCKET_TRANSPORTS]
+    : [...DEFAULT_SOCKET_TRANSPORTS];
 };
 
 export const resolveFrontendUrl = () => {

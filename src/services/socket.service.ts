@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import { SOCKET_CHAT_SERVER_URL } from "../config/api.config";
+import { SOCKET_CHAT_SERVER_URL, SOCKET_CHAT_TRANSPORTS } from "../config/api.config";
 
 type CallType = "voice" | "video";
 
@@ -107,7 +107,7 @@ class SocketService {
 
     const token = localStorage.getItem("accessToken");
     const socket = io(SOCKET_CHAT_SERVER_URL, {
-      transports: ["polling", "websocket"],
+      transports: SOCKET_CHAT_TRANSPORTS,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       auth: {
