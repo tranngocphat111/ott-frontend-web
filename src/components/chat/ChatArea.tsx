@@ -46,6 +46,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatNotification } from "./ChatNotification";
 import { ChatTimeSeparator } from "./ChatTimeSeparator";
 import ChatSidebarRight from "./ChatSidebarRight";
+import Avatar from "../common/Avatar";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import { ReplacePinnedModal } from "../modal/ReplacePinnedModal";
 import { ForwardMessageModal } from "../modal/ForwardMessageModal";
@@ -87,6 +88,7 @@ const REVOKE_EXPIRED_MESSAGE =
 const GROUP_CALL_PENDING_LOCK_MS = 15000;
 const MAX_GROUP_CALL_PARTICIPANTS = 8;
 const RIGHT_SIDEBAR_DOCK_MIN_WIDTH = 1536;
+const TYPING_TTL_MS = 4500;
 
 const messageLoadingShimmerStyle: React.CSSProperties = {
   backgroundImage:
@@ -188,6 +190,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const { user: currentUser } = useAuth();
   const {
     conversations,
+    addConversation,
     updateConversation,
     updateParticipant,
   } = useConversations();
@@ -307,6 +310,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const allowInitialSeenRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
   const isLoadingNewerRef = useRef(false);
+  const typingExpiryTimersRef = useRef<Map<string, number>>(new Map());
 
   const suppressAutoScrollAfterNewerLoadRef = useRef(false);
   const newerLoadScrollTopRef = useRef<number | null>(null);
@@ -852,6 +856,113 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     [clearImageRemovalTimer, updateOptimisticImageMessage],
   );
 
+  const syncConversationAfterOwnMessage = useCallback(
+    (sentMessage?: Message | ChatMessageType | null) => {
+      if (!sentMessage || !activeConversation?._id) return;
+
+      const sent = sentMessage as ChatMessageType & {
+        conversationId?: string;
+        content?: unknown;
+      };
+      const conversationId = String(
+        sent.conversation_id || sent.conversationId || activeConversation._id || "",
+      ).trim();
+
+      if (!conversationId || conversationId.startsWith("VIRTUAL_CONV_")) return;
+
+      const messageId = String(sent.msg_id || sent._id || Date.now()).trim();
+      const createdAt = String(
+        sent.createdAt || sent.created_at || new Date().toISOString(),
+      );
+      const messageType = String(sent.type || "text").toLowerCase();
+
+      const readContentValue = (value: unknown): string => {
+        if (typeof value === "string") return value;
+        if (value && typeof value === "object") {
+          const item = value as { text?: string; content?: string; url?: string; name?: string };
+          return String(item.text || item.content || item.name || item.url || "");
+        }
+        return String(value || "");
+      };
+
+      const contentItems = Array.isArray(sent.content)
+        ? sent.content
+        : [sent.content];
+      const rawContent = contentItems
+        .map(readContentValue)
+        .filter(Boolean)
+        .join(" ");
+      const mediaCount = contentItems.filter(Boolean).length;
+
+      let displayContent = rawContent;
+      switch (messageType) {
+        case "image":
+          displayContent = mediaCount > 1 ? `[${mediaCount} hình ảnh]` : "[Hình ảnh]";
+          break;
+        case "video":
+          displayContent = "[Video]";
+          break;
+        case "audio":
+          displayContent = "[Âm thanh]";
+          break;
+        case "file":
+          displayContent = sent.fileName || "[Tệp tin]";
+          break;
+        default:
+          displayContent = convertDisplayShortcodeToEmoji(
+            convertEmojiImageMarkupToText(rawContent || "Tin nhắn"),
+          );
+      }
+
+      if (displayContent.length > 50) {
+        displayContent = `${displayContent.slice(0, 50).trim()}...`;
+      }
+
+      const lastMessage = {
+        msg_id: messageId,
+        sender_id: String(sent.sender_id || normalizedUserId || ""),
+        sender_name:
+          sent.sender_name ||
+          (String(sent.sender_id || "") === String(normalizedUserId || "")
+            ? "Bạn"
+            : ""),
+        content: displayContent,
+        type: sent.type as any,
+        createdAt,
+      };
+
+      addConversation({
+        ...activeConversation,
+        _id: conversationId,
+        is_deleted: false,
+        last_message: lastMessage,
+        updatedAt: createdAt,
+      });
+
+      updateConversation(conversationId, {
+        is_deleted: false,
+        last_message: lastMessage,
+        updatedAt: createdAt,
+      });
+
+      updateParticipant(conversationId, {
+        deleted_msg_id: "0",
+        unread_count: 0,
+        last_read_message_id: messageId,
+        last_read_at: createdAt,
+        last_delivered_message_id: messageId,
+        last_delivered_at: createdAt,
+      });
+    },
+    [
+      activeConversation,
+      addConversation,
+      normalizedUserId,
+      updateConversation,
+      updateParticipant,
+    ],
+  );
+
   const handleImageSendSuccess = useCallback(
     ({ clientMessageId, sentMessage }: ImageSendSuccess) => {
       clearImageRemovalTimer(clientMessageId);
@@ -870,6 +981,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }));
 
       appendMessage(sentMessage);
+      syncConversationAfterOwnMessage(sentMessage);
 
       const timerId = window.setTimeout(() => {
         removeOptimisticImageMessage(clientMessageId);
@@ -886,6 +998,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       appendMessage,
       clearImageRemovalTimer,
       removeOptimisticImageMessage,
+      syncConversationAfterOwnMessage,
       updateOptimisticImageMessage,
     ],
   );
@@ -1072,9 +1185,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   );
 
   const typingUsers = useMemo(() => {
-    const typingIds = Object.keys(typingUserIds).filter(
-      (userId) => userId && String(userId) !== String(normalizedUserId || ""),
-    );
+    const activeConversationId = String(activeConversation?._id || "");
+    const typingKeyPrefix = `${activeConversationId}:`;
+    const typingIds = Object.keys(typingUserIds)
+      .filter((key) => key.startsWith(typingKeyPrefix))
+      .map((key) => key.slice(typingKeyPrefix.length))
+      .filter(
+        (userId) => userId && String(userId) !== String(normalizedUserId || ""),
+      );
 
     return typingIds
       .map((userId) => {
@@ -1103,8 +1221,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             "",
         };
       })
-      .filter(Boolean);
-  }, [activeConversation?.participants, normalizedUserId, typingUserIds]);
+      .filter((user) => Boolean(user.id));
+  }, [
+    activeConversation?._id,
+    activeConversation?.participants,
+    normalizedUserId,
+    typingUserIds,
+  ]);
 
   const jumpToPinnedMessage = useCallback(
     async (msg: Message) => {
@@ -1712,6 +1835,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }
       mediaSettleCleanupRef.current?.();
       mediaSettleCleanupRef.current = null;
+      typingExpiryTimersRef.current.forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+      typingExpiryTimersRef.current.clear();
     };
   }, []);
 
@@ -2194,6 +2321,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     async (sentMessage?: Message | null) => {
       if (sentMessage) {
         appendMessage(sentMessage);
+        syncConversationAfterOwnMessage(sentMessage);
       } else {
         await loadMessageContextAfterLast();
       }
@@ -2214,7 +2342,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       window.requestAnimationFrame(pinToBottom);
       window.setTimeout(pinToBottom, 120);
     },
-    [appendMessage, loadMessageContextAfterLast],
+    [appendMessage, loadMessageContextAfterLast, syncConversationAfterOwnMessage],
   );
 
   const handleReactMessage = async (msg: Message, reactionType: string) => {
@@ -2492,7 +2620,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
         // Remove from list
         window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
-          detail: { conversationId: activeConversation._id }
+          detail: {
+            conversationId: activeConversation._id,
+            reason: "delete-history",
+          }
         }));
 
         // Back to welcome screen or another conversation
@@ -3356,48 +3487,104 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   }, [activeConversation?._id, loadPinnedMessages]);
 
   useEffect(() => {
-    const markTyping = (userId: string) => {
-      if (!userId) return;
+    const getTypingPayloadValue = (payload: any, keys: string[]) => {
+      for (const key of keys) {
+        const value = payload?.[key];
+        if (value !== undefined && value !== null && String(value).trim()) {
+          return String(value).trim();
+        }
+      }
+      return "";
+    };
+
+    const getTypingKey = (conversationId: string, userId: string) =>
+      `${conversationId}:${userId}`;
+
+    const clearTypingTimer = (typingKey: string) => {
+      const timerId = typingExpiryTimersRef.current.get(typingKey);
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId);
+        typingExpiryTimersRef.current.delete(typingKey);
+      }
+    };
+
+    const markTyping = (conversationId: string, userId: string) => {
+      if (!conversationId || !userId) return;
+
+      const typingKey = getTypingKey(conversationId, userId);
+      const timestamp = Date.now();
 
       setTypingUserIds((prev) => ({
         ...prev,
-        [userId]: Date.now(),
+        [typingKey]: timestamp,
       }));
+
+      clearTypingTimer(typingKey);
+      const timerId = window.setTimeout(() => {
+        setTypingUserIds((prev) => {
+          if (prev[typingKey] !== timestamp) return prev;
+          const next = { ...prev };
+          delete next[typingKey];
+          return next;
+        });
+        typingExpiryTimersRef.current.delete(typingKey);
+      }, TYPING_TTL_MS);
+
+      typingExpiryTimersRef.current.set(typingKey, timerId);
     };
 
-    const unmarkTyping = (userId: string) => {
-      if (!userId) return;
+    const unmarkTyping = (conversationId: string, userId: string) => {
+      if (!conversationId || !userId) return;
+      const typingKey = getTypingKey(conversationId, userId);
+      clearTypingTimer(typingKey);
+
       setTypingUserIds((prev) => {
-        if (!prev[userId]) return prev;
+        if (!prev[typingKey]) return prev;
         const next = { ...prev };
-        delete next[userId];
+        delete next[typingKey];
         return next;
       });
     };
 
-    const handleTypingStart = (payload: {
-      conversationId?: string;
-      userId?: string;
-    }) => {
-      if (payload.conversationId !== activeConversation?._id) return;
+    const handleTypingStart = (payload: any) => {
+      const conversationId = getTypingPayloadValue(payload, [
+        "conversationId",
+        "conversation_id",
+        "roomId",
+      ]);
+      const userId = getTypingPayloadValue(payload, [
+        "userId",
+        "user_id",
+        "senderId",
+        "sender_id",
+      ]);
+
       if (
-        !payload.userId ||
-        String(payload.userId) === String(normalizedUserId || "")
+        !conversationId ||
+        !userId ||
+        String(userId) === String(normalizedUserId || "")
       ) {
         return;
       }
 
-      markTyping(payload.userId);
+      markTyping(conversationId, userId);
     };
 
-    const handleTypingStop = (payload: {
-      conversationId?: string;
-      userId?: string;
-    }) => {
-      if (payload.conversationId !== activeConversation?._id) return;
+    const handleTypingStop = (payload: any) => {
+      const conversationId = getTypingPayloadValue(payload, [
+        "conversationId",
+        "conversation_id",
+        "roomId",
+      ]);
+      const userId = getTypingPayloadValue(payload, [
+        "userId",
+        "user_id",
+        "senderId",
+        "sender_id",
+      ]);
 
-      if (!payload.userId) return;
-      unmarkTyping(payload.userId);
+      if (!conversationId || !userId) return;
+      unmarkTyping(conversationId, userId);
     };
 
     socketService.onTyping(handleTypingStart);
@@ -3409,7 +3596,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     };
 
   }, [
-    activeConversation?._id,
     normalizedUserId,
   ]);
 
@@ -3463,7 +3649,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     <div className="relative flex h-full min-w-0 flex-1 overflow-hidden">
       {/* Main Chat Area */}
       <div
-        className={`flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#F2F4F7] transition-all duration-300 ${
+        className={`relative flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#F2F4F7] transition-all duration-300 ${
           sidebarOpen ? "2xl:mr-80" : ""
         }`}
       >
@@ -3839,22 +4025,12 @@ isExpanded && (
 
           {typingUsers.length > 0 && !isInvited && (
             <div className="flex items-center  gap-2 mt-1 mb-1 pl-0.5">
-              {/* Phần Avatar giữ nguyên */}
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-white/80 shadow-sm bg-slate-300 shrink-0">
-                 {typingUsers[0].avatar ? (
-                  <img
-                    src={typingUsers[0].avatar}
-                    alt={typingUsers[0].name}
-                    className="w-full h-full object-cover"
-                     loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-white bg-slate-500">
-                     {typingUsers[0].name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
+              <Avatar
+                src={typingUsers[0].avatar ? getFullUrl(typingUsers[0].avatar) : ""}
+                name={typingUsers[0].name}
+                size={32}
+                className="border border-white/80 bg-slate-300 shadow-sm hover:scale-100 active:scale-100"
+              />
 
               {/* Phần bong bóng chat "..." đã được sửa lại giao diện sáng */}
               <div className="h-6 px-4 rounded-2xl bg-white flex items-center pt-1 gap-1 shadow-sm">
@@ -3880,20 +4056,18 @@ isExpanded && (
           )}
 
           <div ref={messagesEndRef} />
-
-          {/* Scroll to bottom button */}
-          {showScrollButton && (
-            <button
-              onClick={scrollToBottom}
-              className={`fixed bottom-28 right-4 z-[110] rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600 md:bottom-32 ${
-                sidebarOpen ? "md:right-6 2xl:right-[344px]" : "md:right-6"
-              }`}
-              title="Scroll to bottom"
-            >
-              <ChevronDown size={24} strokeWidth={2} />
-            </button>
-          )}
          </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-28 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600 md:bottom-32"
+            title="Scroll to bottom"
+          >
+            <ChevronDown size={24} strokeWidth={2} />
+          </button>
+        )}
 
         {isParticipant && !isDissolved && !isInvited && relationshipStatus?.status !== "BLOCKED" ? (
           <>

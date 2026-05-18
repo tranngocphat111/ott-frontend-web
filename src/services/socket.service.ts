@@ -417,7 +417,7 @@ class SocketService {
   onTyping(
     callback: (payload: { conversationId: string; userId: string }) => void,
   ) {
-    this.socket?.on("nguoi_dung_dang_soan_tin_nhan", callback);
+    this.ensureSocket().on("nguoi_dung_dang_soan_tin_nhan", callback);
   }
 
   offTyping(
@@ -433,7 +433,7 @@ class SocketService {
   onTypingStopped(
     callback: (payload: { conversationId: string; userId: string }) => void,
   ) {
-    this.socket?.on("nguoi_dung_ngung_soan_tin_nhan", callback);
+    this.ensureSocket().on("nguoi_dung_ngung_soan_tin_nhan", callback);
   }
 
   offTypingStopped(

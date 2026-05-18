@@ -32,7 +32,10 @@ const GroupActions: React.FC<GroupActionsProps> = ({
 
       // Dispatch event to remove from local session list immediately
       window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
-        detail: { conversationId: conversation._id }
+        detail: {
+          conversationId: conversation._id,
+          reason: "delete-history",
+        }
       }));
 
       onLeaveSuccess();
@@ -61,7 +64,11 @@ const GroupActions: React.FC<GroupActionsProps> = ({
       // For owner, remove immediately from local state
       if (isOwner) {
         window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
-          detail: { conversationId: conversation._id }
+          detail: {
+            conversationId: conversation._id,
+            reason: "dissolve-group",
+            keepOutOfList: true,
+          }
         }));
       }
       onLeaveSuccess();

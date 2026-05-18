@@ -359,7 +359,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       // Báo cho ChatPage biết để đóng cửa sổ chat nếu đang mở đoạn này
       window.dispatchEvent(
         new CustomEvent("chat:remove-conversation", {
-          detail: { conversationId: conversation._id },
+          detail: {
+            conversationId: conversation._id,
+            reason: "delete-history",
+          },
         }),
       );
 

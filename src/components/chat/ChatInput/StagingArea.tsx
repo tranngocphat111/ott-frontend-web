@@ -8,6 +8,10 @@ interface StagingAreaProps {
   onAddMore: () => void;
 }
 
+const isImagePreviewFile = (file: File) =>
+  file.type.startsWith("image/") ||
+  /\.(svg|png|jpe?g|gif|webp|bmp|heic)$/i.test(file.name);
+
 // Preview card cho từng file
 const FilePreview = ({
   file,
@@ -19,7 +23,7 @@ const FilePreview = ({
   onRemove: (i: number) => void;
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const isImage = file.type.startsWith("image/");
+  const isImage = isImagePreviewFile(file);
   const isVideo = file.type.startsWith("video/");
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   const displayName =
@@ -109,7 +113,7 @@ export const StagingArea = ({
   onClearAll,
   onAddMore,
 }: StagingAreaProps) => {
-  const imageCount = files.filter((f) => f.type.startsWith("image/")).length;
+  const imageCount = files.filter(isImagePreviewFile).length;
   const otherCount = files.length - imageCount;
 
   const summary = [
