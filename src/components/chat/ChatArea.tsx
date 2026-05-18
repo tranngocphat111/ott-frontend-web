@@ -452,6 +452,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
   const [relationshipStatus, setRelationshipStatus] = useState<any>(null);
   const [isRelationshipLoading, setIsRelationshipLoading] = useState(false);
+  const canShowPrivatePresence =
+    activeConversation?.type === "private" &&
+    String(relationshipStatus?.status || "").toUpperCase() === "ACCEPTED";
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
   const [isSmartReplyLoading, setIsSmartReplyLoading] = useState(false);
   const [isSmartReplyOpen, setIsSmartReplyOpen] = useState(false);
@@ -4222,6 +4225,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           onToggleSidebar={toggleSidebar}
           onSummarize={isDissolved ? undefined : handleSummarize}
           isSummarizing={isSummarizing}
+          canShowPrivatePresence={canShowPrivatePresence}
           hideCallActions={
             Boolean(activeConversation?.is_self_conversation) ||
             !isParticipant ||
