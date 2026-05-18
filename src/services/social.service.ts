@@ -6,6 +6,8 @@
 
 import { API_MEDIA_SERVER_URL, API_CHAT_SERVER_URL, API_BASE_URL } from "../config/api.config";
 import { authFetch } from "./api/fetchClient";
+import { ConversationService } from "./conversation.service";
+import { MessageService } from "./message.service";
 
 /* ─── Raw shape trả về từ backend ────────────────────── */
 export interface ApiUser {
@@ -125,6 +127,56 @@ const normalizeRelationshipResponse = (relationship: any) => {
         requesterId: relationship.requesterId || relationship.requester_id,
         receiverId: relationship.receiverId || relationship.receiver_id,
     };
+};
+
+const dispatchRelationshipUpdate = (relationship: any) => {
+    if (typeof window === "undefined" || !relationship) return;
+    window.dispatchEvent(
+        new CustomEvent("chat:relationship-updated", {
+            detail: normalizeRelationshipResponse(relationship),
+        }),
+    );
+};
+
+const isSameDirectionActiveRequest = (
+    relationship: ChatRelationshipLike | null | undefined,
+    requesterId: string,
+    receiverId: string,
+) => {
+    if (!relationship) return false;
+    return (
+        getRelationshipRequesterId(relationship) === String(requesterId) &&
+        getRelationshipReceiverId(relationship) === String(receiverId) &&
+        isRelationshipStatus(relationship, ["PENDING", "ACCEPTED"])
+    );
+};
+
+const sendFriendRequestSystemMessage = async (
+    requesterId: string,
+    receiverId: string,
+) => {
+    try {
+        const directConversation =
+            await ConversationService.getOrCreatePrivateConversation(
+                requesterId,
+                receiverId,
+            );
+        const conversationId = String(
+            (directConversation as any)?.conversation?._id ||
+                (directConversation as any)?._id ||
+                "",
+        );
+        if (!conversationId) return;
+
+        await MessageService.sendMessage(
+            conversationId,
+            requesterId,
+            "Đã gửi lời mời kết bạn",
+            "system_friend_request",
+        );
+    } catch (error) {
+        console.warn("Không thể gửi thông báo lời mời kết bạn:", error);
+    }
 };
 
 function unwrapList<T>(json: unknown): T[] {
@@ -585,6 +637,16 @@ export async function sendFriendRequestViaChat(
     requesterId: string,
     receiverId: string,
 ): Promise<any> {
+    const existingRelationship = await fetchRelationshipStatusViaChat(
+        requesterId,
+        receiverId,
+    );
+    if (isSameDirectionActiveRequest(existingRelationship, requesterId, receiverId)) {
+        const normalizedExisting = normalizeRelationshipResponse(existingRelationship);
+        dispatchRelationshipUpdate(normalizedExisting);
+        return normalizedExisting;
+    }
+
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/send`,
@@ -597,13 +659,26 @@ export async function sendFriendRequestViaChat(
         );
         if (!res.ok) {
             const verified = await verifySentFriendRequest(requesterId, receiverId);
-            if (verified) return normalizeRelationshipResponse(verified);
+            if (verified) {
+                const normalizedVerified = normalizeRelationshipResponse(verified);
+                dispatchRelationshipUpdate(normalizedVerified);
+                void sendFriendRequestSystemMessage(requesterId, receiverId);
+                return normalizedVerified;
+            }
             throw new Error("Gửi kết bạn qua Chat thất bại.")
         }
-        return normalizeRelationshipResponse(await res.json());
+        const normalized = normalizeRelationshipResponse(await res.json());
+        dispatchRelationshipUpdate(normalized);
+        void sendFriendRequestSystemMessage(requesterId, receiverId);
+        return normalized;
     } catch (error) {
         const verified = await verifySentFriendRequest(requesterId, receiverId);
-        if (verified) return normalizeRelationshipResponse(verified);
+        if (verified) {
+            const normalizedVerified = normalizeRelationshipResponse(verified);
+            dispatchRelationshipUpdate(normalizedVerified);
+            void sendFriendRequestSystemMessage(requesterId, receiverId);
+            return normalizedVerified;
+        }
         console.error(error)
         return null;
     }

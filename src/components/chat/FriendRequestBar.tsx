@@ -26,10 +26,20 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
 
   if (isFetching) return null;
 
+  const relationshipId =
+    relationship?._id || relationship?.id || relationship?.relationship_id;
+  const relationshipStatus = String(relationship?.status || "").toUpperCase();
+  const requesterId = String(
+    relationship?.requester_id || relationship?.requesterId || "",
+  );
+  const receiverId = String(
+    relationship?.receiver_id || relationship?.receiverId || "",
+  );
+
   const handleAccept = async () => {
-    if (!relationship?._id) return;
+    if (!relationshipId) return;
     setLoading(true);
-    const success = await acceptFriendRequestViaChat(relationship._id, relationship);
+    const success = await acceptFriendRequestViaChat(relationshipId, relationship);
     if (success) {
       onStatusChange();
     } else {
@@ -39,9 +49,9 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   };
 
   const handleReject = async () => {
-    if (!relationship?._id) return;
+    if (!relationshipId) return;
     setLoading(true);
-    const success = await rejectFriendRequestViaChat(relationship._id, relationship);
+    const success = await rejectFriendRequestViaChat(relationshipId, relationship);
     if (success) {
       onStatusChange();
     } else {
@@ -62,9 +72,9 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   };
 
   const handleCancel = async () => {
-    if (!relationship?._id) return;
+    if (!relationshipId) return;
     setLoading(true);
-    const success = await cancelFriendRequestViaChat(relationship._id, relationship);
+    const success = await cancelFriendRequestViaChat(relationshipId, relationship);
     if (success) {
       onStatusChange();
     } else {
@@ -74,7 +84,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   };
 
   // State 1: Incoming Request
-  if (relationship?.status === "PENDING" && relationship?.receiver_id === currentUserId) {
+  if (relationshipStatus === "PENDING" && receiverId === String(currentUserId)) {
     return (
       <div className="bg-primary-50 border-b border-primary-100 px-6 py-3 flex items-center justify-between animate-in slide-in-from-top duration-300">
         <div className="flex items-center gap-3">
@@ -108,7 +118,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   }
 
   // State 2: Outgoing Request
-  if (relationship?.status === "PENDING" && relationship?.requester_id === currentUserId) {
+  if (relationshipStatus === "PENDING" && requesterId === String(currentUserId)) {
     return (
       <div className="bg-gray-50 border-b border-gray-100 px-6 py-3 flex items-center justify-between animate-in slide-in-from-top duration-300">
         <div className="flex items-center gap-3">
@@ -132,7 +142,7 @@ export const FriendRequestBar: React.FC<FriendRequestBarProps> = ({
   }
 
   // State 3: Not friends (relationship is null or removed/blocked)
-  if (!relationship || relationship.status === 'REMOVED') {
+  if (!relationship || relationshipStatus === 'REMOVED') {
     return (
       <div className="bg-primary-50 border-b border-primary-100 px-6 py-3 flex items-center justify-between animate-in slide-in-from-top duration-300">
         <div className="flex items-center gap-3">

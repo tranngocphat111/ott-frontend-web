@@ -49,6 +49,7 @@ const FILE_ACCEPT_TYPES =
   "image/*,video/*,audio/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,.txt,.json,.csv,.zip,.rar,.7z,.tar,.gz,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/x-7z-compressed,application/gzip,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/flac,.env,.ini,.conf,.config,.yaml,.yml,.toml,.md,.xml,.log,.js,.ts,.tsx,.jsx,.mjs,.cjs,.py,.java,.cpp,.c,.h,.hpp,.cs,.go,.rs,.php,.rb,.sh,.bat,.ps1,.sql";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
+  svg: "image/svg+xml",
   env: "text/plain",
   ini: "text/plain",
   conf: "text/plain",
@@ -100,6 +101,11 @@ const resolveMimeType = (file: File) => {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 };
+
+const IMAGE_FILE_EXTENSION_PATTERN = /\.(svg|png|jpe?g|gif|webp|bmp|heic)$/i;
+
+const isImageUploadFile = (file: File) =>
+  file.type.startsWith("image/") || IMAGE_FILE_EXTENSION_PATTERN.test(file.name);
 
 const URL_PATTERN =
   /((https?:\/\/|www\.)[^\s]+|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:\/[^\s]*)?)/i;
@@ -1019,8 +1025,8 @@ export const ChatInput = ({
       if (hasFiles) {
         setPendingFiles([]); // xoá staging ngay khi bắt đầu gửi
 
-        const images = validFiles.filter((f) => f.type.startsWith("image/"));
-        const others = validFiles.filter((f) => !f.type.startsWith("image/"));
+        const images = validFiles.filter(isImageUploadFile);
+        const others = validFiles.filter((file) => !isImageUploadFile(file));
 
         const uploadTasks: Promise<unknown>[] = [];
         if (images.length > 0) {
@@ -1134,8 +1140,8 @@ export const ChatInput = ({
 
     setIsUploading(true);
     try {
-      const images = valid.filter((f) => f.type.startsWith("image/"));
-      const others = valid.filter((f) => !f.type.startsWith("image/"));
+      const images = valid.filter(isImageUploadFile);
+      const others = valid.filter((file) => !isImageUploadFile(file));
 
       const uploadTasks: Promise<unknown>[] = [];
       if (images.length > 0) {

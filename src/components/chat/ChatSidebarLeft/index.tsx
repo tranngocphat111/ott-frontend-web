@@ -17,6 +17,17 @@ import type { SidebarProps } from "../../../interfaces";
 import { SearchResultsPanel, SidebarHeader } from "./components";
 import useChatSearch from "../../../hooks/useChatSearch";
 
+const isMessageIdAfter = (left?: string, right?: string) => {
+  const normalizedLeft = String(left || "0").trim();
+  const normalizedRight = String(right || "0").trim();
+
+  try {
+    return BigInt(normalizedLeft || "0") > BigInt(normalizedRight || "0");
+  } catch {
+    return normalizedLeft > normalizedRight;
+  }
+};
+
 const ChatSidebarLeft: React.FC<SidebarProps> = ({
   onConversationSelect,
   selectedConversationId,
@@ -124,7 +135,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       const lastMsgId = item.conversation.last_message?.msg_id;
       const deletedMsgId = item.participant.deleted_msg_id || "0";
       if (deletedMsgId === "0") return true;
-      if (lastMsgId) return BigInt(lastMsgId) > BigInt(deletedMsgId);
+      if (lastMsgId) return isMessageIdAfter(lastMsgId, deletedMsgId);
       return false;
     });
 

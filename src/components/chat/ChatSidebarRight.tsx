@@ -369,18 +369,75 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       handleSocketMessageRemoved(payload);
     };
 
+    const normalizeRelationshipPayload = (payload: any) => ({
+      ...payload,
+      _id: payload?._id || payload?.id || payload?.relationship_id,
+      requester_id: payload?.requester_id || payload?.requesterId,
+      receiver_id: payload?.receiver_id || payload?.receiverId,
+      requesterId: payload?.requesterId || payload?.requester_id,
+      receiverId: payload?.receiverId || payload?.receiver_id,
+      status: payload?.status ? String(payload.status).toUpperCase() : payload?.status,
+    });
+
     const handleSocketRelationshipUpdate = (payload: any) => {
       if (!isOpen || !currentUser?.id) return;
 
-      const requesterId = payload.requesterId || payload.requester_id;
-      const receiverId = payload.receiverId || payload.receiver_id;
+      const normalizedPayload = normalizeRelationshipPayload(payload);
+      const requesterId = normalizedPayload.requester_id;
+      const receiverId = normalizedPayload.receiver_id;
+      const currentUserId = String(currentUser.id);
+      const isRequester = String(requesterId) === currentUserId;
+      const isReceiver = String(receiverId) === currentUserId;
+      if (!isRequester && !isReceiver) return;
 
-      // If the update involves the current user
-      if (String(requesterId) === String(currentUser.id) ||
-        String(receiverId) === String(currentUser.id)) {
-        console.log("ChatSidebarRight: Relationship updated via socket, refreshing data...");
-        loadSidebarData();
+      const otherUserId = String(isRequester ? receiverId : requesterId);
+      if (!otherUserId) return;
+
+      setRelationship(normalizedPayload);
+
+      if (normalizedPayload.status === "PENDING") {
+        if (isRequester) {
+          setSentFriendRequestIds((prev) => new Set([...prev, otherUserId]));
+          setPendingFriendRequestIds((prev) => {
+            const next = new Set(prev);
+            next.delete(otherUserId);
+            return next;
+          });
+        } else {
+          setPendingFriendRequestIds((prev) => new Set([...prev, otherUserId]));
+          setSentFriendRequestIds((prev) => {
+            const next = new Set(prev);
+            next.delete(otherUserId);
+            return next;
+          });
+        }
+        return;
       }
+
+      if (normalizedPayload.status === "ACCEPTED") {
+        setFriendIds((prev) => new Set([...prev, otherUserId]));
+      }
+
+      if (
+        ["ACCEPTED", "REMOVED", "REJECTED", "CANCELLED", "CANCELED"].includes(
+          String(normalizedPayload.status || ""),
+        )
+      ) {
+        setPendingFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(otherUserId);
+          return next;
+        });
+        setSentFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(otherUserId);
+          return next;
+        });
+      }
+    };
+
+    const handleLocalRelationshipUpdate = (event: Event) => {
+      handleSocketRelationshipUpdate((event as CustomEvent).detail);
     };
 
     window.addEventListener(
@@ -406,6 +463,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     socketService.onMessageDestroyed(handleSocketMessageRemoved);
     socketService.onMessageRecalled(handleSocketMessageRecalled);
     socketService.onRelationshipUpdate(handleSocketRelationshipUpdate);
+    window.addEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
 
     return () => {
       window.removeEventListener(
@@ -430,8 +488,9 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       socketService.offMessageDestroyed(handleSocketMessageRemoved);
       socketService.offMessageRecalled(handleSocketMessageRecalled);
       socketService.offRelationshipUpdate(handleSocketRelationshipUpdate);
+      window.removeEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
     };
-  }, [conversation?._id, isOpen, loadSidebarData]);
+  }, [conversation?._id, currentUser?.id, isOpen, loadSidebarData]);
 
   // Load available users for create group modal
   useEffect(() => {
@@ -725,6 +784,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       if (!currentUser?.id) return;
       const ok = await sendFriendRequestViaChat(currentUser.id, userId);
       if (ok) {
+        setSentFriendRequestIds((prev) => new Set([...prev, userId]));
+        setPendingFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
         showToast("Đã gửi lời mời kết bạn", "success");
       } else {
         showToast("Không thể gửi lời mời kết bạn", "error");
@@ -763,13 +828,46 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
 
   if (loading) {
     return (
-      <>
-        <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] 2xl:z-40 2xl:w-80 2xl:max-w-none 2xl:shadow-lg">
-          <div className="flex h-full items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-500"></div>
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isGroupChat ? "Thông tin nhóm" : "Thông tin đoạn chat"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        <div className="animate-pulse">
+          <div className="border-b border-gray-100 px-4 py-6 text-center">
+            <div className="mx-auto mb-3 h-20 w-20 rounded-full bg-slate-200" />
+            <div className="mx-auto h-5 w-36 rounded-full bg-slate-200" />
+            <div className="mx-auto mt-2 h-3 w-20 rounded-full bg-slate-100" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-3 border-b border-gray-100 px-4 py-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="flex flex-col items-center gap-2">
+                <div className="h-10 w-10 rounded-full bg-slate-200" />
+                <div className="h-2.5 w-12 rounded-full bg-slate-100" />
+              </div>
+            ))}
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div key={item} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2 px-4 py-3">
+                <div className="h-6 w-6 rounded-full bg-slate-200" />
+                <div className="h-4 w-36 rounded-full bg-slate-100" />
+                {item > 2 && <div className="h-4 w-4 rounded-full bg-slate-100" />}
+              </div>
+            ))}
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -814,7 +912,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">×</button>
         </div>
       )}
-      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] 2xl:z-40 2xl:w-80 2xl:max-w-none 2xl:shadow-none">
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
         {/* MAIN VIEW */}
         {viewMode === "main" && (
           <>
@@ -831,7 +929,11 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               <div className="flex-1 flex flex-col bg-white">
                 <div className="px-4 py-8 text-center">
                   <Avatar
-                    src={getConversationDisplayAvatar(activeConversation, currentUser?.id)}
+                    src={
+                      isDissolved && activeConversation.type === "group"
+                        ? undefined
+                        : getConversationDisplayAvatar(activeConversation, currentUser?.id)
+                    }
                     name={getConversationDisplayName(activeConversation, currentUser?.id)}
                     size={80}
                     className="mx-auto mb-3 shadow-md"
@@ -915,11 +1017,13 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                   <>
                     <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={joinedMembers.length} onClick={handleViewMembers} showIndicator={false} />
                     {/* Link tham gia nhóm – Zalo style */}
-                    <div className="border-t border-gray-100 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[15px] font-medium text-gray-700">
-                          <LinkIcon size={16} className="text-gray-500" />
-                          <span>Link tham gia nhóm</span>
+                    <div className="border-t border-gray-100 px-4 py-2.5">
+                      <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2">
+                        <span className="flex h-6 w-6 items-center justify-center text-gray-500">
+                          <LinkIcon size={20} />
+                        </span>
+                        <div className="min-w-0 text-left">
+                          <span className="block truncate text-[15px] font-medium leading-6 text-gray-700">Link tham gia nhóm</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -936,7 +1040,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                                 const link = await ConversationService.getInviteLink(conversation._id, currentUser.id);
                                 await navigator.clipboard.writeText(link);
                                 showToast("Đã sao chép link tham gia nhóm!", "success");
-                              } catch (err) {
+                              } catch {
                                 showToast("Không thể sao chép link", "error");
                               }
                             }}

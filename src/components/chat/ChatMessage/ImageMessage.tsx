@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Message } from "../../../types";
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
 import { MessageLayout } from "./MessageLayout";
@@ -7,6 +7,23 @@ import { isMessageMediaFlagged } from "../../../utils/mediaModeration";
 const imagePreviewCache = new Map<string, string>();
 const PREVIEW_MAX_EDGE = 640;
 const PREVIEW_QUALITY = 0.72;
+
+const isLikelySvgUrl = (url: string) => {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return /\.svg$/i.test(decodeURIComponent(parsed.pathname));
+  } catch {
+    return /\.svg(?:$|[?#])/i.test(url);
+  }
+};
+
+const createSvgPreviewUrl = async (blob: Blob) => {
+  const svgText = await blob.text();
+  if (!/<svg[\s>]/i.test(svgText)) return "";
+  return URL.createObjectURL(
+    new Blob([svgText], { type: "image/svg+xml" }),
+  );
+};
 
 const createImagePreview = async (url: string): Promise<string> => {
   if (!url) return url;
@@ -18,8 +35,17 @@ const createImagePreview = async (url: string): Promise<string> => {
   if (!response.ok) return url;
 
   const blob = await response.blob();
-  if (!blob.type.startsWith("image/")) return url;
-  if (blob.type.includes("svg")) return url;
+  const blobType = blob.type.toLowerCase();
+  const isSvg = blobType.includes("svg") || isLikelySvgUrl(url);
+
+  if (isSvg) {
+    const svgPreviewUrl = await createSvgPreviewUrl(blob);
+    if (!svgPreviewUrl) return url;
+    imagePreviewCache.set(url, svgPreviewUrl);
+    return svgPreviewUrl;
+  }
+
+  if (!blobType.startsWith("image/")) return url;
 
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(
@@ -58,6 +84,53 @@ const createImagePreview = async (url: string): Promise<string> => {
   const objectUrl = URL.createObjectURL(previewBlob);
   imagePreviewCache.set(url, objectUrl);
   return objectUrl;
+};
+
+const AttachmentImage = ({
+  src,
+  alt = "Attachment",
+  className = "",
+  loading,
+  fetchPriority,
+  decoding,
+  style,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+  loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
+  decoding?: "async" | "sync" | "auto";
+  style?: CSSProperties;
+}) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div
+        className={`${className} flex flex-col items-center justify-center gap-1 bg-slate-100 px-3 text-center text-slate-500`}
+        style={style}
+      >
+        <AlertCircle size={18} />
+        <span className="text-[11px] font-semibold leading-tight">
+          Không mở được ảnh
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading={loading}
+      fetchPriority={fetchPriority}
+      decoding={decoding}
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
 };
 
 export const ImageMessage = ({
@@ -251,7 +324,7 @@ export const ImageMessage = ({
           } ${borderRadius}`}
           onClick={canPreviewClick ? () => handleImageClick(0) : undefined}
         >
-          <img
+          <AttachmentImage
             src={getDisplaySrc(urls[0])}
             alt="Attachment"
             className={getImageClassName(
@@ -289,7 +362,7 @@ export const ImageMessage = ({
               {(() => {
                 const priority = getImagePriority(index);
                 return (
-                  <img
+                  <AttachmentImage
                     src={getDisplaySrc(url)}
                     alt="Attachment"
                     className={getImageClassName(index, "w-full h-full object-cover")}
@@ -325,7 +398,7 @@ export const ImageMessage = ({
             {(() => {
               const priority = getImagePriority(0);
               return (
-                <img
+                <AttachmentImage
                   src={getDisplaySrc(urls[0])}
                   alt="Attachment"
                   className={getImageClassName(0, "w-full h-full object-cover")}
@@ -352,7 +425,7 @@ export const ImageMessage = ({
               {(() => {
                 const priority = getImagePriority(index + 1);
                 return (
-                  <img
+                  <AttachmentImage
                     src={getDisplaySrc(url)}
                     alt="Attachment"
                     className={getImageClassName(
@@ -393,7 +466,7 @@ export const ImageMessage = ({
               {(() => {
                 const priority = getImagePriority(index);
                 return (
-                  <img
+                  <AttachmentImage
                     src={getDisplaySrc(url)}
                     alt="Attachment"
                     className={getImageClassName(index, "w-full h-full object-cover")}
@@ -430,7 +503,7 @@ export const ImageMessage = ({
             {(() => {
               const priority = getImagePriority(0);
               return (
-                <img
+                <AttachmentImage
                   src={getDisplaySrc(urls[0])}
                   alt="Attachment"
                   className={getImageClassName(0, "h-full w-full object-cover")}
@@ -458,7 +531,7 @@ export const ImageMessage = ({
               {(() => {
                 const priority = getImagePriority(index + 1);
                 return (
-                  <img
+                  <AttachmentImage
                     src={getDisplaySrc(url)}
                     alt="Attachment"
                     className={getImageClassName(
@@ -490,7 +563,7 @@ export const ImageMessage = ({
               {(() => {
                 const priority = getImagePriority(index + 3);
                 return (
-                  <img
+                  <AttachmentImage
                     src={getDisplaySrc(url)}
                     alt="Attachment"
                     className={getImageClassName(
@@ -535,7 +608,7 @@ export const ImageMessage = ({
             {(() => {
               const priority = getImagePriority(index);
               return (
-                <img
+                <AttachmentImage
                   src={getDisplaySrc(url)}
                   alt="Attachment"
                   className={getImageClassName(index, "w-full h-full object-cover")}

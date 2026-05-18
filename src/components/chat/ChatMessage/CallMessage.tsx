@@ -174,6 +174,8 @@ export const CallMessage = ({
       isLast={isLastInSequence}
       isTopBoundary={isTopBoundary}
       onDelete={onDelete}
+      participants={conversation?.participants}
+      conversationType={conversation?.type}
     >
       {(borderRadius) => (
         <div

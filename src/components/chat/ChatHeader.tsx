@@ -107,8 +107,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const getConversationName = (): string =>
     getConversationDisplayName(conversation, currentUserId);
 
+  const isDissolved =
+    conversation.status === "dissolved" || Boolean(conversation.is_dissolved);
+
   const getConversationAvatar = (): string | undefined =>
-    getConversationDisplayAvatar(conversation, currentUserId);
+    conversation.type === "group" && isDissolved
+      ? undefined
+      : getConversationDisplayAvatar(conversation, currentUserId);
 
   // Xác định userId của người kia (chỉ 1-1)
   const otherUserId = getOtherUserId(conversation, currentUserId);
@@ -142,7 +147,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       const lastSeen = getLastSeen(otherUserId);
       statusText = formatLastSeen(lastSeen);
     }
-  } else if (conversation.type === "group") {
+  } else if (conversation.type === "group" && !isDissolved) {
     const participants = conversation.participants ?? [];
     statusDot = false; // Hide dot for group member count display
     statusText = `${participants.length} thành viên`;
@@ -150,7 +155,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const canShowCallActions = !hideCallActions;
   const isGroupActiveCall =
-    conversation.type === "group" && Boolean(conversation.is_calling);
+    conversation.type === "group" &&
+    !isDissolved &&
+    Boolean(conversation.is_calling);
   const isVideoCallDisabled =
     disableCallActions ||
     Boolean(conversation.is_calling);
@@ -242,26 +249,31 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             <div className="mx-0.5 h-6 w-px bg-gray-200 sm:mx-1" />
           )}
 
-          {/* AI Tools */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onSummarize}
-              disabled={isSummarizing}
-              className={`p-2 hover:bg-gray-50 rounded-full transition-all duration-200 group relative ${isSummarizing ? "opacity-50" : ""}`}
-              title="Tóm tắt hội thoại (AI)"
-            >
-              <Sparkles size={20} className={`${isSummarizing ? "animate-spin" : "text-primary-500"}`} />
-              {isSummarizing && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
-                </span>
-              )}
-            </button>
+          {!isDissolved && onSummarize && (
+            <>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onSummarize}
+                  disabled={isSummarizing}
+                  className={`p-2 hover:bg-gray-50 rounded-full transition-all duration-200 group relative ${isSummarizing ? "opacity-50" : ""}`}
+                  title="Tóm tắt hội thoại (AI)"
+                >
+                  <Sparkles
+                    size={20}
+                    className={isSummarizing ? "animate-spin" : "text-primary-500"}
+                  />
+                  {isSummarizing && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-primary-500" />
+                    </span>
+                  )}
+                </button>
+              </div>
 
-          </div>
-
-          <div className="w-px h-6 bg-gray-200 mx-1" />
+              <div className="mx-0.5 h-6 w-px bg-gray-200 sm:mx-1" />
+            </>
+          )}
 
           {/* Sidebar Toggle Button */}
           <button
@@ -280,7 +292,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       {/* Active Call Banner (Group Call) */}
-      {conversation.type === "group" && conversation.is_calling && (
+      {conversation.type === "group" && !isDissolved && conversation.is_calling && (
         <div className="px-3 py-2 sm:px-6 bg-emerald-50/80 backdrop-blur-md border-b border-emerald-100 flex items-center justify-between gap-3 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-200">
