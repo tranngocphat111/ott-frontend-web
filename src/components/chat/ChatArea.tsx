@@ -259,6 +259,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       const senderId = String(
         (message as any).sender_id || (message as any).senderId || "",
       ).trim();
+      const messageConversationId = String(
+        (message as any).conversation_id || (message as any).conversationId || "",
+      ).trim();
+      if (messageConversationId && messageConversationId !== conversationId) {
+        return null;
+      }
+
       return {
         conversationId,
         messageId,
@@ -332,6 +339,12 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const prevMessageCountRef = useRef(0);
   const prevLastMessageIdRef = useRef<string | null>(null);
   const lastSmartReplyMessageIdRef = useRef<string | null>(null);
+  const smartReplyCacheRef = useRef<Map<string, string[]>>(new Map());
+  const smartReplyLoadingTimerRef = useRef<number | null>(null);
+  const scrollAnchorRef = useRef<{
+    messageId: string;
+    topOffset: number;
+  } | null>(null);
   const autoFillOlderRef = useRef(false);
 
   const pendingCallParamsRef = useRef<{
@@ -394,6 +407,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
 
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(112);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [showPinnedMenu, setShowPinnedMenu] = useState(false);
 
@@ -1405,7 +1419,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       if (
         stableId &&
         !isSystemLikeType(message.type) &&
-        !isCallMessageType(message.type) &&
         String(message.sender_id || "") === String(normalizedUserId || "")
       ) {
         return stableId;
@@ -1807,11 +1820,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     lastLayoutScrollHeightRef.current = 0;
     lastLayoutClientHeightRef.current = 0;
     newerLoadScrollTopRef.current = null;
+    wasNearBottomRef.current = true;
     forceScrollToBottomRef.current = false;
     suppressAutoScrollAfterNewerLoadRef.current = false;
     lastScrollTopRef.current = 0;
+    suppressTopLoadUntilRef.current = Date.now() + 800;
     suppressBottomLoadUntilRef.current = 0;
     suppressAutoScrollUntilRef.current = 0;
+    setShowScrollButton(false);
 
     // Immediately clear unread when entering a conversation
     updateParticipant(activeConversation._id, { unread_count: 0 });
@@ -1833,6 +1849,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       }
       mediaSettleCleanupRef.current?.();
       mediaSettleCleanupRef.current = null;
+      if (smartReplyLoadingTimerRef.current !== null) {
+        window.clearTimeout(smartReplyLoadingTimerRef.current);
+        smartReplyLoadingTimerRef.current = null;
+      }
       typingExpiryTimersRef.current.forEach((timerId) => {
         window.clearTimeout(timerId);
       });
@@ -2006,7 +2026,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         options.force ||
         forceScrollToBottomRef.current ||
         wasNearBottomRef.current ||
-        distanceToBottom < 180;
+        distanceToBottom < 80;
 
       if (
         !shouldPin ||
@@ -2854,6 +2874,79 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     [hasMoreAfter, messages.length],
   );
 
+  const captureScrollAnchor = useCallback(
+    (container: HTMLDivElement | null = messagesContainerRef.current) => {
+      if (!container) {
+        scrollAnchorRef.current = null;
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const messageElements =
+        container.querySelectorAll<HTMLElement>("[data-message-id]");
+
+      for (const element of Array.from(messageElements)) {
+        const messageId = element.dataset.messageId || "";
+        if (!messageId) continue;
+
+        const rect = element.getBoundingClientRect();
+        const isVisible =
+          rect.bottom >= containerRect.top + 8 &&
+          rect.top <= containerRect.bottom - 8;
+
+        if (isVisible) {
+          scrollAnchorRef.current = {
+            messageId,
+            topOffset: rect.top - containerRect.top,
+          };
+          return;
+        }
+      }
+
+      scrollAnchorRef.current = null;
+    },
+    [],
+  );
+
+  const restoreScrollAnchor = useCallback(
+    (container: HTMLDivElement, anchor = scrollAnchorRef.current) => {
+      if (!anchor?.messageId) return false;
+
+      const target = Array.from(
+        container.querySelectorAll<HTMLElement>("[data-message-id]"),
+      ).find((element) => element.dataset.messageId === anchor.messageId);
+
+      if (!target) return false;
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const nextOffset = targetRect.top - containerRect.top;
+      const delta = nextOffset - anchor.topOffset;
+
+      if (Math.abs(delta) < 1) return true;
+
+      container.scrollTop += delta;
+      lastScrollTopRef.current = container.scrollTop;
+      return true;
+    },
+    [],
+  );
+
+  const syncScrollButtonAfterLayout = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (!container) return;
+
+      const distanceToBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      const isNearBottom = distanceToBottom < 100;
+
+      wasNearBottomRef.current = isNearBottom;
+      setShowScrollButton(shouldShowScrollToBottomButton(container));
+      captureScrollAnchor(container);
+    });
+  }, [captureScrollAnchor, shouldShowScrollToBottomButton]);
+
   useEffect(() => {
     const container = messagesContainerRef.current;
 
@@ -2891,6 +2984,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     if (
       container.scrollTop < 100 &&
       hasMore &&
+      !isFirstLoadRef.current &&
       !isLoadingMoreRef.current &&
       !loading &&
       Date.now() > suppressTopLoadUntilRef.current
@@ -2924,6 +3018,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     if (
       isNearBottom &&
       hasMoreAfter &&
+      !isFirstLoadRef.current &&
       !isLoadingNewerRef.current &&
       !loading &&
       isScrollingDown &&
@@ -2946,6 +3041,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     wasNearBottomRef.current = isNearBottom;
     setShowScrollButton(shouldShowScrollToBottomButton(container));
     lastScrollTopRef.current = currentScrollTop;
+    captureScrollAnchor(container);
   };
 
   const scrollToBottom = useCallback(async () => {
@@ -2970,7 +3066,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     const composer = composerContainerRef.current;
     if (!composer || typeof ResizeObserver === "undefined") return;
 
-    lastComposerHeightRef.current = composer.getBoundingClientRect().height;
+    const initialComposerHeight = composer.getBoundingClientRect().height;
+    lastComposerHeightRef.current = initialComposerHeight;
+    setComposerHeight(initialComposerHeight);
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -2978,6 +3076,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
       const previousHeight = lastComposerHeightRef.current;
       lastComposerHeightRef.current = nextHeight;
+      setComposerHeight(nextHeight);
 
       if (
         previousHeight === null ||
@@ -2992,7 +3091,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       const distanceToBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       const shouldKeepBottom =
-        wasNearBottomRef.current || distanceToBottom < 180;
+        distanceToBottom < 80 ||
+        (wasNearBottomRef.current && distanceToBottom < 120);
 
       if (!shouldKeepBottom || isLoadingMoreRef.current || isLoadingNewerRef.current) {
         return;
@@ -3100,8 +3200,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         window.cancelAnimationFrame(initialScrollRafRef.current);
       }
 
+      container.scrollTop = container.scrollHeight;
+      lastScrollTopRef.current = container.scrollTop;
+      wasNearBottomRef.current = true;
+      setShowScrollButton(false);
+
       initialScrollRafRef.current = window.requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
+        lastScrollTopRef.current = container.scrollTop;
         forceScrollToBottomRef.current = false;
         wasNearBottomRef.current = true;
         setShowScrollButton(false);
@@ -3119,6 +3225,11 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       if (initialScrollRafRef.current !== null) {
         window.cancelAnimationFrame(initialScrollRafRef.current);
       }
+
+      container.scrollTop = container.scrollHeight;
+      lastScrollTopRef.current = container.scrollTop;
+      wasNearBottomRef.current = true;
+      setShowScrollButton(false);
 
       initialScrollRafRef.current = window.requestAnimationFrame(() => {
         void (async () => {
@@ -3158,7 +3269,14 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             wasNearBottomRef.current || finalDistanceToBottom < 180;
 
           if (shouldStayPinned) {
-            pinMessagesToBottom();
+            activeContainer.scrollTop = activeContainer.scrollHeight;
+            await waitForNextFrame();
+
+            const finalContainer = messagesContainerRef.current;
+            if (finalContainer) {
+              finalContainer.scrollTop = finalContainer.scrollHeight;
+              lastScrollTopRef.current = finalContainer.scrollTop;
+            }
             wasNearBottomRef.current = true;
             setShowScrollButton(false);
           } else {
@@ -3183,6 +3301,13 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       currentLastMessageId !== previousLastMessageId;
 
     const wasNearBottom = wasNearBottomRef.current;
+    const previousDistanceToBottom =
+      (lastLayoutScrollHeightRef.current || container.scrollHeight) -
+      container.scrollTop -
+      (lastLayoutClientHeightRef.current || container.clientHeight);
+    const shouldAutoScrollNewMessage =
+      previousDistanceToBottom < 96 ||
+      (wasNearBottom && previousDistanceToBottom < 140);
     const isIncomingLatestMessage =
       !!latestMessageSenderId &&
       !!normalizedUserId &&
@@ -3193,7 +3318,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       !isLoadingNewerRef.current &&
       !loading &&
       hasAppendedNewMessage &&
-      wasNearBottom &&
+      shouldAutoScrollNewMessage &&
       Date.now() > suppressAutoScrollUntilRef.current
     ) {
       requestAnimationFrame(() => {
@@ -3239,6 +3364,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     const container = messagesContainerRef.current;
     if (!container) return;
 
+    const previousAnchor = scrollAnchorRef.current;
     const previousHeight = lastLayoutScrollHeightRef.current;
     const previousClientHeight = lastLayoutClientHeightRef.current;
     const currentHeight = container.scrollHeight;
@@ -3252,8 +3378,12 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         (previousHeight || currentHeight) -
         container.scrollTop -
         (previousClientHeight || currentClientHeight);
+      const currentDistanceToBottom =
+        currentHeight - container.scrollTop - currentClientHeight;
       const shouldKeepBottom =
-        wasNearBottomRef.current || previousDistanceToBottom < 140;
+        previousDistanceToBottom < 96 ||
+        currentDistanceToBottom < 72 ||
+        (wasNearBottomRef.current && previousDistanceToBottom < 120);
 
       if (
         shouldKeepBottom &&
@@ -3265,20 +3395,47 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         Date.now() > suppressAutoScrollUntilRef.current
       ) {
         container.scrollTop = container.scrollHeight;
+        lastScrollTopRef.current = container.scrollTop;
         wasNearBottomRef.current = true;
         setShowScrollButton(false);
+      } else if (
+        !isLoadingMoreRef.current &&
+        !isLoadingNewerRef.current &&
+        !isFirstLoadRef.current &&
+        !forceScrollToBottomRef.current &&
+        !suppressAutoScrollAfterNewerLoadRef.current &&
+        Date.now() > suppressAutoScrollUntilRef.current &&
+        previousAnchor
+      ) {
+        restoreScrollAnchor(container, previousAnchor);
+        const nextDistanceToBottom =
+          container.scrollHeight - container.scrollTop - container.clientHeight;
+        wasNearBottomRef.current = nextDistanceToBottom < 100;
+        setShowScrollButton(shouldShowScrollToBottomButton(container));
       }
     }
 
     lastLayoutScrollHeightRef.current = container.scrollHeight;
     lastLayoutClientHeightRef.current = container.clientHeight;
+    captureScrollAnchor(container);
+
+    if (heightChanged || clientHeightChanged) {
+      syncScrollButtonAfterLayout();
+    }
   });
 
   // AI Smart Replies Logic
   useEffect(() => {
     let cancelled = false;
+    const clearSmartReplyLoadingTimer = () => {
+      if (smartReplyLoadingTimerRef.current !== null) {
+        window.clearTimeout(smartReplyLoadingTimerRef.current);
+        smartReplyLoadingTimerRef.current = null;
+      }
+    };
 
     if (isDissolved) {
+      clearSmartReplyLoadingTimer();
       setSmartReplies([]);
       setIsSmartReplyLoading(false);
       setIsSmartReplyOpen(false);
@@ -3291,6 +3448,16 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
     const source = latestSmartReplySource;
     const smartReplySourceKey = source?.key || "";
+
+    if (loading || messages.length === 0 || !source || !smartReplySourceKey) {
+      clearSmartReplyLoadingTimer();
+      setSmartReplies([]);
+      setIsSmartReplyLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const isEligibleIncomingSmartReplySource =
       Boolean(source) &&
       Boolean(normalizedUserId) &&
@@ -3302,12 +3469,26 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       smartReplySourceKey !== lastSmartReplyMessageIdRef.current;
 
     if (shouldFetchSmartReplies) {
-      lastSmartReplyMessageIdRef.current = smartReplySourceKey;
+      const cachedReplies = smartReplyCacheRef.current.get(smartReplySourceKey);
+      if (cachedReplies) {
+        lastSmartReplyMessageIdRef.current = smartReplySourceKey;
+        clearSmartReplyLoadingTimer();
+        setSmartReplies(cachedReplies);
+        setIsSmartReplyLoading(false);
+        setIsSmartReplyOpen(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+
       setSmartReplies([]);
       setIsSmartReplyOpen(false);
+      clearSmartReplyLoadingTimer();
 
       const fetchSuggestions = async () => {
+        lastSmartReplyMessageIdRef.current = smartReplySourceKey;
         setIsSmartReplyLoading(true);
+
         try {
           const aiConvId = activeConversation._id.startsWith("VIRTUAL_CONV_")
             ? activeConversation._id.replace("VIRTUAL_CONV_", "")
@@ -3318,30 +3499,37 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
             normalizedUserId,
           );
           if (!cancelled) {
-            setSmartReplies(suggestions || []);
+            const nextSuggestions = suggestions || [];
+            smartReplyCacheRef.current.set(smartReplySourceKey, nextSuggestions);
+            setSmartReplies(nextSuggestions);
           }
         } catch (error) {
           console.error("Error fetching smart replies:", error);
         } finally {
+          clearSmartReplyLoadingTimer();
           if (!cancelled) {
             setIsSmartReplyLoading(false);
           }
         }
       };
 
-      fetchSuggestions();
+      void fetchSuggestions();
     } else if (!isEligibleIncomingSmartReplySource) {
+      clearSmartReplyLoadingTimer();
       setSmartReplies([]);
       setIsSmartReplyLoading(false);
     }
 
     return () => {
       cancelled = true;
+      clearSmartReplyLoadingTimer();
     };
   }, [
     activeConversation._id,
     isDissolved,
     latestSmartReplySource,
+    loading,
+    messages.length,
     normalizedUserId,
   ]);
 
@@ -3350,6 +3538,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     setIsSmartReplyOpen(false);
     setSmartReplies([]);
     setIsSmartReplyLoading(false);
+    if (smartReplyLoadingTimerRef.current !== null) {
+      window.clearTimeout(smartReplyLoadingTimerRef.current);
+      smartReplyLoadingTimerRef.current = null;
+    }
     lastSmartReplyMessageIdRef.current = null;
   }, [activeConversation._id]);
 
@@ -3983,7 +4175,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               const stableMessageId = String(
                 msg.msg_id || msg._id || msg.local_client_id || "",
               ).trim();
-              const isCallMessage = isCallMessageType(msg.type);
               return (
                 <React.Fragment key={item.key}>
                   {item.showTime && <ChatTimeSeparator time={item.time} />}
@@ -4004,7 +4195,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                           ),
                         __show_delivery_status:
                           isMe &&
-                          !isCallMessage &&
                           Boolean(stableMessageId) &&
                           stableMessageId === latestOwnMessageId,
                       }}
@@ -4071,7 +4261,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         {showScrollButton && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-28 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600 md:bottom-32"
+            className="absolute left-1/2 z-[110] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
+            style={{ bottom: Math.max(composerHeight + 18, 112) }}
             title="Scroll to bottom"
           >
             <ChevronDown size={24} strokeWidth={2} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageCircle, Phone, PhoneOff, Video, PhoneCall, X } from "lucide-react";
 import Sidebar from "../components/chat/ChatSidebarLeft";
 import { ConversationsProvider, useConversations } from "../contexts/ConversationsContext";
@@ -38,7 +39,7 @@ const AppModal: React.FC<{
   icon?: React.ReactNode;
 }> = ({ title, body, onClose, icon }) => (
   <div
-    className="fixed inset-0 z-50 flex items-center justify-center"
+    className="fixed inset-0 z-[10000] flex items-center justify-center"
     style={{ background: "rgba(35,26,16,0.45)", backdropFilter: "blur(2px)" }}
     onClick={onClose}
   >
@@ -434,8 +435,8 @@ const ChatContent: React.FC = () => {
     >
 
       {/* ── INCOMING CALL MODAL (Modern Warm Brown Theme) ─────────────── */}
-      {incomingCall && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-all">
+      {incomingCall && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 transition-all">
           <div className="relative w-72 rounded-[2rem] bg-stone-900 text-white shadow-2xl ring-1 ring-amber-500/20 animate-scale-in overflow-hidden">
 
             {/* Top accent glow */}
@@ -506,11 +507,12 @@ const ChatContent: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* ── GENERIC APP MODAL ─────────────── */}
-      {modalInfo && (
+      {modalInfo && createPortal(
         <AppModal
           title={modalInfo.title}
           body={modalInfo.body}
@@ -520,7 +522,8 @@ const ChatContent: React.FC = () => {
             </div>
           }
           onClose={() => setModalInfo(null)}
-        />
+        />,
+        document.body,
       )}
 
       {/* ── SIDEBAR ─────────────── */}
