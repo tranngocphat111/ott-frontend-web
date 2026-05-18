@@ -1,10 +1,19 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { Message } from "../../../types/message.type";
+import type { ConversationParticipant } from "../../../types/participant.type";
 import { MessageService } from "../../../services";
-import { ListChecks, CheckCircle2 } from "lucide-react";
+import {
+  BarChart3,
+  Check,
+  ChevronRight,
+  Lock,
+  Loader2,
+  Users,
+} from "lucide-react";
 
 import { MessageLayout } from "./MessageLayout";
 import { PollVoterDetailModal } from "./PollVoterDetailModal";
+import { ConfirmModal } from "../../modal/ConfirmModal";
 
 interface PollMessageProps {
   msg: Message;
@@ -19,7 +28,7 @@ interface PollMessageProps {
   onDelete?: (msg: Message) => void;
   onPin?: (msg: Message) => void;
   onForward?: (msg: Message) => void;
-  participants?: any[];
+  participants?: ConversationParticipant[];
   conversationType?: string;
 }
 
@@ -35,27 +44,59 @@ export const PollMessage: React.FC<PollMessageProps> = ({
   conversationType,
 }) => {
   const [isVoting, setIsVoting] = useState(false);
+  const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
+  const [isLocking, setIsLocking] = useState(false);
+  const [locallyLocked, setLocallyLocked] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isLockConfirmOpen, setIsLockConfirmOpen] = useState(false);
+  const [noticeModal, setNoticeModal] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Fallback for missing properties
   const question = msg.poll_question || "Khảo sát";
-  const options = msg.poll_options || [];
+  const options = useMemo(() => msg.poll_options || [], [msg.poll_options]);
   const totalVotes = options.reduce((sum, opt) => sum + (opt.voters?.length || 0), 0);
+  const totalVoters = useMemo(() => {
+    const voters = new Set<string>();
+    options.forEach((opt) => {
+      (opt.voters || []).forEach((voterId) => voters.add(String(voterId)));
+    });
+    return voters.size;
+  }, [options]);
+  const isLocked = locallyLocked || Boolean(msg.poll_locked);
+  const canLockPoll =
+    isMe &&
+    !isLocked &&
+    Boolean(msg.msg_id) &&
+    Boolean(msg.conversation_id) &&
+    Boolean(currentUserId);
+  const modeLabel = msg.poll_multiple_choice ? "Chọn nhiều" : "Bình chọn một";
 
   const handleVote = async (optionId: string) => {
-    if (isVoting || !msg.msg_id || !msg.conversation_id || !currentUserId) return;
+    if (
+      isLocked ||
+      isVoting ||
+      !msg.msg_id ||
+      !msg.conversation_id ||
+      !currentUserId
+    ) return;
 
     try {
       setIsVoting(true);
+      setVotingOptionId(optionId);
 
-      const isCurrentlySelected = options.find(opt => opt.id === optionId)?.voters?.includes(currentUserId);
+      const isCurrentlySelected = options
+        .find((opt) => opt.id === optionId)
+        ?.voters?.some((voterId) => String(voterId) === String(currentUserId));
 
       // Compute new optionIds list based on multipleChoice
       let newOptionIds: string[] = [];
       if (msg.poll_multiple_choice) {
         // Collect currently selected options
         options.forEach(opt => {
-          if (opt.voters?.includes(currentUserId as string)) {
+          if (opt.voters?.some((voterId) => String(voterId) === String(currentUserId))) {
             newOptionIds.push(opt.id);
           }
         });
@@ -82,8 +123,40 @@ export const PollMessage: React.FC<PollMessageProps> = ({
 
     } catch (error) {
       console.error("Error voting:", error);
+      setNoticeModal({
+        title: "Không thể gửi bình chọn",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Không thể gửi bình chọn. Vui lòng thử lại.",
+      });
     } finally {
       setIsVoting(false);
+      setVotingOptionId(null);
+    }
+  };
+
+  const handleLockPoll = async () => {
+    if (!canLockPoll || isLocking || !msg.msg_id || !msg.conversation_id || !currentUserId) {
+      return;
+    }
+
+    try {
+      setIsLocking(true);
+      await MessageService.lockPoll(msg.conversation_id, msg.msg_id, currentUserId);
+      setLocallyLocked(true);
+      setIsLockConfirmOpen(false);
+    } catch (error) {
+      console.error("Error locking poll:", error);
+      setNoticeModal({
+        title: "Không thể khóa bình chọn",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Không thể khóa bình chọn. Vui lòng thử lại.",
+      });
+    } finally {
+      setIsLocking(false);
     }
   };
 
@@ -104,109 +177,149 @@ export const PollMessage: React.FC<PollMessageProps> = ({
         conversationType={conversationType}
         onViewDetails={() => setIsDetailModalOpen(true)}
       >
-        {(borderRadius) => (
-          <div className={`w-[320px] sm:w-[380px] bg-surface  overflow-hidden shadow-md ring-1 ring-primary-900/5 ${borderRadius} flex flex-col font-body`}>
-            {/* Header section with gradient background */}
-            <div className="p-5 bg-[image:var(--background-image-gradient-subtle)] flex flex-col gap-2 relative">
-
-
-              <div className="flex items-center gap-2 text-primary-700 font-extrabold font-display">
-                <div className="bg-primary-600 text-surface p-1 rounded-md shadow-sm">
-                  <ListChecks size={16} strokeWidth={3} />
+        {() => (
+          <div className="flex w-[min(380px,calc(100vw-48px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white font-body shadow-sm">
+            <div className="border-b border-slate-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
+                    <BarChart3 size={18} strokeWidth={2.4} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-600">
+                        Bình chọn
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        {modeLabel}
+                      </span>
+                    </div>
+                    <h4 className="mt-2 break-words text-[16px] font-bold leading-snug text-slate-900">
+                      {question}
+                    </h4>
+                  </div>
                 </div>
-                <span className="text-[12px] uppercase tracking-[0.1em]">Bình chọn</span>
+
+                {isLocked ? (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[12px] font-semibold text-white">
+                    <Lock size={14} />
+                    Đã khóa
+                  </span>
+                ) : canLockPoll ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsLockConfirmOpen(true)}
+                    disabled={isLocking}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-wait disabled:opacity-60"
+                    title="Khóa bình chọn"
+                  >
+                    {isLocking ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Lock size={14} />
+                    )}
+                    Khóa
+                  </button>
+                ) : null}
               </div>
 
-              <h4 className="text-[18px] font-bold text-primary-900 leading-tight break-words pr-4 font-display">
-                {question}
-              </h4>
-
-              <div className="flex items-center justify-between mt-1 pt-1">
-                <span className="text-[11px] font-bold text-primary-700 bg-primary-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  {msg.poll_multiple_choice ? "Chọn nhiều" : "Bình chọn một"}
+              <div className="mt-3 flex items-center gap-3 text-[12px] font-medium text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={13} />
+                  {totalVoters} người tham gia
                 </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-bold text-primary-700">{totalVotes}</span>
-                  <span className="text-[13px] text-primary-600">lượt bình chọn</span>
-                </div>
+                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                <span>{totalVotes} lượt chọn</span>
               </div>
             </div>
 
-            {/* Options list */}
-            <div className="p-4 flex flex-col gap-3 max-h-[350px] overflow-y-auto custom-scrollbar">
+            <div className="flex max-h-[360px] flex-col gap-2.5 overflow-y-auto p-3 custom-scrollbar">
               {options.map((opt) => {
                 const voteCount = opt.voters?.length || 0;
-                const isSelected = opt.voters?.includes(currentUserId as string);
+                const isSelected = opt.voters?.some(
+                  (voterId) => String(voterId) === String(currentUserId),
+                );
                 const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                const isOptionBusy = isVoting && votingOptionId === opt.id;
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={opt.id}
                     onClick={() => handleVote(opt.id)}
-                    className={`relative cursor-pointer group rounded-xl border transition-base active:scale-[0.98]  ${isSelected
-                      ? "border-primary-400 bg-primary-50"
-                      : "border-primary-100 hover:border-primary-300 hover:bg-surface-raised bg-surface"
-                      }`}
+                    disabled={isLocked || isVoting || !currentUserId}
+                    className={`group relative min-h-[58px] overflow-hidden rounded-xl border text-left transition-colors ${
+                      isSelected
+                        ? "border-primary-300 bg-primary-50"
+                        : "border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50"
+                    } ${
+                      isLocked
+                        ? "cursor-default opacity-90"
+                        : "cursor-pointer active:scale-[0.99]"
+                    } disabled:pointer-events-none`}
                   >
-                    {/* Progress Bar with subtle gradient */}
                     {percentage > 0 && (
                       <div
-                        className={`absolute left-0 top-0 bottom-0 opacity-[0.15] rounded-l-lg pointer-events-none transition-all duration-700 ease-out ${isSelected ? "bg-[image:var(--background-image-gradient-primary)]" : "bg-primary-200"
-                          }`}
+                        className={`pointer-events-none absolute inset-y-0 left-0 rounded-xl transition-all duration-500 ${
+                          isSelected ? "bg-primary-100" : "bg-slate-100"
+                        }`}
                         style={{ width: `${percentage}%` }}
                       />
                     )}
 
-                    <div className="relative p-3.5 flex items-center justify-between z-10">
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                        {/* Custom indicators */}
-                        <div className={`w-5.5 h-5.5 border-2 flex items-center justify-center shrink-0 transition-base ${msg.poll_multiple_choice ? "rounded-md" : "rounded-full"
-                          } ${isSelected
-                            ? "bg-primary-600 border-primary-600 scale-110 shadow-md shadow-primary-900/10"
-                            : "border-primary-300 bg-surface group-hover:border-primary-500"
-                          }`}>
-                          {isSelected && <CheckCircle2 size={12} className="text-surface" strokeWidth={4} />}
+                    <div className="relative z-10 flex items-center justify-between gap-3 px-3.5 py-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center border-2 transition-colors ${
+                            msg.poll_multiple_choice ? "rounded-md" : "rounded-full"
+                          } ${
+                            isSelected
+                              ? "border-primary-600 bg-primary-600 text-white"
+                              : "border-slate-300 bg-white text-transparent group-hover:border-primary-400"
+                          }`}
+                        >
+                          {isSelected && <Check size={13} strokeWidth={3} />}
                         </div>
 
-                        <div className="flex flex-col min-w-0">
-                          <span className={`text-[15px] font-bold truncate leading-tight font-display ${isSelected ? "text-primary-900" : "text-primary-800"}`}>
+                        <div className="min-w-0 flex-1">
+                          <span className={`block truncate text-[14px] font-semibold leading-5 ${
+                            isSelected ? "text-slate-950" : "text-slate-800"
+                          }`}>
                             {opt.name}
                           </span>
                           {voteCount > 0 && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={`text-[11px] font-bold ${isSelected ? "text-primary-700" : "text-primary-500"}`}>
-                                {voteCount}
-                              </span>
-                              <div className="w-1 h-1 rounded-full bg-primary-300"></div>
-                              <span className={`text-[11px] font-medium ${isSelected ? "text-primary-600" : "text-primary-400"}`}>
-                                {percentage}%
-                              </span>
-                            </div>
+                            <span className="mt-0.5 block text-[12px] font-medium text-slate-500">
+                              {voteCount} lượt chọn
+                            </span>
                           )}
                         </div>
                       </div>
 
-                      {isSelected && (
-                        <div className="flex items-center gap-1 text-primary-700 font-bold text-[10px] bg-primary-100 border border-primary-200 px-2 py-1 rounded-full shadow-sm badge-pop">
-                          <span>Đã chọn</span>
-                        </div>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {isOptionBusy && (
+                          <Loader2 size={14} className="animate-spin text-slate-400" />
+                        )}
+                        <span className="min-w-9 text-right text-[12px] font-bold tabular-nums text-slate-600">
+                          {percentage}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
 
-            {/* Action footer */}
-            <div className="px-5 py-3.5 border-t border-primary-100 bg-surface flex items-center justify-center">
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <span className="truncate text-[12px] font-medium text-slate-500">
+                {isLocked ? "Bình chọn đã khóa" : "Có thể thay đổi lựa chọn"}
+              </span>
               <button
-                className="text-primary-600 text-[14px] font-extrabold hover:text-primary-800 transition-base py-1.5 px-3 rounded-lg flex items-center gap-2 group btn-ripple"
+                type="button"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-primary-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
                 onClick={() => setIsDetailModalOpen(true)}
               >
-                <span>Xem chi tiết bình chọn</span>
-                <div className="w-5 h-5 rounded-full bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
-                  <CheckCircle2 size={10} strokeWidth={3} className="text-primary-700" />
-                </div>
+                Chi tiết
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>
@@ -218,6 +331,29 @@ export const PollMessage: React.FC<PollMessageProps> = ({
         onClose={() => setIsDetailModalOpen(false)}
         msg={msg}
         currentUserId={currentUserId}
+      />
+
+      <ConfirmModal
+        isOpen={isLockConfirmOpen}
+        title="Khóa bình chọn"
+        message="Sau khi khóa, mọi người sẽ không thể bình chọn hoặc đổi lựa chọn nữa."
+        confirmText={isLocking ? "Đang khóa..." : "Khóa"}
+        cancelText="Hủy"
+        onConfirm={handleLockPoll}
+        onCancel={() => {
+          if (isLocking) return;
+          setIsLockConfirmOpen(false);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={!!noticeModal}
+        title={noticeModal?.title || ""}
+        message={noticeModal?.message || ""}
+        confirmText="Đóng"
+        hideCancelButton
+        onConfirm={() => setNoticeModal(null)}
+        onCancel={() => setNoticeModal(null)}
       />
     </>
   );

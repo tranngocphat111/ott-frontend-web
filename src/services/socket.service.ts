@@ -358,6 +358,24 @@ class SocketService {
     }
   }
 
+  onMemberNicknameUpdated(callback: (payload: {
+    conversationId?: string;
+    conversation_id?: string;
+    userId?: string;
+    user_id?: string;
+    nickname?: string;
+  }) => void) {
+    this.ensureSocket().on("cap_nhat_biet_danh", callback);
+  }
+
+  offMemberNicknameUpdated(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_biet_danh", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_biet_danh");
+    }
+  }
+
   startTyping(conversationId: string, userId: string) {
     this.emitWhenConnected("nguoi_dung_dang_soan_tin_nhan", {
       conversationId,

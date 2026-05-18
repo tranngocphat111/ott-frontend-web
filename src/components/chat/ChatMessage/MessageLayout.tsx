@@ -453,9 +453,28 @@ export const MessageLayout = ({
   const sender = useMessageSender(msg.sender_id, isMe, preloadedSender);
 
   const borderRadius = getMessageBorderRadius(isMe, isFirst, isLast);
-  const senderName = sender?.name || msg.sender_name || "Người lạ";
+  const participantSender = useMemo(
+    () =>
+      (participants || []).find(
+        (participant) =>
+          String(participant?.user_id || participant?._id || "") ===
+          String(msg.sender_id || ""),
+      ),
+    [msg.sender_id, participants],
+  );
+  const participantSenderName = String(
+    participantSender?.nickname ||
+      participantSender?.display_name ||
+      participantSender?.name ||
+      "",
+  ).trim();
+  const senderName =
+    participantSenderName || sender?.name || msg.sender_name || "Người lạ";
   const senderAvatarUrl =
-    sender?.avatar || msg.sender_avatar || msg.sender_avatar_url;
+    participantSender?.avatar ||
+    sender?.avatar ||
+    msg.sender_avatar ||
+    msg.sender_avatar_url;
   const avatarBg = getAvatarColor(senderName);
   const avatarLabel = getAvatarLabel(senderName);
 
@@ -766,7 +785,7 @@ export const MessageLayout = ({
       visibleSeenAvatars.length > 0 ||
       deliverySummary.label === "Đã gửi");
   const messageTimeLabel = getMessageTimeLabel(msg);
-  const shouldShowMessageTime = false;
+  const shouldShowMessageTime = Boolean(messageTimeLabel) && isLast;
   const hasSeenAvatarMeta = visibleSeenAvatars.length > 0;
   const inlineMetaLabel =
     shouldShowMessageTime || showHoverTime ? messageTimeLabel : "";

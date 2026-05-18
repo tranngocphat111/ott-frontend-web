@@ -79,6 +79,9 @@ const isSystemLikeType = (type?: string) =>
   String(type || "").startsWith("system_") ||
   String(type || "").toLowerCase() === "call_join";
 
+const isPollMessageType = (type?: string) =>
+  String(type || "").toLowerCase() === "poll";
+
 const isCallMessageType = (type?: string) =>
   String(type || "").startsWith("call_");
 
@@ -225,6 +228,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const {
     messages,
     appendMessage,
+    removeMessage,
     loadMessages,
     loadOlderMessages,
     loadMessageContext,
@@ -568,13 +572,44 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       (container.firstElementChild as HTMLElement) ??
       container;
 
+    const getHighlightBorderRadius = () => {
+      const candidates = [
+        bubbleTarget.firstElementChild as HTMLElement | null,
+        ...Array.from(bubbleTarget.querySelectorAll<HTMLElement>("*")),
+      ].filter(Boolean) as HTMLElement[];
+
+      for (const candidate of candidates) {
+        const style = getComputedStyle(candidate);
+        const hasRadius = [
+          style.borderTopLeftRadius,
+          style.borderTopRightRadius,
+          style.borderBottomRightRadius,
+          style.borderBottomLeftRadius,
+        ].some((value) => value && value !== "0px");
+
+        if (hasRadius) {
+          return {
+            borderTopLeftRadius: style.borderTopLeftRadius,
+            borderTopRightRadius: style.borderTopRightRadius,
+            borderBottomRightRadius: style.borderBottomRightRadius,
+            borderBottomLeftRadius: style.borderBottomLeftRadius,
+          };
+        }
+      }
+
+      return {
+        borderTopLeftRadius: "18px",
+        borderTopRightRadius: "18px",
+        borderBottomRightRadius: "18px",
+        borderBottomLeftRadius: "18px",
+      };
+    };
+
     const previousPosition = bubbleTarget.style.position;
     const previousZIndex = bubbleTarget.style.zIndex;
     const previousFilter = bubbleTarget.style.filter;
     const previousTransformOrigin = bubbleTarget.style.transformOrigin;
-    const contentTarget =
-      (bubbleTarget.firstElementChild as HTMLElement | null) ?? bubbleTarget;
-    const contentStyle = getComputedStyle(contentTarget);
+    const highlightRadius = getHighlightBorderRadius();
     const primaryColor =
       getComputedStyle(document.documentElement)
         .getPropertyValue("--color-primary-500")
@@ -588,7 +623,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     ring.setAttribute("aria-hidden", "true");
     ring.style.position = "absolute";
     ring.style.inset = "0";
-    ring.style.borderRadius = contentStyle.borderRadius || "inherit";
+    ring.style.borderTopLeftRadius = highlightRadius.borderTopLeftRadius;
+    ring.style.borderTopRightRadius = highlightRadius.borderTopRightRadius;
+    ring.style.borderBottomRightRadius = highlightRadius.borderBottomRightRadius;
+    ring.style.borderBottomLeftRadius = highlightRadius.borderBottomLeftRadius;
     ring.style.pointerEvents = "none";
     ring.style.border = `2px solid ${primaryColor}`;
     ring.style.boxShadow = `0 0 0 6px rgba(183, 124, 69, 0.16), 0 14px 36px rgba(183, 124, 69, 0.22)`;
@@ -872,7 +910,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     (sentMessage?: Message | ChatMessageType | null) => {
       if (!sentMessage || !activeConversation?._id) return;
 
-      const sent = sentMessage as ChatMessageType & {
+      const sentPayload = sentMessage as { message?: unknown; result?: unknown };
+      const sent = (sentPayload?.message || sentPayload?.result || sentPayload) as ChatMessageType & {
         conversationId?: string;
         content?: unknown;
       };
@@ -965,6 +1004,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         last_delivered_message_id: messageId,
         last_delivered_at: createdAt,
       });
+
+      window.dispatchEvent(
+        new CustomEvent("chat:message-upserted", {
+          detail: {
+            conversationId,
+            message: sent,
+          },
+        }),
+      );
     },
     [
       activeConversation,
@@ -1178,13 +1226,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         return "Bạn";
       }
 
-      if (msg.sender_name) {
-        return msg.sender_name;
-      }
-
       const participant = (activeConversation?.participants || []).find(
         (item) => String(item.user_id || item._id || "") === senderId,
       );
+      const participantNickname = String(participant?.nickname || "").trim();
+      if (participantNickname) {
+        return participantNickname;
+      }
+
+      if (msg.sender_name) {
+        return msg.sender_name;
+      }
 
       return (
         participant?.display_name ||
@@ -2655,28 +2707,119 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           return;
         }
 
+        const revokedMessageId = getStableMessageId(message);
+        const containerBeforeRevoke = messagesContainerRef.current;
+        const targetBeforeRevoke = revokedMessageId
+          ? document.getElementById(`chat-msg-${revokedMessageId}`) ||
+            (document.querySelector(
+              `[data-message-id="${revokedMessageId}"]`,
+            ) as HTMLElement | null)
+          : null;
+        const revokeAnchor =
+          containerBeforeRevoke && targetBeforeRevoke
+            ? {
+              messageId: revokedMessageId,
+              topOffset:
+                targetBeforeRevoke.getBoundingClientRect().top -
+                containerBeforeRevoke.getBoundingClientRect().top,
+            }
+            : null;
+
+        if (revokeAnchor) {
+          scrollAnchorRef.current = revokeAnchor;
+        }
+        suppressAutoScrollUntilRef.current = Date.now() + 1800;
+        forceScrollToBottomRef.current = false;
+        wasNearBottomRef.current = false;
+        isFirstLoadRef.current = false;
+
         const revokedResult = await MessageService.revokeMessage(
           activeConversation._id,
           message.msg_id,
           normalizedUserId,
         );
 
-        if (revokedResult?.last_message) {
+        const lastMessageSource =
+          revokedResult?.systemMessage || revokedResult?.last_message;
+
+        if (lastMessageSource) {
+          const lastContent = Array.isArray(lastMessageSource.content)
+            ? String(lastMessageSource.content[0] || "")
+            : String(lastMessageSource.content || "");
+
           updateConversation(activeConversation._id, {
             last_message: {
-              msg_id: String(revokedResult.last_message.msg_id || ""),
-              sender_id: String(revokedResult.last_message.sender_id || ""),
-              sender_name: String(revokedResult.last_message.sender_name || ""),
-              content: String(revokedResult.last_message.content || ""),
+              msg_id: String(lastMessageSource.msg_id || ""),
+              sender_id: String(lastMessageSource.sender_id || ""),
+              sender_name: String(lastMessageSource.sender_name || ""),
+              content: lastContent,
               type: "text",
               createdAt:
-                revokedResult.last_message.createdAt ||
+                lastMessageSource.createdAt ||
                 new Date().toISOString(),
             },
           });
         }
 
-        await loadMessages();
+        const revokedMessagePatch = {
+          ...message,
+          ...revokedResult,
+          content: revokedResult?.content || ["Tin nhắn đã được thu hồi"],
+          is_revoked: true,
+          is_deleted: Boolean(revokedResult?.is_deleted),
+          is_pinned: false,
+          pinned_at: null,
+          pinned_by: null,
+          reactions: [],
+        };
+
+        appendMessage(revokedMessagePatch);
+        if (revokedResult?.systemMessage) {
+          appendMessage(revokedResult.systemMessage);
+        }
+
+        window.dispatchEvent(
+          new CustomEvent("chat:message-upserted", {
+            detail: {
+              conversationId: activeConversation._id,
+              message: revokedMessagePatch,
+            },
+          }),
+        );
+
+        if (revokedResult?.systemMessage) {
+          window.dispatchEvent(
+            new CustomEvent("chat:message-upserted", {
+              detail: {
+                conversationId: activeConversation._id,
+                message: revokedResult.systemMessage,
+              },
+            }),
+          );
+        }
+
+        if (revokeAnchor) {
+          window.requestAnimationFrame(() => {
+            const container = messagesContainerRef.current;
+            if (!container) return;
+
+            const target =
+              document.getElementById(`chat-msg-${revokeAnchor.messageId}`) ||
+              (document.querySelector(
+                `[data-message-id="${revokeAnchor.messageId}"]`,
+              ) as HTMLElement | null);
+            if (!target) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            const nextOffset = targetRect.top - containerRect.top;
+            container.scrollTop += nextOffset - revokeAnchor.topOffset;
+            lastScrollTopRef.current = container.scrollTop;
+            wasNearBottomRef.current = false;
+            setShowScrollButton(shouldShowScrollToBottomButton(container));
+          });
+        }
+
         await loadPinnedMessages();
 
         window.dispatchEvent(
@@ -2689,6 +2832,47 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         const wasCurrentLastMessage =
           String(activeConversation?.last_message?.msg_id || "") ===
           String(message.msg_id || "");
+        const deletedMessageId = getStableMessageId(message);
+        const containerBeforeDelete = messagesContainerRef.current;
+        const deleteScrollTop = containerBeforeDelete?.scrollTop ?? 0;
+        const deleteAnchor =
+          containerBeforeDelete && deletedMessageId
+            ? (() => {
+              const containerRect =
+                containerBeforeDelete.getBoundingClientRect();
+              const messageElements =
+                containerBeforeDelete.querySelectorAll<HTMLElement>(
+                  "[data-message-id]",
+                );
+
+              for (const element of Array.from(messageElements)) {
+                const messageId = element.dataset.messageId || "";
+                if (!messageId || messageId === deletedMessageId) continue;
+
+                const rect = element.getBoundingClientRect();
+                const isVisible =
+                  rect.bottom >= containerRect.top + 8 &&
+                  rect.top <= containerRect.bottom - 8;
+
+                if (isVisible) {
+                  return {
+                    messageId,
+                    topOffset: rect.top - containerRect.top,
+                  };
+                }
+              }
+
+              return null;
+            })()
+            : null;
+
+        if (deleteAnchor) {
+          scrollAnchorRef.current = deleteAnchor;
+        }
+        suppressAutoScrollUntilRef.current = Date.now() + 1800;
+        forceScrollToBottomRef.current = false;
+        wasNearBottomRef.current = false;
+        isFirstLoadRef.current = false;
 
         await MessageService.deleteMessage(
           activeConversation._id,
@@ -2696,7 +2880,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           normalizedUserId,
         );
 
-        const deletedMessageId = getStableMessageId(message);
         const shouldKeepPinnedOnBar =
           Boolean(deletedMessageId) &&
           (Boolean(message.is_pinned) ||
@@ -2769,7 +2952,54 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           }
         }
 
-        await loadMessages();
+        removeMessage({
+          msg_id: message.msg_id,
+          _id: message._id,
+          messageId: deletedMessageId,
+        });
+
+        window.dispatchEvent(
+          new CustomEvent("chat:message-upserted", {
+            detail: {
+              conversationId: activeConversation._id,
+              message: {
+                ...message,
+                conversation_id: activeConversation._id,
+                is_deleted: true,
+              },
+            },
+          }),
+        );
+
+        window.requestAnimationFrame(() => {
+          const container = messagesContainerRef.current;
+          if (!container) return;
+
+          if (deleteAnchor) {
+            const target =
+              document.getElementById(`chat-msg-${deleteAnchor.messageId}`) ||
+              (document.querySelector(
+                `[data-message-id="${deleteAnchor.messageId}"]`,
+              ) as HTMLElement | null);
+
+            if (target) {
+              const containerRect = container.getBoundingClientRect();
+              const targetRect = target.getBoundingClientRect();
+              const nextOffset = targetRect.top - containerRect.top;
+              container.scrollTop += nextOffset - deleteAnchor.topOffset;
+            }
+          } else {
+            container.scrollTop = Math.min(
+              deleteScrollTop,
+              Math.max(0, container.scrollHeight - container.clientHeight),
+            );
+          }
+
+          lastScrollTopRef.current = container.scrollTop;
+          wasNearBottomRef.current = false;
+          setShowScrollButton(shouldShowScrollToBottomButton(container));
+        });
+
         await loadPinnedMessages();
 
         window.dispatchEvent(
@@ -3609,6 +3839,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         messageId: string;
         highlight?: boolean;
         openMedia?: boolean;
+        mediaMessageId?: string;
+        imageIndex?: number;
         fromPinned?: boolean;
       }>;
 
@@ -3630,8 +3862,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
         // Open media viewer if requested (e.g., from pinned messages)
         if (custom.detail?.openMedia) {
-          const msgId = custom.detail.messageId;
-          handleOpenMedia(msgId, 0);
+          const msgId =
+            custom.detail.mediaMessageId || custom.detail.messageId;
+          handleOpenMedia(msgId, custom.detail.imageIndex ?? 0);
         }
       })();
     };
@@ -3855,6 +4088,121 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     };
   }, [showPinnedMenu]);
 
+  const pinnedBar = primaryPinnedMessage ? (
+    <div className="shrink-0 bg-[#F2F4F7] px-2 pt-2 sm:px-4">
+      <div ref={pinnedMenuRef} className="relative w-full">
+        <div className="relative w-full rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm">
+          <button
+            type="button"
+            onClick={() => jumpToPinnedMessage(primaryPinnedMessage)}
+            className="w-full px-3 py-2.5 text-left flex items-center gap-3 hover:bg-slate-50 transition-colors rounded-xl"
+            title="Đi đến tin nhắn ghim"
+          >
+            <span className="shrink-0 mt-0.5 text-primary-500">
+              <MessageCircle size={18} />
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-semibold text-slate-600">
+                Tin nhắn ghim
+              </div>
+              <div className="text-[14px] leading-5 text-slate-900 flex items-center gap-2 min-w-0">
+                {renderPinnedTypeVisual(primaryPinnedMessage, "sm")}
+                <span className="truncate">
+                  {getPinnedSenderName(primaryPinnedMessage)}:{" "}
+                  {getPinnedPreviewText(primaryPinnedMessage)}
+                </span>
+              </div>
+            </div>
+          </button>
+
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void handlePinMessage(primaryPinnedMessage);
+              }}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Bỏ ghim tin nhắn này"
+            >
+              <PinOff size={15} />
+            </button>
+
+            {morePinnedCount > 0 && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowPinnedMenu((prev) => !prev);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                title="Xem thêm tin nhắn ghim"
+              >
+                +{morePinnedCount} ghim
+                <ChevronDown size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showPinnedMenu && pinnedMessages.length > 1 && (
+          <div className="absolute right-2 top-[calc(100%+8px)] z-50 w-[320px] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+            {pinnedMessages.slice(1).map((item) => (
+              <div
+                key={item._id || item.msg_id}
+                className="w-full rounded-md px-2.5 py-2 text-left text-slate-800 hover:bg-slate-50"
+              >
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      jumpToPinnedMessage(item);
+                    }}
+                    className="flex-1 text-left"
+                  >
+                    <div className="text-[12px] text-slate-500">
+                      Tin nhắn ghim
+                    </div>
+                    <div className="text-[13px] text-slate-800 pr-2 flex items-center gap-2 w-60">
+                      {renderPinnedTypeVisual(item, "sm")}
+                      <span className="truncate">
+                        {getPinnedSenderName(item)}:{" "}
+                        {getPinnedPreviewText(item)}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handlePinMessage(item);
+                    }}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 mt-0.5"
+                    title="Bỏ ghim"
+                  >
+                    <PinOff size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  const isChatOverlayOpen =
+    confirmModal.isOpen ||
+    removedMessageNotice.isOpen ||
+    replacePinModalOpen ||
+    forwardModalOpen ||
+    Boolean(callBlockModal) ||
+    isGroupCallModalOpen ||
+    Boolean(summaryResult) ||
+    viewerOpen;
+
   return (
     <div className="relative flex h-full min-w-0 flex-1 overflow-hidden">
       {/* Main Chat Area */}
@@ -3893,6 +4241,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
 
 
+        {pinnedBar}
+
         <div
           ref={messagesContainerRef}
           className="custom-scrollbar relative flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-2 pb-2 pt-2 sm:px-4"
@@ -3904,117 +4254,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           onTouchStart={() => markLatestMessageSeen(true)}
           onWheel={() => markLatestMessageSeen(true)}
         >
-          {primaryPinnedMessage && (
-            <div
-              className="shrink-0 full sticky top-0 -mx-4 px-2 w-[calc(100%+2.5rem)] z-40 "
-              style={{
-                transform: "translate3d(0, 0, 0)",
-                willChange: "transform", // Báo trước cho trình duyệt để tối ưu
-              }}
-            >
-              <div
-                ref={pinnedMenuRef}
-                className="relative w-full rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm"
-              >
-                <button
-                  type="button"
-                  onClick={() => jumpToPinnedMessage(primaryPinnedMessage)}
-                  className="w-full px-3 py-2.5 text-left flex items-center gap-3 hover:bg-slate-50 transition-colors rounded-xl"
-                  title="Đi đến tin nhắn ghim"
-                >
-                  <span className="shrink-0 mt-0.5 text-primary-500">
-                    <MessageCircle size={18} />
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-semibold text-slate-600">
-                      Tin nhắn ghim
-                    </div>
-                    <div className="text-[14px] leading-5 text-slate-900 flex items-center gap-2 min-w-0">
-                      {renderPinnedTypeVisual(primaryPinnedMessage, "sm")}
-                      <span className="truncate">
-                        {getPinnedSenderName(primaryPinnedMessage)}:{" "}
-                        {getPinnedPreviewText(primaryPinnedMessage)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handlePinMessage(primaryPinnedMessage);
-                    }}
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    title="Bỏ ghim tin nhắn này"
-                  >
-                    <PinOff size={15} />
-                  </button>
-
-                  {morePinnedCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setShowPinnedMenu((prev) => !prev);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
-                      title="Xem thêm tin nhắn ghim"
-                    >
-                      +{morePinnedCount} ghim
-                      <ChevronDown size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {showPinnedMenu && pinnedMessages.length > 1 && (
-                  <div className="absolute right-2 top-[calc(100%+8px)] z-50 w-[320px] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
-                    {pinnedMessages.slice(1).map((item) => (
-                      <div
-                        key={item._id || item.msg_id}
-                        className="w-full rounded-md px-2.5 py-2 text-left text-slate-800 hover:bg-slate-50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              jumpToPinnedMessage(item);
-                            }}
-                            className="flex-1 text-left"
-                          >
-                            <div className="text-[12px] text-slate-500">
-                              Tin nhắn ghim
-                            </div>
-                            <div className="text-[13px] text-slate-800 pr-2 flex items-center gap-2 w-60">
-                              {renderPinnedTypeVisual(item, "sm")}
-                              <span className="truncate">
-                                {getPinnedSenderName(item)}:{" "}
-                                {getPinnedPreviewText(item)}
-                              </span>
-                            </div>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handlePinMessage(item);
-                            }}
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 mt-0.5"
-                            title="Bỏ ghim"
-                          >
-                            <PinOff size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
           {!isInitialLoading && <div className="flex-1 min-h-0" />}
 
           {/* Loading indicator for older messages */}
@@ -4154,22 +4393,26 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
               const index = item.index;
               const prevMsg = hydratedMessages[index - 1];
               const nextMsg = hydratedMessages[index + 1];
-              const prevIsSystem = isSystemLikeType(prevMsg?.type);
-              const nextIsSystem = isSystemLikeType(nextMsg?.type);
+              const prevIsSequenceBoundary =
+                isSystemLikeType(prevMsg?.type) || isPollMessageType(prevMsg?.type);
+              const nextIsSequenceBoundary =
+                isSystemLikeType(nextMsg?.type) || isPollMessageType(nextMsg?.type);
               const nextShowTime = nextMsg
                 ? shouldShowTimestamp(nextMsg.createdAt || "", msg.createdAt)
                 : false;
               const firstUserMessageIndex = hydratedMessages.findIndex(
-                (message) => !isSystemLikeType(message.type),
+                (message) =>
+                  !isSystemLikeType(message.type) &&
+                  !isPollMessageType(message.type),
               );
               const isTopBoundary = index === firstUserMessageIndex;
               const isMe = msg.sender_id === normalizedUserId;
               const isFirstInSequence =
-                !prevMsg || prevIsSystem ||
+                !prevMsg || prevIsSequenceBoundary ||
                 prevMsg.sender_id !== msg.sender_id ||
                 item.showTime;
               const isLastInSequence =
-                !nextMsg || nextIsSystem ||
+                !nextMsg || nextIsSequenceBoundary ||
                 nextMsg.sender_id !== msg.sender_id ||
                 nextShowTime;
               const stableMessageId = String(
@@ -4258,10 +4501,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         </div>
 
         {/* Scroll to bottom button */}
-        {showScrollButton && (
+        {showScrollButton && !isChatOverlayOpen && (
           <button
             onClick={scrollToBottom}
-            className="absolute left-1/2 z-[110] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
+            className="absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
             style={{ bottom: Math.max(composerHeight + 18, 112) }}
             title="Scroll to bottom"
           >

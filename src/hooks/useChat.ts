@@ -115,6 +115,47 @@ export const useChat = (conversationId: string, userId?: string) => {
     [conversationId, normalizeIncomingMessage],
   );
 
+  const removeMessage = useCallback((payload: unknown) => {
+    const payloadRecord =
+      payload && typeof payload === "object"
+        ? (payload as { msg_id?: unknown; _id?: unknown; messageId?: unknown })
+        : null;
+    const targetMsgId = String(
+      payloadRecord?.msg_id || payloadRecord?._id || payloadRecord?.messageId || "",
+    );
+    if (!targetMsgId) return;
+
+    setMessages((prev) => {
+      const nextMessages = prev
+        .filter(
+          (message) =>
+            String(message._id || "") !== targetMsgId &&
+            String(message.msg_id || "") !== targetMsgId,
+        )
+        .map((message) => {
+          const replyTargetId =
+            message.reply_to_msg_id || message.reply_to?.msg_id;
+
+          if (String(replyTargetId || "") !== targetMsgId) {
+            return message;
+          }
+
+          return {
+            ...message,
+            reply_to: {
+              ...(message.reply_to || {}),
+              msg_id: targetMsgId,
+              is_deleted: true,
+              is_revoked: false,
+            },
+          };
+        });
+
+      messagesRef.current = nextMessages;
+      return nextMessages;
+    });
+  }, []);
+
   const isVirtual = conversationId.startsWith("VIRTUAL_CONV_");
 
   // Reset messages khi đổi conversation, tránh dùng tin nhắn cũ
@@ -417,34 +458,9 @@ export const useChat = (conversationId: string, userId?: string) => {
 
       if (payloadConvId !== conversationId) return;
 
-      setMessages((prev) =>
-        prev
-          .filter(
-            (message: any) =>
-              message._id !== payload.messageId &&
-              message.msg_id !== payload.msg_id,
-          )
-          .map((message: any) => {
-            const replyTargetId =
-              message.reply_to_msg_id || message.reply_to?.msg_id;
-
-            if (replyTargetId !== payload.msg_id) {
-              return message;
-            }
-
-            return {
-              ...message,
-              reply_to: {
-                ...(message.reply_to || {}),
-                msg_id: payload.msg_id,
-                is_deleted: true,
-                is_revoked: false,
-              },
-            };
-          }),
-      );
+      removeMessage(payload);
     },
-    [conversationId],
+    [conversationId, removeMessage],
   );
 
   const handleMessageRevoked = useCallback(
@@ -484,6 +500,9 @@ export const useChat = (conversationId: string, userId?: string) => {
             ...message,
             content: payload.content || ["Tin nhắn đã được thu hồi"],
             is_revoked: true,
+            is_pinned: false,
+            pinned_at: null,
+            pinned_by: null,
             reactions: [],
           };
         }),
@@ -632,6 +651,7 @@ export const useChat = (conversationId: string, userId?: string) => {
   return {
     messages,
     appendMessage,
+    removeMessage,
     loadMessages,
     loadOlderMessages,
     loadMessageContext,

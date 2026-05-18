@@ -808,6 +808,66 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     }
   }, [updateConversationParticipant, updateParticipant, user]);
 
+  const handleMemberNicknameUpdated = useCallback((payload: any) => {
+    const conversationId = String(
+      payload?.conversationId || payload?.conversation_id || "",
+    ).trim();
+    const targetUserId = String(
+      payload?.userId || payload?.user_id || "",
+    ).trim();
+    const nickname = String(payload?.nickname || "").trim();
+
+    if (!conversationId || !targetUserId) return;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (String(item.conversation._id) !== conversationId) return item;
+
+        const updatedParticipants = (item.conversation.participants || []).map(
+          (participant) => {
+            const participantUserId = String(
+              participant.user_id || participant._id || "",
+            );
+
+            if (participantUserId !== targetUserId) return participant;
+
+            const realName =
+              String(participant.name || "").trim() ||
+              (!participant.nickname
+                ? String(participant.display_name || "").trim()
+                : "");
+
+            return {
+              ...participant,
+              nickname,
+              display_name: nickname || realName || participant.display_name,
+            };
+          },
+        );
+
+        const participantUserId = String(
+          item.participant?.user_id || item.participant?._id || "",
+        );
+        const updatedParticipant =
+          participantUserId === targetUserId
+            ? {
+                ...item.participant,
+                nickname,
+              }
+            : item.participant;
+
+        return {
+          ...item,
+          participant: updatedParticipant,
+          conversation: {
+            ...item.conversation,
+            participants: updatedParticipants,
+          },
+        };
+      }),
+    );
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -827,6 +887,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socketService.onMessageStatusChanged(applyParticipantCursorPayload);
     socketService.onParticipantCursorChanged(applyParticipantCursorPayload);
     socketService.onConversationReadSynced(applyParticipantCursorPayload);
+    socketService.onMemberNicknameUpdated(handleMemberNicknameUpdated);
 
     return () => {
       socketService.offNewMessage(handleIncomingMessage);
@@ -841,6 +902,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       socketService.offMessageStatusChanged(applyParticipantCursorPayload);
       socketService.offParticipantCursorChanged(applyParticipantCursorPayload);
       socketService.offConversationReadSynced(applyParticipantCursorPayload);
+      socketService.offMemberNicknameUpdated(handleMemberNicknameUpdated);
     };
   }, [
     applyParticipantCursorPayload,
@@ -851,6 +913,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     handleGroupCallUpdated,
     handleStartCallSuccess,
     handleMemberAdded,
+    handleMemberNicknameUpdated,
     isAuthenticated,
   ]);
 

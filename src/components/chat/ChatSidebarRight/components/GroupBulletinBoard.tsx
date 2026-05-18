@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronLeft, Pin, ListChecks } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import type { GroupBulletinBoardProps, BulletinTab } from "../../../../interfaces";
 import PinnedMessages from "./PinnedMessages";
 import PollsList from "./PollsList";
@@ -23,7 +23,8 @@ const GroupBulletinBoard: React.FC<GroupBulletinBoardProps> = ({
         if (!msgId || !conversationId) return;
 
         const messageType = String(message?.type || "").toLowerCase();
-        const isMedia = ["image", "video", "audio"].includes(messageType);
+        const canOpenMediaViewer = ["image", "video"].includes(messageType);
+        const mediaMessageId = String(message?._id || "");
 
         window.dispatchEvent(
             new CustomEvent("chat:jump", {
@@ -31,7 +32,9 @@ const GroupBulletinBoard: React.FC<GroupBulletinBoardProps> = ({
                     conversationId,
                     messageId: msgId,
                     highlight: true,
-                    openMedia: isMedia,
+                    openMedia: canOpenMediaViewer,
+                    mediaMessageId: canOpenMediaViewer && mediaMessageId ? mediaMessageId : undefined,
+                    imageIndex: 0,
                     fromBulletin: true,
                 },
             }),
