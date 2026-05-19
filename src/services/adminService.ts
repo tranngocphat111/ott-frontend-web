@@ -9,7 +9,6 @@ import type {
   ModerationDashboardResponse,
   OverviewResponse,
   PaginatedAuditLogsResponse,
-  PaginatedRecentUsersResponse,
   TimeRange,
   UserSummary,
 } from "../interfaces/admin.interface";
@@ -54,14 +53,57 @@ interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const unwrapResponseData = <T>(value: unknown): T => {
+  if (!isRecord(value)) {
+    return value as T;
+  }
+
+  if ("data" in value) {
+    return value.data as T;
+  }
+
+  if ("result" in value) {
+    return value.result as T;
+  }
+
+  if ("payload" in value) {
+    return value.payload as T;
+  }
+
+  return value as T;
+};
+
+const asArray = <T>(value: unknown): T[] => {
+  const unwrapped = unwrapResponseData<unknown>(value);
+  return Array.isArray(unwrapped) ? unwrapped : [];
+};
+
+const asPaginatedResponse = <T>(value: unknown): PaginatedResponse<T> => {
+  const unwrapped = unwrapResponseData<unknown>(value);
+  const record = isRecord(unwrapped) ? unwrapped : {};
+  const items = Array.isArray(record.items) ? (record.items as T[]) : [];
+
+  return {
+    items,
+    totalElements:
+      typeof record.totalElements === "number" ? record.totalElements : items.length,
+    page: typeof record.page === "number" ? record.page : 0,
+    size: typeof record.size === "number" ? record.size : items.length,
+    totalPages: typeof record.totalPages === "number" ? record.totalPages : 1,
+  };
+};
+
 // 3. Hàm gọi API chung cực kỳ gọn nhẹ nhờ Axios (Xóa bỏ hoàn toàn buildUrl thủ công)
 async function getJson<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
   try {
-    const response = await adminApiClient.get<T>(path, { params });
-    return response.data;
+    const response = await adminApiClient.get<unknown>(path, { params });
+    return unwrapResponseData<T>(response.data);
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
     const status = axiosError.response?.status ?? 500;
@@ -77,8 +119,16 @@ async function getPaginatedItems<T>(
   path: string,
   timeRange?: TimeRange,
 ): Promise<T[]> {
-  const response = await getJson<PaginatedResponse<T>>(path, { timeRange });
-  return response.items;
+  const response = await getJson<unknown>(path, { timeRange });
+  return asPaginatedResponse<T>(response).items;
+}
+
+async function getArrayJson<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>,
+): Promise<T[]> {
+  const response = await getJson<unknown>(path, params);
+  return asArray<T>(response);
 }
 
 function isNotFoundError(error: unknown): error is AdminApiError {
@@ -88,23 +138,23 @@ function isNotFoundError(error: unknown): error is AdminApiError {
 // 4. Các Service Methods
 export const adminService = {
   getOverview: (timeRange: TimeRange = "allTime") =>
-    getJson<OverviewResponse>("/api/v1/admin/analytics/overview", {
+    getJson<OverviewResponse>("/v1/admin/analytics/overview", {
       timeRange,
     }),
 
   getRecentUsers: (timeRange: TimeRange = "allTime") =>
     getPaginatedItems<UserSummary>(
-      "/api/v1/admin/analytics/users/recent",
+      "/v1/admin/analytics/users/recent",
       timeRange,
     ),
 
   getMessageTypes: (timeRange: TimeRange = "allTime") =>
-    getJson<MessageTypesResponse>("/api/v1/admin/analytics/messages/types", {
+    getJson<MessageTypesResponse>("/v1/admin/analytics/messages/types", {
       timeRange,
     }),
 
   getLoginMethods: (timeRange: TimeRange = "allTime") =>
-    getJson<LoginMethodCount[]>("/api/v1/admin/analytics/logins/methods", {
+    getArrayJson<LoginMethodCount>("/v1/admin/analytics/logins/methods", {
       timeRange,
     }),
 
@@ -112,26 +162,22 @@ export const adminService = {
     timeRange: TimeRange = "allTime",
     params?: { query?: string; page?: number; size?: number },
   ) =>
-    getJson<PaginatedRecentUsersResponse>(
-      "/api/v1/admin/analytics/users/recent",
-      {
-        timeRange,
-        query: params?.query,
-        page: params?.page ?? 0,
-        size: params?.size ?? 10,
-      },
-    ),
+    getJson<unknown>("/v1/admin/analytics/users/recent", {
+      timeRange,
+      query: params?.query,
+      page: params?.page ?? 0,
+      size: params?.size ?? 10,
+    }).then(asPaginatedResponse<UserSummary>),
 
   getUserDailyTrend: (timeRange: TimeRange = "allTime") =>
-    getJson<DailyUserTrendPoint[]>(
-      "/api/v1/admin/analytics/users/daily-trend",
-      { timeRange },
-    ),
+    getArrayJson<DailyUserTrendPoint>("/v1/admin/analytics/users/daily-trend", {
+      timeRange,
+    }),
 
   getDailyActivity: async (timeRange: TimeRange = "allTime") => {
     try {
-      return await getJson<DailyActivityPoint[]>(
-        "/api/v1/admin/analytics/social/activity/daily",
+      return await getArrayJson<DailyActivityPoint>(
+        "/v1/admin/analytics/social/activity/daily",
         { timeRange },
       );
     } catch (error) {
@@ -139,8 +185,8 @@ export const adminService = {
         throw error;
       }
 
-      const legacyPosts = await getJson<DailyPostPoint[]>(
-        "/api/v1/admin/analytics/social/posts/daily",
+      const legacyPosts = await getArrayJson<DailyPostPoint>(
+        "/v1/admin/analytics/social/posts/daily",
         { timeRange },
       );
 
@@ -153,18 +199,27 @@ export const adminService = {
   },
 
   getDailyPosts: (timeRange: TimeRange = "allTime") =>
-    getJson<DailyPostPoint[]>("/api/v1/admin/analytics/social/posts/daily", {
+    getArrayJson<DailyPostPoint>("/v1/admin/analytics/social/posts/daily", {
       timeRange,
     }),
 
   getAuditLogsPage: (params?: { page?: number; size?: number }) =>
-    getJson<PaginatedAuditLogsResponse>("/api/v1/admin/analytics/audit-logs", {
+    getJson<unknown>("/v1/admin/analytics/audit-logs", {
       page: params?.page ?? 0,
       size: params?.size ?? 10,
-    }),
+    }).then(asPaginatedResponse<PaginatedAuditLogsResponse["items"][number]>),
 
-  getModerationDashboard: () =>
-    getJson<ModerationDashboardResponse>(
-      "/api/v1/analytics/moderation/dashboard",
-    ),
+  getModerationDashboard: async () => {
+    const response = await getJson<Partial<ModerationDashboardResponse>>(
+      "/v1/analytics/moderation/dashboard",
+    );
+
+    return {
+      totalBannedUsers:
+        typeof response.totalBannedUsers === "number"
+          ? response.totalBannedUsers
+          : 0,
+      recentLogs: Array.isArray(response.recentLogs) ? response.recentLogs : [],
+    };
+  },
 };

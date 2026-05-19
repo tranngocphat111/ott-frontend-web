@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Send,
   Loader2,
@@ -47,6 +47,9 @@ const CommentSection: React.FC<Props> = ({
   currentUser,
   onCountChange,
 }) => {
+  // Keep track of processed comment IDs (realtime events + optimistic actions) to ensure idempotency
+  const processedCommentIds = useRef<Set<string>>(new Set());
+
   /* ── Root comments ────────────────────────────────── */
   const [roots, setRoots] = useState<Comment[]>([]);
   const [rootPage, setRootPage] = useState(0);
@@ -98,12 +101,16 @@ const CommentSection: React.FC<Props> = ({
       if (data.accountId === currentUser.id) return;
 
       if (payload.action === "CREATE") {
+        if (processedCommentIds.current.has(data.id)) return;
+        processedCommentIds.current.add(data.id);
+
         const newComment = mapComment(data as ApiComment);
         if (newComment.parentId) {
           // If it's a reply
           setRepliesMap((prev) => {
             const existing = prev[newComment.parentId!];
             if (!existing) return prev; // If not expanded, ignore
+            if (existing.comments.some((r) => r.id === newComment.id)) return prev;
             return {
               ...prev,
               [newComment.parentId!]: {
@@ -136,9 +143,15 @@ const CommentSection: React.FC<Props> = ({
           });
         } else {
           // If it's a root comment
-          setRoots((prev) => [newComment, ...prev]);
+          setRoots((prev) => {
+            if (prev.some((c) => c.id === newComment.id)) return prev;
+            return [newComment, ...prev];
+          });
         }
       } else if (payload.action === "DELETE") {
+        if (processedCommentIds.current.has(data.id)) return;
+        processedCommentIds.current.add(data.id);
+
         const deletedCommentId = data.id;
         const parentId = data.parentCommentId; // Need parentId to update counts
         
@@ -292,6 +305,7 @@ const CommentSection: React.FC<Props> = ({
       replyTo?.id,
     );
     if (created) {
+      processedCommentIds.current.add(created.id);
       if (replyTo) {
         setRepliesMap((prev) => {
           const existing = prev[replyTo.id];
@@ -345,6 +359,7 @@ const CommentSection: React.FC<Props> = ({
   const handleDelete = async (c: Comment) => {
     const ok = await deleteComment(postId, c.id);
     if (!ok) return;
+    processedCommentIds.current.add(c.id);
     if (c.parentId) {
       setRepliesMap((prev) => {
         const s = prev[c.parentId!];
@@ -409,6 +424,68 @@ const CommentSection: React.FC<Props> = ({
     const isExpanded = expandedReplies.has(c.id);
     // Cap visual indentation at depth 3 to avoid overflow
     const indentClass = depth > 0 ? "ml-8" : "";
+
+    if (c.isDeleted) {
+      return (
+        <div key={c.id} className={indentClass}>
+          <div className="flex gap-2">
+            <div className="size-8 rounded-full shrink-0 flex items-center justify-center bg-gray-100 text-gray-400 border border-gray-200">
+              <Trash2 className="size-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="bg-gray-50 rounded-2xl px-3 py-2 inline-block max-w-full border border-gray-200 border-dashed">
+                <p className="text-xs italic text-gray-400 select-none">
+                  Bình luận này đã bị xóa.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Nested replies – available at every depth even if parent is deleted */}
+          {(c.totalReplies > 0 || (rs && rs.comments.length > 0)) && (
+            <div className="ml-9 mt-1">
+              {!isExpanded ?
+                <button
+                  onClick={() => toggleReplies(c.id)}
+                  className="flex items-center gap-1 text-[12px] text-primary-500 font-medium hover:underline">
+                  <CornerDownRight className="size-3" />
+                  Xem {c.totalReplies || rs?.comments.length} trả lời
+                </button>
+              : <>
+                  <button
+                    onClick={() => toggleReplies(c.id)}
+                    className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-gray-600 mb-2">
+                    <ChevronDown className="size-3 rotate-180" />
+                    Ẩn trả lời
+                  </button>
+                  {rs?.loading && rs.comments.length === 0 ?
+                    <div className="flex justify-center py-1">
+                      <Loader2 className="size-3 animate-spin text-primary-400" />
+                    </div>
+                  : <div className="space-y-2">
+                      {(rs?.comments ?? []).map((r) =>
+                        renderComment(r, depth + 1),
+                      )}
+                      {rs?.hasMore && (
+                        <button
+                          onClick={() => loadMoreReplies(c.id)}
+                          disabled={rs.loading}
+                          className="flex items-center gap-1 text-[12px] text-primary-500 font-medium hover:underline disabled:opacity-50 ml-9">
+                          {rs.loading ?
+                            <Loader2 className="size-3 animate-spin" />
+                          : <ChevronDown className="size-3" />}
+                          Xem thêm trả lời
+                        </button>
+                      )}
+                    </div>
+                  }
+                </>
+              }
+            </div>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div key={c.id} className={indentClass}>

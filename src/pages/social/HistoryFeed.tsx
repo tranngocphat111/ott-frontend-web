@@ -7,6 +7,7 @@ import PostCard from "../../components/social/PostCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { fetchViewHistory, clearViewHistory } from "../../services/social.service";
 import { History, Trash2 } from "lucide-react";
+import { mapPost } from "../../services/post.service";
 
 const HistoryFeed: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
@@ -64,31 +65,6 @@ const HistoryFeed: React.FC = () => {
     );
   }
 
-  // Quick adapter for backend PostResponse to frontend Post type
-  const adaptPost = (apiPost: any) => {
-    return {
-      id: apiPost.id,
-      author: {
-        id: apiPost.account?.id,
-        name: apiPost.account?.fullName || "User",
-        avatar: apiPost.account?.avatarUrl,
-        type: "user",
-      },
-      time: apiPost.createdAt,
-      visibility: apiPost.visibility || "PUBLIC",
-      content: apiPost.caption || "",
-      media: apiPost.medias?.map((m: any) => ({
-        type: m.url?.endsWith(".mp4") ? "video" : "image",
-        url: m.url,
-      })) || [],
-      likes: apiPost.totalReactions || 0,
-      comments: apiPost.totalComments || 0,
-      shares: 0,
-      relationship: "none",
-      relationshipLabel: "",
-    };
-  };
-
   return (
     <SocialFeedLayout
       currentUser={currentUser}
@@ -133,7 +109,7 @@ const HistoryFeed: React.FC = () => {
                   return (
                     <PostCard
                       key={item.id || idx}
-                      post={adaptPost(item) as any}
+                      post={mapPost(item, 0, currentUser?.id)}
                       currentUser={currentUser}
                       onToggleLike={() => {}}
                     />

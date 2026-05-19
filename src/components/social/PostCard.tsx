@@ -7,9 +7,10 @@ import PostActions from "./post/PostActions";
 import PostDetailModal from "./PostDetailModal";
 import PostReactionsListModal from "./post/PostReactionsListModal";
 import { useNavigate } from "react-router-dom";
-import { getReactionByKey, type ReactionKey } from "./post/reactions";
+import { getReactionByKey, REACTIONS, type ReactionKey } from "./post/reactions";
 import PostHeader from "./post/PostHeader";
 import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
+import { fetchPostById, fetchPostReactionDetails, type ApiReaction } from "../../services/post.service";
 import { checkIsSaved, toggleSaveContent, recordViewHistory } from "../../services/social.service";
 
 interface Props {
@@ -27,6 +28,43 @@ interface Props {
   onEdit?: (post: Post) => void;
   currentUser: PostUser;
 }
+
+const emptyReactionCounts = (): Record<ReactionKey, number> =>
+  Object.fromEntries(REACTIONS.map((reaction) => [reaction.key, 0])) as Record<
+    ReactionKey,
+    number
+  >;
+
+const toReactionKey = (value?: string | null): ReactionKey | null => {
+  const key = String(value || "").toLowerCase();
+  return REACTIONS.some((reaction) => reaction.key === key)
+    ? (key as ReactionKey)
+    : null;
+};
+
+const buildReactionCounts = (reactions: ApiReaction[]) => {
+  const counts = emptyReactionCounts();
+  reactions.forEach((item) => {
+    const key = toReactionKey(item.reactionType);
+    if (key) counts[key] += 1;
+  });
+  return counts;
+};
+
+const buildInitialReactionCounts = (
+  initialCounts: Partial<Record<ReactionKey, number>> | undefined,
+  fallbackLikes: number,
+) =>
+  initialCounts ?
+    {
+      like: initialCounts.like ?? 0,
+      love: initialCounts.love ?? 0,
+      haha: initialCounts.haha ?? 0,
+      wow: initialCounts.wow ?? 0,
+      sad: initialCounts.sad ?? 0,
+      angry: initialCounts.angry ?? 0,
+    }
+  : { ...emptyReactionCounts(), like: fallbackLikes };
 
 const PostCard: React.FC<Props> = ({
   post,
@@ -46,18 +84,7 @@ const PostCard: React.FC<Props> = ({
   // Seed reaction counts từ server (breakdown thực tế), fallback vào bucket "like"
   const [reactionCounts, setReactionCounts] = useState<
     Record<ReactionKey, number>
-  >(() =>
-    initialReactionCounts ?
-      {
-        like: initialReactionCounts.like ?? 0,
-        love: initialReactionCounts.love ?? 0,
-        haha: initialReactionCounts.haha ?? 0,
-        wow: initialReactionCounts.wow ?? 0,
-        sad: initialReactionCounts.sad ?? 0,
-        angry: initialReactionCounts.angry ?? 0,
-      }
-      : { like: post.likes, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 },
-  );
+  >(() => buildInitialReactionCounts(initialReactionCounts, post.likes));
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -72,6 +99,18 @@ const PostCard: React.FC<Props> = ({
   useEffect(() => {
     checkIsSaved(post.id).then(setIsSaved);
   }, [post.id]);
+
+  useEffect(() => {
+    setCommentCount(post.comments);
+  }, [post.id, post.comments]);
+
+  useEffect(() => {
+    setReaction(initialReaction ?? null);
+  }, [post.id, initialReaction]);
+
+  useEffect(() => {
+    setReactionCounts(buildInitialReactionCounts(initialReactionCounts, post.likes));
+  }, [post.id, initialReactionCounts]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -103,43 +142,39 @@ const PostCard: React.FC<Props> = ({
   }, [post.id]);
 
   useEffect(() => {
+    let active = true;
+
     const handleActivity = (payload: PostActivityPayload) => {
       if (payload.postId !== post.id) return;
 
       if (payload.activityType === "REACTION") {
-        const data = payload.data || {};
-        // Bỏ qua action của chính user hiện tại để tránh duplicate
-        if (data.accountId && data.accountId === currentUser.id) return;
-
-        const reactionTypeStr = (data.reactionType?.toLowerCase() || "like") as ReactionKey;
-
-        setReactionCounts((c) => {
-          const next = { ...c };
-          if (payload.action === "CREATE") {
-            next[reactionTypeStr] = (next[reactionTypeStr] || 0) + 1;
-          } else if (payload.action === "DELETE") {
-            next[reactionTypeStr] = Math.max(0, (next[reactionTypeStr] || 0) - 1);
-          }
-          return next;
+        void fetchPostReactionDetails(post.id).then((reactions) => {
+          if (!active) return;
+          setReactionCounts(buildReactionCounts(reactions));
+          const ownReaction = reactions.find((item) => item.accountId === currentUser.id);
+          setReaction(toReactionKey(ownReaction?.reactionType));
         });
       } else if (payload.activityType === "COMMENT") {
-        const data = payload.data;
-        if (!data) return;
-        if (data.accountId === currentUser.id) return;
-
-        if (payload.action === "CREATE") {
-          setCommentCount((prev) => prev + 1);
-        } else if (payload.action === "DELETE") {
-          setCommentCount((prev) => Math.max(0, prev - 1));
-        }
+        void fetchPostById(post.id, currentUser.id).then((freshPost) => {
+          if (!active || !freshPost) return;
+          setCommentCount(freshPost.comments);
+        });
       } else if (payload.activityType === "SHARE") {
         // Tương lai nếu có share real-time
       }
     };
 
     mediaSocketService.onPostActivity(handleActivity);
-    return () => mediaSocketService.offPostActivity(handleActivity);
+    return () => {
+      active = false;
+      mediaSocketService.offPostActivity(handleActivity);
+    };
   }, [post.id, currentUser.id]);
+
+  const totalReactionCount = Object.values(reactionCounts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
 
   const handleReactionClick = (key: ReactionKey) => {
     if (isLiking) return;
@@ -265,7 +300,7 @@ const PostCard: React.FC<Props> = ({
         <PostBody
           content={post.content}
           media={post.media}
-          totalLikes={post.likes}
+          totalLikes={totalReactionCount}
           isInView={isInView}
         />
 
@@ -304,7 +339,7 @@ const PostCard: React.FC<Props> = ({
 
       <PostDetailModal
         isOpen={isModalOpen}
-        post={post}
+        post={{ ...post, likes: totalReactionCount }}
         currentUser={currentUser}
         showMenu={showMenu}
         menuRef={menuRef}

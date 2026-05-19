@@ -11,15 +11,8 @@ import type { PostUser } from "../types";
 import UserAvatar from "../UserAvatar";
 
 const NAV_ITEMS = [
-  { icon: <Clock className="size-6 text-primary-400" />, label: "Kỷ niệm", route: "/social" },
   { icon: <Bookmark className="size-6 text-primary-600" />, label: "Đã lưu", route: "/social/saved" },
-  { icon: <History className="size-6 text-blue-500" />, label: "Lịch sử xem", route: "/social/history" },
-  { icon: <Users className="size-6 text-primary-700" />, label: "Nhóm", route: "/social" },
-  {
-    icon: <Clapperboard className="size-6 text-primary-500" />,
-    label: "Reels",
-    route: "/social",
-  },
+  { icon: <History className="size-6 text-primary-600" />, label: "Lịch sử xem", route: "/social/history" }
 ];
 
 interface Props {

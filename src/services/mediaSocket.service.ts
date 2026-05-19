@@ -42,7 +42,9 @@ class MediaSocketService {
         const socket = io(this.endpoint, {
             transports: ["polling", "websocket"],
             timeout: 5000,
-            reconnection: false,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1200,
             auth: {
                 token: token,
             },
