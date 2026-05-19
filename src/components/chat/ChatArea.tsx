@@ -459,6 +459,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const [isSmartReplyLoading, setIsSmartReplyLoading] = useState(false);
   const [isSmartReplyOpen, setIsSmartReplyOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const isSummarizingRef = useRef(false);
   const [summaryResult, setSummaryResult] = useState<AiSummaryResult | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -3730,6 +3731,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
           const suggestions = await AiService.getSmartReplies(
             aiConvId,
             normalizedUserId,
+            {
+              conversationType: activeConversation.type,
+              limit: activeConversation.type === "group" ? 18 : 12,
+            },
           );
           if (!cancelled) {
             const nextSuggestions = suggestions || [];
@@ -3759,6 +3764,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     };
   }, [
     activeConversation._id,
+    activeConversation.type,
     isDissolved,
     latestSmartReplySource,
     loading,
@@ -3786,8 +3792,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   };
 
   const handleSummarize = async () => {
-    if (isDissolved || !normalizedUserId) return;
+    if (isDissolved || !normalizedUserId || isSummarizingRef.current) return;
 
+    isSummarizingRef.current = true;
     setIsSummarizing(true);
 
     try {
@@ -3798,11 +3805,15 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       const summary = await AiService.summarizeConversation(
         aiConvId,
         normalizedUserId,
+        {
+          limit: activeConversation.type === "group" ? 100 : 60,
+        },
       );
       setSummaryResult(summary);
     } catch (error) {
       console.error("Summarization error:", error);
     } finally {
+      isSummarizingRef.current = false;
       setIsSummarizing(false);
     }
   };
@@ -4748,7 +4759,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                   );
                 })}
 
-                {summaryResult?.highlights?.length ? (
+                {summaryResult?.meta?.hasImportantContent !== false && summaryResult?.highlights?.length ? (
                   <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
                     <div className="mb-2 text-[12px] font-bold uppercase text-slate-500">
                       Ý chính
@@ -4764,7 +4775,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                   </div>
                 ) : null}
 
-                {summaryResult?.actionItems?.length ? (
+                {summaryResult?.meta?.hasImportantContent !== false && summaryResult?.actionItems?.length ? (
                   <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
                     <div className="mb-2 text-[12px] font-bold uppercase text-amber-700">
                       Việc cần làm
@@ -4788,10 +4799,10 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
                   </div>
                 ) : null}
 
-                {summaryResult?.questions?.length ? (
+                {summaryResult?.meta?.hasImportantContent !== false && summaryResult?.questions?.length ? (
                   <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3">
                     <div className="mb-2 text-[12px] font-bold uppercase text-sky-700">
-                      Còn bỏ ngỏ
+                      Cần làm rõ
                     </div>
                     <div className="space-y-2">
                       {summaryResult.questions.map((item, index) => (
