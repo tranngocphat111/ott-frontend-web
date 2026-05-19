@@ -8,6 +8,7 @@ import {
   AUTH_LOGOUT_EVENT,
   isAuthLogoutStorageEvent,
 } from "../utils/authLogoutSignal";
+import { cleanEnvValue } from "../config/runtime";
 import {
   Mic,
   MicOff,
@@ -516,7 +517,10 @@ const CallPage: React.FC = () => {
     return (
       <LiveKitGroupCall
         token={livekitToken}
-        serverUrl={import.meta.env.VITE_LIVEKIT_URL || "ws://localhost:7880"}
+        serverUrl={
+          cleanEnvValue(import.meta.env.VITE_LIVEKIT_URL as string | undefined) ||
+          "ws://localhost:7880"
+        }
         onLeave={handleExit}
         video={callType === "video"}
         name={remoteDisplayName}

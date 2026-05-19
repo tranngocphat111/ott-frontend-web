@@ -33,7 +33,7 @@ export const ImageInput = ({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
-        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+        className="shrink-0 p-2 text-gray-400 transition-colors hover:text-gray-600 disabled:opacity-50"
         title="Gửi ảnh (nhiều ảnh = 1 tin nhắn)"
       >
         {isUploading ? (

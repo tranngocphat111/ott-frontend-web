@@ -8,6 +8,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ConversationsProvider } from "./contexts/ConversationsContext";
 import { ToastProvider } from './contexts/ToastContext';
 import { PresenceProvider } from './contexts/PresenceContext';
+import WebIncomingCallGate from "./components/call/WebIncomingCallGate";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
             <PresenceProvider>
               <ConversationsProvider>
                 <AppRouter />
+                <WebIncomingCallGate />
               </ConversationsProvider>
             </PresenceProvider>
           </AuthProvider>
@@ -25,4 +27,4 @@ createRoot(document.getElementById("root")!).render(
       </ToastProvider>
     </div>
   </StrictMode>
-);
+);

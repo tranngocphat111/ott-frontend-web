@@ -1,21 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import NavigationSidebar from '../components/navigation/NavigationSidebar';
+
+const resolveActiveItem = (path: string) => {
+  if (path.includes('/chat')) return 'chat';
+  if (path.includes('/social')) return 'social';
+  if (path.includes('/call')) return 'call';
+  return 'chat';
+};
 
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
   // Get active item from current path
-  const getActiveItem = () => {
-    const path = location.pathname;
-    if (path.includes('/chat')) return 'chat';
-    if (path.includes('/social')) return 'social';
-    if (path.includes('/call')) return 'call';
-    return 'chat';
-  };
+  const [activeItem, setActiveItem] = useState(() =>
+    resolveActiveItem(location.pathname),
+  );
 
-  const [activeItem, setActiveItem] = useState(getActiveItem());
+  useEffect(() => {
+    setActiveItem(resolveActiveItem(location.pathname));
+  }, [location.pathname]);
 
   const handleItemClick = (itemId: string) => {
     if (itemId === 'settings' || itemId === 'profile') {
@@ -28,12 +33,12 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="fixed inset-0 flex overflow-hidden bg-gray-100">
       {/* Navigation Sidebar */}
       <NavigationSidebar activeItem={activeItem} onItemClick={handleItemClick} />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </div>
     </div>

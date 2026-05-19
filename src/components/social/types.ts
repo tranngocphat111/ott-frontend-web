@@ -45,6 +45,7 @@ export interface StoryContentItem {
     rotation: number;
     zIndex: number;
     file?: File;
+    localUrl?: string;
 }
 
 export interface StoryItem {

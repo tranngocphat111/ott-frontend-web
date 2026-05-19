@@ -57,6 +57,88 @@ import Avatar from "../common/Avatar";
 import { getConversationDisplayAvatar, getConversationDisplayName } from "../../utils/conversationDisplayUtils";
 import StorageView from "./ChatSidebarRight/StorageView";
 
+const SIDEBAR_LINK_PATTERN = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+type SidebarPayloadRecord = Record<string, unknown>;
+
+const isSidebarPayloadRecord = (
+  payload: unknown,
+): payload is SidebarPayloadRecord =>
+  Boolean(payload && typeof payload === "object");
+
+const normalizeSidebarMessagePayload = (payload: unknown) => {
+  if (!isSidebarPayloadRecord(payload)) return payload;
+  return payload.message || payload.result || payload;
+};
+
+const getSidebarMessageStableId = (payload: unknown) => {
+  if (!isSidebarPayloadRecord(payload)) return "";
+  return String(payload.msg_id || payload._id || payload.messageId || "").trim();
+};
+
+const getSidebarMessageConversationId = (payload: unknown) => {
+  if (!isSidebarPayloadRecord(payload)) return "";
+  return String(payload.conversation_id || payload.conversationId || "").trim();
+};
+
+const getSidebarContentText = (content: unknown) => {
+  const contentItems = Array.isArray(content) ? content : [content];
+
+  return contentItems
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") {
+        const value = item as { text?: unknown; content?: unknown; url?: unknown; name?: unknown };
+        return String(value.text || value.content || value.url || value.name || "");
+      }
+      return String(item || "");
+    })
+    .filter(Boolean)
+    .join(" ");
+};
+
+const extractSidebarLinks = (content: unknown) => {
+  const text = getSidebarContentText(content);
+  return text.match(SIDEBAR_LINK_PATTERN) || [];
+};
+
+const toSidebarLinkData = (message: unknown): LinkData | null => {
+  if (!isSidebarPayloadRecord(message)) return null;
+
+  const type = String(message.type || "").toLowerCase();
+  if (type !== "text" && type !== "link") return null;
+
+  const links = extractSidebarLinks(message.content);
+  const messageId = getSidebarMessageStableId(message);
+  if (!messageId || links.length === 0) return null;
+
+  return {
+    _id: String(message._id || messageId),
+    msg_id: String(message.msg_id || messageId),
+    links,
+    sender_id: String(message.sender_id || ""),
+    createdAt: String(message.createdAt || message.created_at || new Date().toISOString()),
+  };
+};
+
+const upsertSidebarItem = <T extends { _id?: string; msg_id?: string }>(
+  items: T[],
+  nextItem: T,
+) => {
+  const nextId = getSidebarMessageStableId(nextItem);
+  if (!nextId) return items;
+
+  return [
+    nextItem,
+    ...items.filter((item) => getSidebarMessageStableId(item) !== nextId),
+  ];
+};
+
+const removeSidebarItemById = <T extends { _id?: string; msg_id?: string }>(
+  items: T[],
+  messageId: string,
+) => items.filter((item) => getSidebarMessageStableId(item) !== messageId);
+
 const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   conversation,
   isOpen,
@@ -318,20 +400,72 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       void loadSidebarData();
     };
 
-    // --- SOCKET HANDLERS FOR REAL-TIME POLLS ---
-    const handleSocketNewMessage = (msg: any) => {
+    const removeMessageFromSidebarStorage = (messageId: string) => {
+      if (!messageId) return;
+
+      setPollMessages((prev) => removeSidebarItemById(prev, messageId));
+      setAllMediaMessages((prev) => removeSidebarItemById(prev, messageId));
+      setMediaMessagesPreview((prev) => removeSidebarItemById(prev, messageId));
+      setAllFileMessages((prev) => removeSidebarItemById(prev, messageId));
+      setFileMessagesPreview((prev) => removeSidebarItemById(prev, messageId));
+      setAllLinkMessages((prev) => removeSidebarItemById(prev, messageId));
+      setLinkMessagesPreview((prev) => removeSidebarItemById(prev, messageId));
+    };
+
+    // --- SOCKET HANDLERS FOR REAL-TIME SIDEBAR DATA ---
+    const handleSocketNewMessage = (payload: unknown) => {
       if (!isOpen || !conversation?._id) return;
-      const msgId = String(msg.msg_id || msg._id || "");
-      const msgConvId = String(msg.conversation_id || msg.conversationId || "");
+      const envelopeConvId = getSidebarMessageConversationId(payload);
+      const msg = normalizeSidebarMessagePayload(payload);
+      if (!isSidebarPayloadRecord(msg)) return;
+
+      const msgId = getSidebarMessageStableId(msg);
+      const msgConvId = getSidebarMessageConversationId(msg) || envelopeConvId;
       if (msgConvId !== conversation._id) return;
 
-      // Only care about polls
-      if (msg.type !== "poll") return;
+      if (msg.is_deleted || msg.is_revoked) {
+        removeMessageFromSidebarStorage(msgId);
+        return;
+      }
 
-      setPollMessages((prev) => {
-        if (prev.some(p => String(p.msg_id || p._id || "") === msgId)) return prev;
-        return [msg, ...prev];
-      });
+      const type = String(msg.type || "").toLowerCase();
+      const normalizedMessage = {
+        ...msg,
+        conversation_id: msgConvId,
+      } as unknown as Message;
+
+      if (type === "poll") {
+        setPollMessages((prev) => upsertSidebarItem(prev, normalizedMessage));
+        return;
+      }
+
+      if (type === "image" || type === "video") {
+        setAllMediaMessages((prev) => upsertSidebarItem(prev, normalizedMessage));
+        setMediaMessagesPreview((prev) =>
+          upsertSidebarItem(prev, normalizedMessage).slice(0, 8),
+        );
+        return;
+      }
+
+      if (type === "file") {
+        setAllFileMessages((prev) => upsertSidebarItem(prev, normalizedMessage));
+        setFileMessagesPreview((prev) =>
+          upsertSidebarItem(prev, normalizedMessage).slice(0, 5),
+        );
+        return;
+      }
+
+      const linkData = toSidebarLinkData(msg);
+      if (linkData) {
+        setAllLinkMessages((prev) => upsertSidebarItem(prev, linkData));
+        setLinkMessagesPreview((prev) =>
+          upsertSidebarItem(prev, linkData).slice(0, 5),
+        );
+      }
+    };
+
+    const handleLocalMessageUpserted = (event: Event) => {
+      handleSocketNewMessage((event as CustomEvent).detail);
     };
 
     const handleSocketMessageUpdated = (payload: any) => {
@@ -357,30 +491,121 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       const payloadConvId = String(payload.conversation_id || payload.conversationId || "");
       if (payloadConvId !== conversation._id) return;
 
-      setPollMessages((prev) =>
-        prev.filter((m) => {
-          const mId = String(m.msg_id || m._id || "");
-          return mId !== msgId;
-        })
-      );
+      removeMessageFromSidebarStorage(msgId);
     };
 
     const handleSocketMessageRecalled = (payload: any) => {
       handleSocketMessageRemoved(payload);
     };
 
+    const handleSocketMemberNicknameUpdated = (payload: any) => {
+      if (!conversation?._id) return;
+
+      const payloadConvId = String(
+        payload?.conversationId || payload?.conversation_id || "",
+      );
+      const targetUserId = String(payload?.userId || payload?.user_id || "");
+      const nickname = String(payload?.nickname || "").trim();
+
+      if (payloadConvId !== conversation._id || !targetUserId) return;
+
+      const targetMember = members.find(
+        (member) => String(member.user_id) === targetUserId,
+      );
+      const nextSenderName = nickname || targetMember?.name || targetUserId;
+
+      setMembers((prev) =>
+        prev.map((member) =>
+          String(member.user_id) === targetUserId
+            ? {
+                ...member,
+                nickname,
+              }
+            : member,
+        ),
+      );
+
+      setPinnedMessages((prev) =>
+        prev.map((message) =>
+          String(message.sender_id || "") === targetUserId
+            ? {
+                ...message,
+                sender_name: nextSenderName,
+              }
+            : message,
+        ),
+      );
+    };
+
+    const normalizeRelationshipPayload = (payload: any) => ({
+      ...payload,
+      _id: payload?._id || payload?.id || payload?.relationship_id,
+      requester_id: payload?.requester_id || payload?.requesterId,
+      receiver_id: payload?.receiver_id || payload?.receiverId,
+      requesterId: payload?.requesterId || payload?.requester_id,
+      receiverId: payload?.receiverId || payload?.receiver_id,
+      status: payload?.status ? String(payload.status).toUpperCase() : payload?.status,
+    });
+
     const handleSocketRelationshipUpdate = (payload: any) => {
       if (!isOpen || !currentUser?.id) return;
 
-      const requesterId = payload.requesterId || payload.requester_id;
-      const receiverId = payload.receiverId || payload.receiver_id;
+      const normalizedPayload = normalizeRelationshipPayload(payload);
+      const requesterId = normalizedPayload.requester_id;
+      const receiverId = normalizedPayload.receiver_id;
+      const currentUserId = String(currentUser.id);
+      const isRequester = String(requesterId) === currentUserId;
+      const isReceiver = String(receiverId) === currentUserId;
+      if (!isRequester && !isReceiver) return;
 
-      // If the update involves the current user
-      if (String(requesterId) === String(currentUser.id) ||
-        String(receiverId) === String(currentUser.id)) {
-        console.log("ChatSidebarRight: Relationship updated via socket, refreshing data...");
-        loadSidebarData();
+      const otherUserId = String(isRequester ? receiverId : requesterId);
+      if (!otherUserId) return;
+
+      setRelationship(normalizedPayload);
+
+      if (normalizedPayload.status === "PENDING") {
+        if (isRequester) {
+          setSentFriendRequestIds((prev) => new Set([...prev, otherUserId]));
+          setPendingFriendRequestIds((prev) => {
+            const next = new Set(prev);
+            next.delete(otherUserId);
+            return next;
+          });
+        } else {
+          setPendingFriendRequestIds((prev) => new Set([...prev, otherUserId]));
+          setSentFriendRequestIds((prev) => {
+            const next = new Set(prev);
+            next.delete(otherUserId);
+            return next;
+          });
+        }
+        return;
       }
+
+      if (normalizedPayload.status === "ACCEPTED") {
+        setFriendIds((prev) => new Set([...prev, otherUserId]));
+      }
+
+      if (
+        ["ACCEPTED", "REMOVED", "REJECTED", "CANCELLED", "CANCELED"].includes(
+          String(normalizedPayload.status || ""),
+        )
+      ) {
+        setPendingFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(otherUserId);
+          return next;
+        });
+        setSentFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(otherUserId);
+          return next;
+        });
+      }
+    };
+
+    const handleLocalRelationshipUpdate = (event: Event) => {
+      handleSocketRelationshipUpdate((event as CustomEvent).detail);
     };
 
     window.addEventListener(
@@ -406,6 +631,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     socketService.onMessageDestroyed(handleSocketMessageRemoved);
     socketService.onMessageRecalled(handleSocketMessageRecalled);
     socketService.onRelationshipUpdate(handleSocketRelationshipUpdate);
+    socketService.onMemberNicknameUpdated(handleSocketMemberNicknameUpdated);
+    window.addEventListener(
+      "chat:message-upserted",
+      handleLocalMessageUpserted as EventListener,
+    );
+    window.addEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
 
     return () => {
       window.removeEventListener(
@@ -430,8 +661,14 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       socketService.offMessageDestroyed(handleSocketMessageRemoved);
       socketService.offMessageRecalled(handleSocketMessageRecalled);
       socketService.offRelationshipUpdate(handleSocketRelationshipUpdate);
+      socketService.offMemberNicknameUpdated(handleSocketMemberNicknameUpdated);
+      window.removeEventListener(
+        "chat:message-upserted",
+        handleLocalMessageUpserted as EventListener,
+      );
+      window.removeEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
     };
-  }, [conversation?._id, isOpen, loadSidebarData]);
+  }, [conversation?._id, currentUser?.id, isOpen, loadSidebarData, members]);
 
   // Load available users for create group modal
   useEffect(() => {
@@ -550,18 +787,79 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
   ) => {
     const normalizedUserId = currentUser?.id;
     if (!userId || !normalizedUserId || !conversation?._id) return;
+
+    const normalizedNickname = nickname.trim();
+    const previousMembers = members;
+    const previousPinnedMessages = pinnedMessages;
+
+    const targetMember = members.find(
+      (member) => String(member.user_id) === String(userId),
+    );
+    const nextSenderName = normalizedNickname || targetMember?.name || "";
+
+    setMembers((prev) =>
+      prev.map((member) =>
+        String(member.user_id) === String(userId)
+          ? {
+            ...member,
+            nickname: normalizedNickname,
+          }
+          : member,
+      ),
+    );
+
+    if (nextSenderName) {
+      setPinnedMessages((prev) =>
+        prev.map((message) =>
+          String(message.sender_id || "") === String(userId)
+            ? {
+              ...message,
+              sender_name: nextSenderName,
+            }
+            : message,
+        ),
+      );
+    }
+
     try {
-      await ParticipantService.updateMemberNickname(
+      const result = await ParticipantService.updateMemberNickname(
         conversation._id,
         userId,
         normalizedUserId,
-        nickname,
+        normalizedNickname,
       );
-      await Promise.all([
-        loadSidebarData(),
-        refreshConversations(normalizedUserId),
-      ]);
+
+      const savedNickname = String(result?.nickname ?? normalizedNickname);
+      if (savedNickname !== normalizedNickname) {
+        const savedSenderName = savedNickname || targetMember?.name || "";
+
+        setMembers((prev) =>
+          prev.map((member) =>
+            String(member.user_id) === String(userId)
+              ? {
+                ...member,
+                nickname: savedNickname,
+              }
+              : member,
+          ),
+        );
+
+        if (savedSenderName) {
+          setPinnedMessages((prev) =>
+            prev.map((message) =>
+              String(message.sender_id || "") === String(userId)
+                ? {
+                  ...message,
+                  sender_name: savedSenderName,
+                }
+                : message,
+            ),
+          );
+        }
+      }
     } catch (error) {
+      setMembers(previousMembers);
+      setPinnedMessages(previousPinnedMessages);
       console.error("Error updating member nickname:", error);
       throw error instanceof Error
         ? error
@@ -725,6 +1023,12 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       if (!currentUser?.id) return;
       const ok = await sendFriendRequestViaChat(currentUser.id, userId);
       if (ok) {
+        setSentFriendRequestIds((prev) => new Set([...prev, userId]));
+        setPendingFriendRequestIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
         showToast("Đã gửi lời mời kết bạn", "success");
       } else {
         showToast("Không thể gửi lời mời kết bạn", "error");
@@ -763,9 +1067,44 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
 
   if (loading) {
     return (
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 overflow-y-auto custom-scrollbar">
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isGroupChat ? "Thông tin nhóm" : "Thông tin đoạn chat"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="cursor-pointer rounded-full p-1 transition-colors hover:bg-gray-100"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        <div className="animate-pulse">
+          <div className="border-b border-gray-100 px-4 py-6 text-center">
+            <div className="mx-auto mb-3 h-20 w-20 rounded-full bg-slate-200" />
+            <div className="mx-auto h-5 w-36 rounded-full bg-slate-200" />
+            <div className="mx-auto mt-2 h-3 w-20 rounded-full bg-slate-100" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-3 border-b border-gray-100 px-4 py-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="flex flex-col items-center gap-2">
+                <div className="h-10 w-10 rounded-full bg-slate-200" />
+                <div className="h-2.5 w-12 rounded-full bg-slate-100" />
+              </div>
+            ))}
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div key={item} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2 px-4 py-3">
+                <div className="h-6 w-6 rounded-full bg-slate-200" />
+                <div className="h-4 w-36 rounded-full bg-slate-100" />
+                {item > 2 && <div className="h-4 w-4 rounded-full bg-slate-100" />}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -812,7 +1151,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">×</button>
         </div>
       )}
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 z-40 overflow-y-auto custom-scrollbar">
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
         {/* MAIN VIEW */}
         {viewMode === "main" && (
           <>
@@ -829,7 +1168,11 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
               <div className="flex-1 flex flex-col bg-white">
                 <div className="px-4 py-8 text-center">
                   <Avatar
-                    src={getConversationDisplayAvatar(activeConversation, currentUser?.id)}
+                    src={
+                      isDissolved && activeConversation.type === "group"
+                        ? undefined
+                        : getConversationDisplayAvatar(activeConversation, currentUser?.id)
+                    }
                     name={getConversationDisplayName(activeConversation, currentUser?.id)}
                     size={80}
                     className="mx-auto mb-3 shadow-md"
@@ -913,11 +1256,13 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                   <>
                     <CollapsibleSection title="Thành viên nhóm" icon={<Users size={20} />} badge={joinedMembers.length} onClick={handleViewMembers} showIndicator={false} />
                     {/* Link tham gia nhóm – Zalo style */}
-                    <div className="border-t border-gray-100 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[15px] font-medium text-gray-700">
-                          <LinkIcon size={16} className="text-gray-500" />
-                          <span>Link tham gia nhóm</span>
+                    <div className="border-t border-gray-100 px-4 py-2.5">
+                      <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2">
+                        <span className="flex h-6 w-6 items-center justify-center text-gray-500">
+                          <LinkIcon size={20} />
+                        </span>
+                        <div className="min-w-0 text-left">
+                          <span className="block truncate text-[15px] font-medium leading-6 text-gray-700">Link tham gia nhóm</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -934,7 +1279,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
                                 const link = await ConversationService.getInviteLink(conversation._id, currentUser.id);
                                 await navigator.clipboard.writeText(link);
                                 showToast("Đã sao chép link tham gia nhóm!", "success");
-                              } catch (err) {
+                              } catch {
                                 showToast("Không thể sao chép link", "error");
                               }
                             }}

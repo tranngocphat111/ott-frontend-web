@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-import { SOCKET_CHAT_SERVER_URL } from "../config/api.config";
+import { SOCKET_CHAT_SERVER_URL, SOCKET_CHAT_TRANSPORTS } from "../config/api.config";
 
 type CallType = "voice" | "video";
 
@@ -107,7 +107,7 @@ class SocketService {
 
     const token = localStorage.getItem("accessToken");
     const socket = io(SOCKET_CHAT_SERVER_URL, {
-      transports: ["websocket", "polling"],
+      transports: SOCKET_CHAT_TRANSPORTS,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       auth: {
@@ -251,7 +251,7 @@ class SocketService {
   }
 
   onRelationshipUpdate(callback: (relationship: any) => void) {
-    this.socket?.on("cap_nhat_quan_he", callback);
+    this.ensureSocket().on("cap_nhat_quan_he", callback);
   }
 
   offRelationshipUpdate(callback?: (relationship: any) => void) {
@@ -358,6 +358,24 @@ class SocketService {
     }
   }
 
+  onMemberNicknameUpdated(callback: (payload: {
+    conversationId?: string;
+    conversation_id?: string;
+    userId?: string;
+    user_id?: string;
+    nickname?: string;
+  }) => void) {
+    this.ensureSocket().on("cap_nhat_biet_danh", callback);
+  }
+
+  offMemberNicknameUpdated(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_biet_danh", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_biet_danh");
+    }
+  }
+
   startTyping(conversationId: string, userId: string) {
     this.emitWhenConnected("nguoi_dung_dang_soan_tin_nhan", {
       conversationId,
@@ -417,7 +435,7 @@ class SocketService {
   onTyping(
     callback: (payload: { conversationId: string; userId: string }) => void,
   ) {
-    this.socket?.on("nguoi_dung_dang_soan_tin_nhan", callback);
+    this.ensureSocket().on("nguoi_dung_dang_soan_tin_nhan", callback);
   }
 
   offTyping(
@@ -433,7 +451,7 @@ class SocketService {
   onTypingStopped(
     callback: (payload: { conversationId: string; userId: string }) => void,
   ) {
-    this.socket?.on("nguoi_dung_ngung_soan_tin_nhan", callback);
+    this.ensureSocket().on("nguoi_dung_ngung_soan_tin_nhan", callback);
   }
 
   offTypingStopped(

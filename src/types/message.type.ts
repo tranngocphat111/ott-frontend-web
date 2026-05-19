@@ -70,6 +70,9 @@ export interface Message {
   poll_question?: string | null;
   poll_multiple_choice?: boolean;
   poll_options?: PollOption[];
+  poll_locked?: boolean;
+  poll_locked_at?: string | null;
+  poll_locked_by?: string | null;
 }
 
 export interface MessageReaction {

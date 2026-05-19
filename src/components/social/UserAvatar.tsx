@@ -6,16 +6,27 @@ interface Props {
   size?: string;
 }
 
-const UserAvatar: React.FC<Props> = ({ user, size = "size-10" }) =>
-  user.avatar ?
+const UserAvatar: React.FC<Props> = ({ user, size = "size-10" }) => {
+  if (!user) {
+    return (
+      <div className={`${size} rounded-full bg-gray-300 flex items-center justify-center text-white font-bold text-sm shrink-0`}>
+        ?
+      </div>
+    );
+  }
+
+  return user.avatar ? (
     <img
       src={user.avatar}
       alt={user.name}
       className={`${size} rounded-full object-cover`}
     />
-  : <div
-      className={`${size} rounded-full ${user.color} flex items-center justify-center text-white font-bold text-sm shrink-0`}>
+  ) : (
+    <div
+      className={`${size} rounded-full ${user.color || "bg-primary-500"} flex items-center justify-center text-white font-bold text-sm shrink-0`}>
       {(user.name || "?").split(" ").pop()?.charAt(0) ?? "?"}
-    </div>;
+    </div>
+  );
+};
 
 export default UserAvatar;

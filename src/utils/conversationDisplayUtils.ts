@@ -73,6 +73,13 @@ export const getConversationDisplayAvatar = (
     return "SPECIAL_AVATAR_SELF";
   }
 
+  if (
+    conversation.type === "group" &&
+    (conversation.status === "dissolved" || Boolean(conversation.is_dissolved))
+  ) {
+    return undefined;
+  }
+
   const explicitAvatar = String(conversation.avatar || "").trim();
   if (explicitAvatar) return getFullUrl(explicitAvatar);
 

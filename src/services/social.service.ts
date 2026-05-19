@@ -6,6 +6,8 @@
 
 import { API_MEDIA_SERVER_URL, API_CHAT_SERVER_URL, API_BASE_URL } from "../config/api.config";
 import { authFetch } from "./api/fetchClient";
+import { ConversationService } from "./conversation.service";
+import { MessageService } from "./message.service";
 
 /* ─── Raw shape trả về từ backend ────────────────────── */
 export interface ApiUser {
@@ -114,6 +116,67 @@ const verifySentFriendRequest = async (requesterId: string, receiverId: string) 
     }
 
     return null;
+};
+
+const normalizeRelationshipResponse = (relationship: any) => {
+    if (!relationship || typeof relationship !== "object") return relationship;
+
+    return {
+        ...relationship,
+        id: relationship.id || relationship._id || relationship.relationship_id,
+        requesterId: relationship.requesterId || relationship.requester_id,
+        receiverId: relationship.receiverId || relationship.receiver_id,
+    };
+};
+
+const dispatchRelationshipUpdate = (relationship: any) => {
+    if (typeof window === "undefined" || !relationship) return;
+    window.dispatchEvent(
+        new CustomEvent("chat:relationship-updated", {
+            detail: normalizeRelationshipResponse(relationship),
+        }),
+    );
+};
+
+const isSameDirectionActiveRequest = (
+    relationship: ChatRelationshipLike | null | undefined,
+    requesterId: string,
+    receiverId: string,
+) => {
+    if (!relationship) return false;
+    return (
+        getRelationshipRequesterId(relationship) === String(requesterId) &&
+        getRelationshipReceiverId(relationship) === String(receiverId) &&
+        isRelationshipStatus(relationship, ["PENDING", "ACCEPTED"])
+    );
+};
+
+const sendFriendRequestSystemMessage = async (
+    requesterId: string,
+    receiverId: string,
+) => {
+    try {
+        const directConversation =
+            await ConversationService.getOrCreatePrivateConversation(
+                requesterId,
+                receiverId,
+            );
+        const conversationId = String(
+            (directConversation as any)?.conversation?._id ||
+                (directConversation as any)?._id ||
+                "",
+        );
+        if (!conversationId) return;
+
+        await MessageService.sendMessage(
+            conversationId,
+            requesterId,
+            "Đã gửi lời mời kết bạn",
+            "system_friend_request",
+        );
+    } catch (error) {
+        console.warn("Không thể gửi thông báo lời mời kết bạn:", error);
+    }
 };
 
 function unwrapList<T>(json: unknown): T[] {
@@ -225,9 +288,12 @@ export async function fetchUserById(id: string): Promise<ApiUser | null> {
     }
 }
 
-export async function fetchFriends(userId: string): Promise<FriendOption[]> {
+export async function fetchFriends(userId: string, page?: number, size?: number): Promise<FriendOption[]> {
     try {
-        const url = `${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`;
+        let url = `${API_MEDIA_SERVER_URL}/relationships/friends/${userId}`;
+        if (page !== undefined && size !== undefined) {
+            url += `?page=${page}&size=${size}`;
+        }
         const res = await authFetch(url, {
             signal: AbortSignal.timeout(5_000),
         });
@@ -306,6 +372,10 @@ export async function fetchRelationshipStatusViaChat(
 
 export async function cancelRelationship(id: string | null): Promise<boolean> {
     if (!id) return false;
+
+    const cancelledViaChat = await cancelFriendRequestViaChat(id);
+    if (cancelledViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${id}/cancel`,
@@ -321,9 +391,15 @@ export async function cancelRelationship(id: string | null): Promise<boolean> {
 
 export async function fetchPendingRequests(
     userId: string,
+    page?: number,
+    size?: number,
 ): Promise<FriendRequestOption[]> {
     try {
-        const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/pending/${userId}`, {
+        let url = `${API_MEDIA_SERVER_URL}/relationships/pending/${userId}`;
+        if (page !== undefined && size !== undefined) {
+            url += `?page=${page}&size=${size}`;
+        }
+        const res = await authFetch(url, {
             signal: AbortSignal.timeout(5_000),
         });
         if (!res.ok) return [];
@@ -345,6 +421,9 @@ export async function fetchPendingRequests(
 export async function acceptFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {
+    const acceptedViaChat = await acceptFriendRequestViaChat(relationshipId);
+    if (acceptedViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/accept`,
@@ -514,6 +593,9 @@ export async function unblockUserViaChat(
 export async function rejectFriendRequest(
     relationshipId: string,
 ): Promise<boolean> {
+    const rejectedViaChat = await rejectFriendRequestViaChat(relationshipId);
+    if (rejectedViaChat) return true;
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/reject`,
@@ -529,6 +611,11 @@ export async function sendFriendRequest(
     requesterId: string,
     receiverId?: string,
 ): Promise<any> {
+    if (receiverId) {
+        const result = await sendFriendRequestViaChat(requesterId, receiverId);
+        if (result) return normalizeRelationshipResponse(result);
+    }
+
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/send?requesterId=${requesterId}&receiverId=${receiverId}`,
@@ -536,7 +623,7 @@ export async function sendFriendRequest(
         );
         if (!res.ok) throw new Error("Gửi kết bạn thất bại.")
         const json = await res.json();
-        return unwrapApiResult<any>(json);
+        return normalizeRelationshipResponse(unwrapApiResult<any>(json));
     } catch (error) {
         console.error(error)
         return null;
@@ -550,6 +637,16 @@ export async function sendFriendRequestViaChat(
     requesterId: string,
     receiverId: string,
 ): Promise<any> {
+    const existingRelationship = await fetchRelationshipStatusViaChat(
+        requesterId,
+        receiverId,
+    );
+    if (isSameDirectionActiveRequest(existingRelationship, requesterId, receiverId)) {
+        const normalizedExisting = normalizeRelationshipResponse(existingRelationship);
+        dispatchRelationshipUpdate(normalizedExisting);
+        return normalizedExisting;
+    }
+
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/send`,
@@ -562,13 +659,26 @@ export async function sendFriendRequestViaChat(
         );
         if (!res.ok) {
             const verified = await verifySentFriendRequest(requesterId, receiverId);
-            if (verified) return verified;
+            if (verified) {
+                const normalizedVerified = normalizeRelationshipResponse(verified);
+                dispatchRelationshipUpdate(normalizedVerified);
+                void sendFriendRequestSystemMessage(requesterId, receiverId);
+                return normalizedVerified;
+            }
             throw new Error("Gửi kết bạn qua Chat thất bại.")
         }
-        return await res.json();
+        const normalized = normalizeRelationshipResponse(await res.json());
+        dispatchRelationshipUpdate(normalized);
+        void sendFriendRequestSystemMessage(requesterId, receiverId);
+        return normalized;
     } catch (error) {
         const verified = await verifySentFriendRequest(requesterId, receiverId);
-        if (verified) return verified;
+        if (verified) {
+            const normalizedVerified = normalizeRelationshipResponse(verified);
+            dispatchRelationshipUpdate(normalizedVerified);
+            void sendFriendRequestSystemMessage(requesterId, receiverId);
+            return normalizedVerified;
+        }
         console.error(error)
         return null;
     }
@@ -719,4 +829,65 @@ export async function updateUserProfile(
         location: result?.location ?? null,
         relationshipStatus: result?.relationshipStatus ?? null,
     };
+}
+
+// --- VIEW HISTORY & SAVED CONTENTS ---
+
+export async function toggleSaveContent(contentId: string, isSaved: boolean): Promise<boolean> {
+    try {
+        const method = isSaved ? "POST" : "DELETE";
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?contentId=${contentId}`, { method });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function checkIsSaved(contentId: string): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved/check?contentId=${contentId}`);
+        if (!res.ok) return false;
+        return await res.json();
+    } catch {
+        return false;
+    }
+}
+
+export async function fetchSavedContents(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function recordViewHistory(contentId: string): Promise<void> {
+    try {
+        await authFetch(`${API_MEDIA_SERVER_URL}/history?contentId=${contentId}`, { method: "POST" });
+    } catch (e) {
+        // fail silently
+    }
+}
+
+export async function fetchViewHistory(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function clearViewHistory(): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history`, { method: "DELETE" });
+        return res.ok;
+    } catch {
+        return false;
+    }
 }

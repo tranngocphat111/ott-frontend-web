@@ -12,18 +12,7 @@ import type {
   TimeRange,
   UserSummary,
 } from "../interfaces/admin.interface";
-
-const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
-
-const resolveGatewayBaseUrl = (): string => {
-  const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
-
-  if (!apiUrl) {
-    return "http://localhost:8080/riff/api";
-  }
-
-  return normalizeBaseUrl(apiUrl);
-};
+import { resolveGatewayBaseUrl } from "../config/runtime";
 
 // 1. Khởi tạo Axios Instance
 const adminApiClient = axios.create({

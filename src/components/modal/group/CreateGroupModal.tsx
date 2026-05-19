@@ -251,7 +251,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-60"
+          className="fixed inset-0 z-60 flex items-center justify-center overflow-hidden bg-black/50 p-2 sm:p-4"
           onClick={handleClose}
         >
           <motion.div
@@ -260,11 +260,11 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl w-full max-w-4xl mx-4 flex flex-col max-h-[85vh]"
+            className="flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:h-auto sm:max-h-[min(86dvh,760px)]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Tạo nhóm</h2>
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+              <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">Tạo nhóm</h2>
               <button
                 onClick={handleClose}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors"
@@ -274,9 +274,9 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
               {/* Left Side - User Selection */}
-              <div className="flex-1 flex flex-col border-r border-gray-200">
+              <div className="flex min-h-0 flex-1 flex-col md:border-r md:border-gray-200">
                 <GroupInfoSection
                   groupName={groupName}
                   groupAvatar={groupAvatar}
@@ -287,7 +287,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 />
 
                 {/* Filters */}
-                <div className="px-6 py-3 border-b border-gray-200">
+                <div className="shrink-0 border-b border-gray-200 px-4 py-2 sm:px-6 sm:py-3">
                   <FilterButtons
                     filters={filters}
                     activeFilter={activeFilter}
@@ -314,8 +314,8 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200">
-              <div className="text-sm text-gray-500">
+            <div className="flex shrink-0 flex-col gap-3 border-t border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+              <div className="min-h-5 text-sm text-gray-500">
                 {selectedUsers.size > 0 && (
                   <>
                     {selectedUsers.size} thành viên được chọn
@@ -323,12 +323,12 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   </>
                 )}
               </div>
-              <div className="flex gap-3">
+              <div className="flex justify-end gap-2 sm:gap-3">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleClose}
-                  className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                  className="rounded-lg px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:px-6"
                 >
                   Hủy
                 </motion.button>
@@ -337,7 +337,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   whileTap={{ scale: 0.98 }}
                   onClick={handleCreate}
                   disabled={!groupName.trim() || selectedUsers.size < 2}
-                  className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium
+                  className="rounded-lg bg-primary-500 px-4 py-2 font-medium text-white sm:px-6
                            hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed
                            transition-colors"
                 >

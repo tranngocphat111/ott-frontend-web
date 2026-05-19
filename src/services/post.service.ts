@@ -636,6 +636,7 @@ export interface Comment {
     isEdited: boolean;
     time: string;
     totalReplies: number;
+    isDeleted?: boolean;
 }
 
 export function mapComment(c: ApiComment): Comment {
@@ -650,6 +651,7 @@ export function mapComment(c: ApiComment): Comment {
         isEdited: c.edited,
         time: relativeTime(c.createdAt ?? new Date().toISOString()),
         totalReplies: c.totalReplies,
+        isDeleted: c.deleted,
     };
 }
 
@@ -698,7 +700,7 @@ export async function fetchRootComments(
 
         const content = unwrapList<ApiComment>(data.content ?? []);
         return {
-            comments: content.filter((c) => !c.deleted).map(mapComment),
+            comments: content.map(mapComment),
             totalElements: data.totalElements ?? 0,
             totalPages: data.totalPages ?? 1,
             page: data.number ?? page,
@@ -738,7 +740,7 @@ async function fetchRootCommentsFallback(
         }
         console.debug(`[fetchRootCommentsFallback] Got ${allComments.length} total comments from legacy endpoint`);
         const roots = allComments
-            .filter((c) => !c.deleted && (c.parentCommentId === null || c.parentCommentId === undefined))
+            .filter((c) => c.parentCommentId === null || c.parentCommentId === undefined)
             .map(mapComment);
         const start = page * size;
         const slice = roots.slice(start, start + size);
@@ -776,7 +778,7 @@ export async function fetchReplies(
 
         const content: ApiComment[] = Array.isArray(data.content) ? data.content : [];
         return {
-            comments: content.filter((c) => !c.deleted).map(mapComment),
+            comments: content.map(mapComment),
             totalElements: data.totalElements ?? 0,
             totalPages: data.totalPages ?? 1,
             page: data.number ?? page,

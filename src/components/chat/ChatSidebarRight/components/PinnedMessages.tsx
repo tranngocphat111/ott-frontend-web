@@ -1,6 +1,7 @@
 import React from "react";
 import { FileText, ImageIcon, Mic, Video, X } from "lucide-react";
 import type { PinnedMessagesProps } from "../../../../interfaces";
+import type { Message } from "../../../../types";
 import { getFileNameFromUrl, getFullUrl } from "../../../../utils";
 
 const PinnedMessages: React.FC<PinnedMessagesProps> = ({
@@ -24,7 +25,7 @@ const PinnedMessages: React.FC<PinnedMessagesProps> = ({
     );
   }
 
-  const getContentPreview = (message: any) => {
+  const getContentPreview = (message: Message) => {
     const contentItems = Array.isArray(message.content)
       ? message.content
       : [message.content];
@@ -84,12 +85,9 @@ const PinnedMessages: React.FC<PinnedMessagesProps> = ({
     return { label: "TEXT", Icon: FileText };
   };
 
-  const handleJumpToPinned = (message: any) => {
+  const handleJumpToPinned = (message: Message) => {
     const msgId = String(message?.msg_id || message?._id || "");
     if (!msgId || !conversationId) return;
-
-    const messageType = String(message?.type || "").toLowerCase();
-    const isMedia = ["image", "video", "audio"].includes(messageType);
 
     window.dispatchEvent(
       new CustomEvent("chat:jump", {
@@ -97,7 +95,7 @@ const PinnedMessages: React.FC<PinnedMessagesProps> = ({
           conversationId,
           messageId: msgId,
           highlight: true,
-          openMedia: isMedia,
+          fromPinned: true,
         },
       }),
     );

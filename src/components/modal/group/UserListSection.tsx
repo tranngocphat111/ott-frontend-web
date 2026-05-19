@@ -14,7 +14,7 @@ const UserListSection: React.FC<UserListSectionProps> = ({
   isSearchingPhone
 }) => {
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-4">
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
       {/* Phone Search Results Section */}
       {searchTerm.trim().length >= 10 && (
         <div className="mb-6">

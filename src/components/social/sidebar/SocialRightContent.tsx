@@ -13,6 +13,7 @@ import {
 } from "../../../services/relationshipSocket.service";
 import FriendRequestsPanel from "../rightSidebar/FriendRequestsPanel";
 import FriendsPanel from "../rightSidebar/FriendsPanel";
+import { RelationshipListModal } from "../rightSidebar/RelationshipListModal";
 
 interface Props {
   currentUserId: string;
@@ -24,6 +25,9 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   const [friends, setFriends] = useState<FriendOption[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
+  
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<"requests" | "friends">("friends");
 
   const loadRequests = useCallback(async () => {
     if (!currentUserId) return;
@@ -163,9 +167,30 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
         busyRequestId={busyRequestId}
         onAccept={handleAccept}
         onReject={handleReject}
+        onViewAll={() => {
+          setModalTab("requests");
+          setModalOpen(true);
+        }}
       />
 
-      <FriendsPanel friends={friends} loading={friendsLoading} />
+      <FriendsPanel 
+        friends={friends} 
+        loading={friendsLoading} 
+        onViewAll={() => {
+          setModalTab("friends");
+          setModalOpen(true);
+        }}
+      />
+
+      <RelationshipListModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        initialTab={modalTab}
+        currentUserId={currentUserId}
+        busyRequestId={busyRequestId}
+        onAccept={handleAccept}
+        onReject={handleReject}
+      />
     </div>
   );
 };
