@@ -6,8 +6,6 @@
 
 import { API_MEDIA_SERVER_URL, API_CHAT_SERVER_URL, API_BASE_URL } from "../config/api.config";
 import { authFetch } from "./api/fetchClient";
-import { ConversationService } from "./conversation.service";
-import { MessageService } from "./message.service";
 
 /* ─── Raw shape trả về từ backend ────────────────────── */
 export interface ApiUser {
@@ -84,6 +82,20 @@ const isRelationshipStatus = (
     return expectedStatuses.some((status) => status.toUpperCase() === normalizedStatus);
 };
 
+const hasRelationshipId = (
+    relationship: ChatRelationshipLike | null | undefined,
+    relationshipId?: string,
+) => {
+    if (!relationshipId) return true;
+    const expectedId = String(relationshipId);
+    return [
+        (relationship as any)?._id,
+        (relationship as any)?.id,
+        (relationship as any)?.relationship_id,
+        (relationship as any)?.relationshipId,
+    ].some((value) => value && String(value) === expectedId);
+};
+
 const verifyRelationshipMutation = async (
     relationship: ChatRelationshipLike | null | undefined,
     expectedStatuses: string[],
@@ -96,11 +108,7 @@ const verifyRelationshipMutation = async (
     const latest = await fetchRelationshipStatusViaChat(requesterId, receiverId);
     if (!latest) return false;
 
-    const sameRelationship =
-        !relationshipId ||
-        String(latest._id || latest.relationship_id || "") === String(relationshipId);
-
-    return sameRelationship && isRelationshipStatus(latest, expectedStatuses);
+    return hasRelationshipId(latest, relationshipId) && isRelationshipStatus(latest, expectedStatuses);
 };
 
 const verifySentFriendRequest = async (requesterId: string, receiverId: string) => {
@@ -149,34 +157,6 @@ const isSameDirectionActiveRequest = (
         getRelationshipReceiverId(relationship) === String(receiverId) &&
         isRelationshipStatus(relationship, ["PENDING", "ACCEPTED"])
     );
-};
-
-const sendFriendRequestSystemMessage = async (
-    requesterId: string,
-    receiverId: string,
-) => {
-    try {
-        const directConversation =
-            await ConversationService.getOrCreatePrivateConversation(
-                requesterId,
-                receiverId,
-            );
-        const conversationId = String(
-            (directConversation as any)?.conversation?._id ||
-                (directConversation as any)?._id ||
-                "",
-        );
-        if (!conversationId) return;
-
-        await MessageService.sendMessage(
-            conversationId,
-            requesterId,
-            "Đã gửi lời mời kết bạn",
-            "system_friend_request",
-        );
-    } catch (error) {
-        console.warn("Không thể gửi thông báo lời mời kết bạn:", error);
-    }
 };
 
 function unwrapList<T>(json: unknown): T[] {
@@ -662,21 +642,18 @@ export async function sendFriendRequestViaChat(
             if (verified) {
                 const normalizedVerified = normalizeRelationshipResponse(verified);
                 dispatchRelationshipUpdate(normalizedVerified);
-                void sendFriendRequestSystemMessage(requesterId, receiverId);
                 return normalizedVerified;
             }
             throw new Error("Gửi kết bạn qua Chat thất bại.")
         }
         const normalized = normalizeRelationshipResponse(await res.json());
         dispatchRelationshipUpdate(normalized);
-        void sendFriendRequestSystemMessage(requesterId, receiverId);
         return normalized;
     } catch (error) {
         const verified = await verifySentFriendRequest(requesterId, receiverId);
         if (verified) {
             const normalizedVerified = normalizeRelationshipResponse(verified);
             dispatchRelationshipUpdate(normalizedVerified);
-            void sendFriendRequestSystemMessage(requesterId, receiverId);
             return normalizedVerified;
         }
         console.error(error)
