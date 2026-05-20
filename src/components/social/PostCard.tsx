@@ -12,6 +12,8 @@ import PostHeader from "./post/PostHeader";
 import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
 import { fetchPostById, fetchPostReactionDetails, type ApiReaction } from "../../services/post.service";
 import { checkIsSaved, toggleSaveContent, recordViewHistory } from "../../services/social.service";
+import PostMediaGrid from "./PostMediaGrid";
+import { SharePostModal } from "./post/SharePostModal";
 
 interface Props {
   post: Post;
@@ -26,6 +28,7 @@ interface Props {
   onToggleLike: (key: ReactionKey | null) => void;
   onDelete?: (id: string) => void;
   onEdit?: (post: Post) => void;
+  onShare?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
   currentUser: PostUser;
 }
 
@@ -73,11 +76,13 @@ const PostCard: React.FC<Props> = ({
   onToggleLike,
   onDelete,
   onEdit,
+  onShare,
   currentUser,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comments);
+  const [shareCount, setShareCount] = useState(post.shares);
   const [reaction, setReaction] = useState<ReactionKey | null>(
     initialReaction ?? null,
   );
@@ -85,6 +90,7 @@ const PostCard: React.FC<Props> = ({
   const [reactionCounts, setReactionCounts] = useState<
     Record<ReactionKey, number>
   >(() => buildInitialReactionCounts(initialReactionCounts, post.likes));
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -111,6 +117,10 @@ const PostCard: React.FC<Props> = ({
   useEffect(() => {
     setReactionCounts(buildInitialReactionCounts(initialReactionCounts, post.likes));
   }, [post.id, initialReactionCounts]);
+
+  useEffect(() => {
+    setShareCount(post.shares);
+  }, [post.id, post.shares]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -160,7 +170,10 @@ const PostCard: React.FC<Props> = ({
           setCommentCount(freshPost.comments);
         });
       } else if (payload.activityType === "SHARE") {
-        // Tương lai nếu có share real-time
+        void fetchPostById(post.id, currentUser.id).then((freshPost) => {
+          if (!active || !freshPost) return;
+          setShareCount(freshPost.shares);
+        });
       }
     };
 
@@ -304,11 +317,49 @@ const PostCard: React.FC<Props> = ({
           isInView={isInView}
         />
 
+        {post.sharedPost && (
+          <div 
+            className="mx-4 mb-4 p-4 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-xl transition duration-200 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              goToProfile(post.sharedPost!.author.id);
+            }}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ${post.sharedPost.author.avatar ? "" : post.sharedPost.author.color}`}>
+                {post.sharedPost.author.avatar ? (
+                  <img src={post.sharedPost.author.avatar} alt={post.sharedPost.author.displayName} className="size-full object-cover" />
+                ) : (
+                  post.sharedPost.author.displayName.charAt(0)
+                )}
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-gray-800 hover:underline">
+                  {post.sharedPost.author.displayName}
+                </div>
+                <div className="text-[11px] text-gray-400">
+                  {post.sharedPost.time}
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed mb-2 line-clamp-3">
+              {post.sharedPost.content}
+            </p>
+            {post.sharedPost.media && post.sharedPost.media.length > 0 && (
+              <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60" onClick={(e) => e.stopPropagation()}>
+                <PostMediaGrid
+                  media={post.sharedPost.media}
+                  isInView={isInView}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         <div>
           <PostReactionsSummary
             reactionCounts={reactionCounts}
             commentCount={commentCount}
-            shares={post.shares}
+            shares={shareCount}
             onToggleComments={() => openModal(true)}
             onShowReactionsList={() => setIsReactionsListModalOpen(true)}
           />
@@ -333,6 +384,7 @@ const PostCard: React.FC<Props> = ({
             onLikeMouseLeave={onMouseLeaveLike}
             onPickerMouseEnter={onMouseEnterPicker}
             onPickerMouseLeave={onMouseLeavePicker}
+            onShareClick={() => setIsShareModalOpen(true)}
           />
         </div>
       </div>
@@ -381,6 +433,23 @@ const PostCard: React.FC<Props> = ({
         isOpen={isReactionsListModalOpen}
         onClose={() => setIsReactionsListModalOpen(false)}
         postId={post.id}
+      />
+
+      <SharePostModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        post={post}
+        currentUser={currentUser}
+        onShare={async (caption, visibility) => {
+          if (onShare) {
+            const res = await onShare(post.id, caption, visibility);
+            if (res.ok) {
+              setShareCount((prev) => prev + 1);
+            }
+            return res;
+          }
+          return { ok: false, error: "Chức năng chia sẻ chưa sẵn sàng." };
+        }}
       />
     </>
   );

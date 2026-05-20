@@ -33,6 +33,7 @@ const SocialFeed: React.FC = () => {
     handleDeletePost,
     handleNewPost,
     handleUpdatePost,
+    handleSharePost,
   } = useSocialFeed();
 
   const { isAuthenticated, isLoading } = useAuth();
@@ -126,6 +127,7 @@ const SocialFeed: React.FC = () => {
               onToggleLike={toggleLikePost}
               onDelete={(id) => setDeleteTargetId(id)}
               onEdit={openEditModal}
+              onShare={handleSharePost}
               currentUser={currentUser}
               loading={loadingDB}
             />

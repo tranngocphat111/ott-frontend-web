@@ -13,6 +13,7 @@ interface PostListProps {
   onToggleLike: (postId: string, reactionKey: ReactionKey | null) => void;
   onDeletePost: (postId: string) => void;
   onEditPost: (post: Post) => void;
+  onSharePost?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const PostList: React.FC<PostListProps> = ({
@@ -24,6 +25,7 @@ const PostList: React.FC<PostListProps> = ({
   onToggleLike,
   onDeletePost,
   onEditPost,
+  onSharePost,
 }) => {
   if (loading) {
     return (
@@ -57,6 +59,7 @@ const PostList: React.FC<PostListProps> = ({
           onToggleLike={(key) => onToggleLike(post.id, key)}
           onDelete={onDeletePost}
           onEdit={onEditPost}
+          onShare={onSharePost}
           currentUser={currentUser}
         />
       ))}

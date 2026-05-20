@@ -19,6 +19,7 @@ interface Props {
   onPickerMouseEnter: () => void;
   onPickerMouseLeave: () => void;
   onToggleSave?: () => void;
+  onShareClick?: () => void;
 }
 
 const PostActions: React.FC<Props> = ({
@@ -37,9 +38,8 @@ const PostActions: React.FC<Props> = ({
   onPickerMouseEnter,
   onPickerMouseLeave,
   onToggleSave,
-}) => {
+  onShareClick,
   const shouldShowReactionEmoji = Boolean(reaction && reaction !== "like" && reactionEmoji);
-
   return (
   <div className="px-4 py-1 border-t border-primary-100 flex">
     <div
@@ -77,7 +77,12 @@ const PostActions: React.FC<Props> = ({
       />
       <span className="hidden sm:inline">Bình luận</span>
     </button>
-    <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition text-primary-700 font-medium text-sm">
+    <button 
+      onClick={(e) => {
+        e.stopPropagation();
+        onShareClick?.();
+      }}
+      className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition text-primary-700 font-medium text-sm">
       <Share2 className="size-5" />
       <span className="hidden sm:inline">Chia sẻ</span>
     </button>

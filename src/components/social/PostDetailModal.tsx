@@ -115,6 +115,44 @@ const PostDetailModal: React.FC<Props> = ({
               variant="carousel"
             />
 
+            {post.sharedPost && (
+              <div 
+                className="mx-4 mb-4 p-4 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-xl transition duration-200 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProfile(post.sharedPost!.author.id);
+                }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ${post.sharedPost.author.avatar ? "" : post.sharedPost.author.color}`}>
+                    {post.sharedPost.author.avatar ? (
+                      <img src={post.sharedPost.author.avatar} alt={post.sharedPost.author.displayName} className="size-full object-cover" />
+                    ) : (
+                      post.sharedPost.author.displayName.charAt(0)
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800 hover:underline">
+                      {post.sharedPost.author.displayName}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {post.sharedPost.time}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed mb-2 line-clamp-3">
+                  {post.sharedPost.content}
+                </p>
+                {post.sharedPost.media && post.sharedPost.media.length > 0 && (
+                  <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60" onClick={(e) => e.stopPropagation()}>
+                    <PostBody
+                      media={post.sharedPost.media}
+                      isInView
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <PostReactionsSummary
               reactionCounts={reactionCounts}
               commentCount={commentCount}

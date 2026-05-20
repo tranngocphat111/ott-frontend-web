@@ -29,6 +29,7 @@ export interface Post {
     relationship?: "self" | "friend" | "friend-of-friend" | "stranger";
     relationshipLabel?: string;
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
+    sharedPost?: Post;
 }
 
 export interface StoryContentItem {

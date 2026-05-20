@@ -10,6 +10,7 @@ interface Props {
   onToggleLike: (id: string, key: ReactionKey | null) => void;
   onDelete: (id: string) => void;
   onEdit: (post: Post) => void;
+  onShare?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
   currentUser: PostUser;
   loading?: boolean;
 }
@@ -36,6 +37,7 @@ const PostsList: React.FC<Props> = ({
   onToggleLike,
   onDelete,
   onEdit,
+  onShare,
   currentUser,
   loading = false,
 }) => (
@@ -59,6 +61,7 @@ const PostsList: React.FC<Props> = ({
           onToggleLike={(key) => onToggleLike(post.id, key)}
           onDelete={onDelete}
           onEdit={onEdit}
+          onShare={onShare}
           currentUser={currentUser}
         />
       ))

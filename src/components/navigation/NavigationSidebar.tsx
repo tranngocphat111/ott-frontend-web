@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   MessageCircle,
   Phone,
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useConversations } from "../../contexts/ConversationsContext";
+import { getParticipantUnreadCount } from "../../utils/conversationNotification";
 import NavigationItem from "./NavigationItem";
 import UserProfile from "./UserProfile";
 import NotificationMenu from "./NotificationMenu";
@@ -27,8 +29,18 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { conversations } = useConversations();
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const chatUnreadCount = useMemo(
+    () =>
+      conversations.reduce(
+        (total, item) => total + getParticipantUnreadCount(item.participant),
+        0,
+      ),
+    [conversations],
+  );
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -52,6 +64,7 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       icon: <MessageCircle className="w-6 h-6" />,
       label: "Tin nhắn",
       isActive: activeItem === "chat",
+      badge: chatUnreadCount,
     },
     {
       id: "social",

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { BellOff, Pin, UserPlus, X, Users } from "lucide-react";
 import { ParticipantService } from "../../../../services";
 import type { GroupActionButtonsProps } from "../../../../interfaces";
+import { isConversationMuted } from "../../../../utils/conversationNotification";
 
 const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
   conversation,
@@ -41,10 +42,10 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
       return;
     }
 
-    const currentStatus = participant?.settings?.notification_status || "on";
+    const currentlyMuted = isConversationMuted(participant);
 
     // Nếu đang mute thì bấm để bật lại ngay, không cần modal
-    if (currentStatus === "mute") {
+    if (currentlyMuted) {
       setLoading((prev) => ({ ...prev, mute: true }));
 
       try {
@@ -142,6 +143,7 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
 
   const isGroupChat = conversation.type === "group";
   const isPrivateChat = conversation.type === "private";
+  const currentlyMuted = isConversationMuted(participant);
 
   return (
     <>
@@ -153,22 +155,22 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
           className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-            participant?.settings?.notification_status === "mute" 
+            currentlyMuted
               ? "bg-primary-100" 
               : "bg-slate-100 group-hover:bg-primary-50"
           }`}>
             <BellOff size={16} className={
-              participant?.settings?.notification_status === "mute" 
+              currentlyMuted
                 ? "text-primary-700" 
                 : "text-slate-600 group-hover:text-primary-700"
             } />
           </div>
           <span className={`max-w-[76px] text-center text-[12.5px] font-medium leading-4 transition-colors ${
-            participant?.settings?.notification_status === "mute" 
+            currentlyMuted
               ? "text-primary-800" 
               : "text-slate-700 group-hover:text-primary-800"
           }`}>
-            {participant?.settings?.notification_status === "mute" ? "Bật thông báo" : "Tắt thông báo"}
+            {currentlyMuted ? "Bật thông báo" : "Tắt thông báo"}
           </span>
         </button>
 

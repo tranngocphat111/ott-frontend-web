@@ -8,6 +8,7 @@ export interface NavigationItem {
   icon: React.ReactNode;
   label: string;
   isActive?: boolean;
+  badge?: number;
 }
 
 export interface NavigationItemProps {

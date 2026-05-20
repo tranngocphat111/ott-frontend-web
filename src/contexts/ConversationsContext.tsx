@@ -18,6 +18,10 @@ import type {
 } from "../types";
 import { ConversationService, CategoryService, socketService } from "../services";
 import { useAuth } from "./AuthContext";
+import {
+  getParticipantUnreadCount,
+  isConversationMuted,
+} from "../utils/conversationNotification";
 
 const APP_TITLE = "Riff - Chat";
 const TAB_MESSAGE_PREVIEW_MS = 6000;
@@ -144,12 +148,12 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
   const [tabTitleBlinkOn, setTabTitleBlinkOn] = useState(false);
   const { isAuthenticated, user } = useAuth();
 
-  const totalUnreadMessages = useMemo(
+  const notifiableUnreadMessages = useMemo(
     () =>
-      conversations.reduce(
-        (total, item) => total + Math.max(0, Number(item.participant.unread_count || 0)),
-        0,
-      ),
+      conversations.reduce((total, item) => {
+        if (isConversationMuted(item.participant)) return total;
+        return total + getParticipantUnreadCount(item.participant);
+      }, 0),
     [conversations],
   );
 
@@ -159,15 +163,15 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
 
   useEffect(() => {
     const unreadPrefix =
-      isAuthenticated && totalUnreadMessages > 0
-        ? `(${totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}) `
+      isAuthenticated && notifiableUnreadMessages > 0
+        ? `(${notifiableUnreadMessages > 99 ? "99+" : notifiableUnreadMessages}) `
         : "";
     const baseTitle = `${unreadPrefix}${APP_TITLE}`;
 
     document.title = isAuthenticated && tabMessagePreview && tabTitleBlinkOn
       ? `${unreadPrefix}${tabMessagePreview}`
       : baseTitle;
-  }, [isAuthenticated, tabMessagePreview, tabTitleBlinkOn, totalUnreadMessages]);
+  }, [isAuthenticated, notifiableUnreadMessages, tabMessagePreview, tabTitleBlinkOn]);
 
   useEffect(() => {
     return () => {
@@ -513,10 +517,13 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       String(message.sender_id || "") !== currentUserId
     ) {
       socketService.markMessageDelivered(convId, currentUserId, msgId);
-      const existingConversation = conversationsRef.current.find(
+      const existingItem = conversationsRef.current.find(
         (item) => item.conversation._id === convId,
-      )?.conversation;
-      showTabMessagePreview(message, existingConversation);
+      );
+
+      if (!existingItem || !isConversationMuted(existingItem.participant)) {
+        showTabMessagePreview(message, existingItem?.conversation);
+      }
     }
 
     setConversations((prev) => {
@@ -652,6 +659,40 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
           }
           : item,
       ),
+    );
+  }, []);
+
+  const handleNotificationUpdated = useCallback((payload: any) => {
+    const conversationId = String(payload?.conversationId || "");
+    if (!conversationId) return;
+
+    const incomingSettings = payload?.participant?.settings || {};
+    const hasMuteUntil =
+      Object.prototype.hasOwnProperty.call(incomingSettings, "mute_until") ||
+      payload?.muteUntil !== undefined;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.conversation._id !== conversationId) return item;
+
+        return {
+          ...item,
+          participant: {
+            ...item.participant,
+            settings: {
+              ...item.participant.settings,
+              ...incomingSettings,
+              notification_status:
+                incomingSettings.notification_status ||
+                payload?.status ||
+                item.participant.settings.notification_status,
+              mute_until: hasMuteUntil
+                ? incomingSettings.mute_until ?? payload?.muteUntil ?? null
+                : item.participant.settings.mute_until,
+            },
+          },
+        };
+      }),
     );
   }, []);
 
@@ -880,6 +921,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     const socket = socketService.getSocket();
     socket?.on("tin_nhan_thu_hoi", handleRevokedMessage);
     socket?.on("cap_nhat_phan_loai", handleCategoryUpdated);
+    socket?.on("cap_nhat_thong_bao", handleNotificationUpdated);
     socketService.onGroupCallUpdated(handleGroupCallUpdated);
     socketService.onStartCallSuccess(handleStartCallSuccess);
     socketService.onCallEnded(handleCallRoomEnded);
@@ -894,6 +936,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const cleanupSocket = socketService.getSocket();
       cleanupSocket?.off("tin_nhan_thu_hoi", handleRevokedMessage);
       cleanupSocket?.off("cap_nhat_phan_loai", handleCategoryUpdated);
+      cleanupSocket?.off("cap_nhat_thong_bao", handleNotificationUpdated);
       cleanupSocket?.off("them_nguoi_moi", handleMemberAdded);
       socketService.offGroupCallUpdated(handleGroupCallUpdated);
       socketService.offStartCallSuccess(handleStartCallSuccess);
@@ -909,6 +952,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     handleIncomingMessage,
     handleRevokedMessage,
     handleCategoryUpdated,
+    handleNotificationUpdated,
     handleCallRoomEnded,
     handleGroupCallUpdated,
     handleStartCallSuccess,

@@ -1,13 +1,8 @@
 import { useCallback } from "react";
 
-import {
-    createPost,
-    deletePost,
-    toggleLike,
-    updatePost,
-} from "../../services/post.service";
 import type { Post, User } from "../../components/social/types";
 import type { UploadedMedia } from "../../components/social/create-post";
+import { createPost, deletePost, sharePost, toggleLike, updatePost } from "../../services/post.service";
 
 
 type Params = {
@@ -169,5 +164,29 @@ export const useSocialFeedActions = ({
         [currentUser],
     );
 
-    return { toggleLikePost, handleDeletePost, handleNewPost, handleUpdatePost };
+    const handleSharePost = useCallback(
+        async (
+            postId: string,
+            caption?: string,
+            visibility: string = "PUBLIC",
+        ): Promise<{ ok: boolean; error?: string }> => {
+            if (!currentUser.id) {
+                return { ok: false, error: "Không tìm thấy tài khoản." };
+            }
+            const result = await sharePost(
+                postId,
+                currentUser.id,
+                caption,
+                visibility,
+            );
+            if (result.post) {
+                setPosts((prev) => [result.post!, ...prev]);
+                return { ok: true };
+            }
+            return { ok: false, error: result.error };
+        },
+        [currentUser.id, setPosts],
+    );
+
+    return { toggleLikePost, handleDeletePost, handleNewPost, handleUpdatePost, handleSharePost };
 };

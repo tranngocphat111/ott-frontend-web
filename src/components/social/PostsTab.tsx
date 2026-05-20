@@ -12,6 +12,7 @@ interface PostsTabProps {
   onToggleLike: (postId: string, reactionKey: ReactionKey | null) => void;
   onDeletePost: (postId: string) => void;
   onEditPost: (post: Post) => void;
+  onSharePost?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const PostsTab: React.FC<PostsTabProps> = ({
@@ -23,6 +24,7 @@ const PostsTab: React.FC<PostsTabProps> = ({
   onToggleLike,
   onDeletePost,
   onEditPost,
+  onSharePost,
 }) => {
   return (
     <PostList
@@ -34,6 +36,7 @@ const PostsTab: React.FC<PostsTabProps> = ({
       onToggleLike={onToggleLike}
       onDeletePost={onDeletePost}
       onEditPost={onEditPost}
+      onSharePost={onSharePost}
     />
   );
 };

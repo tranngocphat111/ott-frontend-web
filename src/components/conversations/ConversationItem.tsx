@@ -15,6 +15,7 @@ import {
   getConversationDisplayAvatar,
   getConversationDisplayName,
 } from "../../utils";
+import { isConversationMuted } from "../../utils/conversationNotification";
 import { EmojiText } from "../chat/EmojiText";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePresence } from "../../contexts/PresenceContext";
@@ -124,11 +125,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   }, [conversation.type, conversation.participants, currentUserId]);
 
   // Check if conversation is muted
-  const isMuted = !!(
-    participant.settings.notification_status === "mute" &&
-    participant.settings.mute_until &&
-    new Date(participant.settings.mute_until) > new Date()
-  );
+  const isMuted = isConversationMuted(participant);
 
   const getConversationName = (): string => {
     return (

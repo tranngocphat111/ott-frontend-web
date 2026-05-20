@@ -40,6 +40,7 @@ export interface ApiPost {
     visibility: string;
     hashTags: string[] | null;
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
+    sharedPost?: ApiPost | null;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -115,6 +116,7 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
         visibility: p.visibility,
         relationship: p.accountId === currentUserId ? "self" : undefined,
         accessControls: p.accessControls,
+        sharedPost: p.sharedPost ? mapPost(p.sharedPost, colorIndex + 1, currentUserId) : undefined,
     };
 }
 
@@ -490,6 +492,55 @@ export async function deletePost(postId: string): Promise<boolean> {
         return res.ok || res.status === 404; // 404 cũng coi là đã xoá
     } catch {
         return false;
+    }
+}
+
+/**
+ * Chia sẻ bài viết (Reshare to Feed)
+ */
+export async function sharePost(
+    postId: string,
+    accountId: string,
+    caption?: string,
+    visibility: string = "PUBLIC",
+): Promise<{ post: Post | null; error?: string }> {
+    try {
+        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/share`);
+        url.searchParams.set("accountId", accountId);
+        if (caption) {
+            url.searchParams.set("caption", caption);
+        }
+        url.searchParams.set("visibility", visibility.toUpperCase());
+
+        const res = await authFetch(url.toString(), {
+            method: "POST",
+            signal: AbortSignal.timeout(10_000),
+        });
+
+        if (!res.ok) {
+            let errBody: string | undefined;
+            try {
+                errBody = await res.text();
+                console.error(`[sharePost] Backend error ${res.status}:`, errBody);
+            } catch {
+                console.error(`[sharePost] Backend error ${res.status}: (no body)`);
+            }
+            return {
+                post: null,
+                error: `Chia sẻ bài viết thất bại (${res.status}).`,
+            };
+        }
+
+        const json = await res.json();
+        const p = unwrapApiResult<ApiPost>(json);
+        if (!p) return { post: null, error: "Dữ liệu trả về không hợp lệ" };
+        return { post: mapPost(p, 0, accountId) };
+    } catch (err) {
+        console.error("[sharePost] Network/timeout error:", err);
+        return {
+            post: null,
+            error: "Không thể kết nối đến máy chủ. Vui lòng thử lại.",
+        };
     }
 }
 
