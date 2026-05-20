@@ -39,6 +39,7 @@ const PostActions: React.FC<Props> = ({
   onPickerMouseLeave,
   onToggleSave,
   onShareClick,
+
 }) => {
   const shouldShowReactionEmoji = Boolean(reaction && reaction !== "like" && reactionEmoji);
 
