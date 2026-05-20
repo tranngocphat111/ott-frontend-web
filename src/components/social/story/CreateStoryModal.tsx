@@ -18,6 +18,7 @@ import {
 import { createStory, updateStory, uploadStoryMedia } from "../../../services/story.service";
 import { fetchFriends, type FriendOption } from "../../../services/social.service";
 import { CustomVisibilityPanel } from "../create-post";
+import type { StoryContentItem, StoryItem } from "../types";
 
 interface Props {
   isOpen: boolean;
@@ -25,7 +26,7 @@ interface Props {
   currentUserId: string;
   currentUserName: string;
   currentUserAvatar: string;
-  onCreated?: () => Promise<void> | void;
+  onCreated?: (story?: any) => Promise<void> | void;
   editingStory?: StoryItem | null;
 }
 
@@ -76,7 +77,7 @@ const CreateStoryModal: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
 
   const MOBILE_TOOLS = [
-    { id: 'music', icon: Music2, label: 'Nhạc', onClick: () => {} },
+    { id: 'music', icon: Music2, label: 'Nhạc', onClick: () => { } },
     {
       id: 'text', icon: Type, label: 'Văn bản', onClick: () => {
         const text = prompt("Nhập nội dung text:");
@@ -107,6 +108,8 @@ const CreateStoryModal: React.FC<Props> = ({
   const [items, setItems] = useState<StoryContentItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMobileEditModal, setShowMobileEditModal] = useState(false);
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Visibility Custom States
   const [friends, setFriends] = useState<FriendOption[]>([]);
@@ -210,8 +213,8 @@ const CreateStoryModal: React.FC<Props> = ({
     setItems(prev => prev.map(item =>
       item.id === id ? {
         ...item,
-        positionX: Math.max(0, Math.min(1, item.positionX + deltaX)),
-        positionY: Math.max(0, Math.min(1, item.positionY + deltaY))
+        positionX: item.positionX + deltaX,
+        positionY: item.positionY + deltaY
       } : item
     ));
   };
@@ -424,8 +427,8 @@ const CreateStoryModal: React.FC<Props> = ({
       // 4. Send to Backend
 
       let saved: any = null;
-      const accessControls = visibility === "CUSTOM" ? 
-        selectedFriendIds.map(id => ({ accountId: id, ruleType: customRuleType })) : 
+      const accessControls = visibility === "CUSTOM" ?
+        selectedFriendIds.map(id => ({ accountId: id, ruleType: customRuleType })) :
         undefined;
 
       if (editingStory) {
@@ -503,9 +506,8 @@ const CreateStoryModal: React.FC<Props> = ({
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const phoneCanvas = (
-    <div 
-      id="story-canvas-area"
-      className="w-[310px] h-[550px] rounded-[2.5rem] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 bg-[#111418] flex items-center justify-center transition-all duration-500 scale-[0.9] sm:scale-100"
+    <div
+      className="story-canvas w-[310px] h-[550px] rounded-[2.5rem] relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 bg-[#111418] flex items-center justify-center transition-all duration-500 scale-[0.9] sm:scale-100"
       onDragOver={(event) => {
         event.preventDefault();
         setIsDragActive(true);
@@ -560,11 +562,25 @@ const CreateStoryModal: React.FC<Props> = ({
             setIsDragging(true);
             dragStartPos.current = { x: e.clientX, y: e.clientY };
 
-            const canvas = document.getElementById('story-canvas-area');
+            let hasDragged = false;
+            if (isMobile) {
+              clickTimer.current = setTimeout(() => {
+                if (!hasDragged) {
+                  setShowMobileEditModal(true);
+                }
+              }, 200);
+            }
+
+            const canvas = (e.currentTarget as HTMLElement).closest('.story-canvas');
             const rect = canvas?.getBoundingClientRect();
 
             const onMouseMove = (moveEvent: MouseEvent) => {
-              if (!dragStartPos.current || !rect) return;
+              if (!dragStartPos.current || !rect || rect.height === 0 || rect.width === 0) return;
+              hasDragged = true;
+              if (clickTimer.current) {
+                clearTimeout(clickTimer.current);
+                clickTimer.current = null;
+              }
               // Calculate movement relative to ACTUAL canvas size
               const dx = (moveEvent.clientX - dragStartPos.current.x) / rect.width;
               const dy = (moveEvent.clientY - dragStartPos.current.y) / rect.height;
@@ -577,6 +593,14 @@ const CreateStoryModal: React.FC<Props> = ({
               window.removeEventListener('mouseup', onMouseUp);
               dragStartPos.current = null;
               setIsDragging(false);
+
+              if (isMobile && !hasDragged) {
+                if (clickTimer.current) {
+                  clearTimeout(clickTimer.current);
+                  clickTimer.current = null;
+                }
+                setShowMobileEditModal(true);
+              }
             };
 
             window.addEventListener('mousemove', onMouseMove);
@@ -632,7 +656,7 @@ const CreateStoryModal: React.FC<Props> = ({
       <div className="md:hidden h-full flex flex-col relative overflow-hidden bg-black">
         {/* Centered Preview Canvas */}
         <div className="absolute inset-0 z-0 flex items-center justify-center">
-           {phoneCanvas}
+          {phoneCanvas}
         </div>
 
         {/* Top Controls Overlay */}
@@ -644,9 +668,9 @@ const CreateStoryModal: React.FC<Props> = ({
             <X className="size-6" />
           </button>
           <div className="flex gap-2 pointer-events-auto">
-             <button className="size-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10">
-                <Settings className="size-6" />
-             </button>
+            <button className="size-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10">
+              <Settings className="size-6" />
+            </button>
           </div>
         </div>
 
@@ -667,25 +691,8 @@ const CreateStoryModal: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Privacy & Share Buttons */}
+          {/* Share Button */}
           <div className="flex items-center justify-between gap-3 pointer-events-auto">
-            <button
-              onClick={() => {
-                if (visibility === 'CUSTOM' && !showCustomPanel) {
-                   setShowCustomPanel(true);
-                   return;
-                }
-                const levels: ('PUBLIC' | 'FRIENDS' | 'PRIVATE' | 'CUSTOM')[] = ['PUBLIC', 'FRIENDS', 'PRIVATE', 'CUSTOM'];
-                const next = levels[(levels.indexOf(visibility as any) + 1) % levels.length];
-                setVisibility(next);
-                if (next === 'CUSTOM') setShowCustomPanel(true);
-                else setShowCustomPanel(false);
-              }}
-              className="flex-1 h-12 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center gap-2 text-white font-bold text-sm hover:bg-white/20 transition"
-            >
-              <Smile className="size-4" />
-              {visibility === 'PUBLIC' ? 'Công khai' : visibility === 'FRIENDS' ? 'Bạn bè' : visibility === 'PRIVATE' ? 'Chỉ mình tôi' : 'Tùy chỉnh'}
-            </button>
             <button
               onClick={handleShare}
               disabled={!canShare || submitting}
@@ -696,59 +703,21 @@ const CreateStoryModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Custom Visibility Bottom Sheet (Mobile) */}
-        {visibility === 'CUSTOM' && showCustomPanel && (
-          <div className="absolute inset-0 z-50 pointer-events-none md:hidden">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
-              onClick={() => setShowCustomPanel(false)}
-            />
-            <div className="absolute bottom-0 left-0 right-0 z-50 bg-white rounded-t-[2rem] p-6 pb-10 pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-full duration-300">
-              <div className="flex items-center justify-between mb-4">
-                 <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Đối tượng tùy chỉnh</h3>
-                 <button onClick={() => setShowCustomPanel(false)} className="size-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition">
-                   <X className="size-4 text-slate-600" />
-                 </button>
-              </div>
-              <CustomVisibilityPanel
-                customRuleType={customRuleType}
-                onRuleTypeChange={setCustomRuleType}
-                friendSearch={friendSearch}
-                onFriendSearchChange={setFriendSearch}
-                friendsLoading={friendsLoading}
-                friends={filteredFriends}
-                selectedFriendIds={selectedFriendIds}
-                onToggleFriend={(friendId) => {
-                  setCustomError(null);
-                  setSelectedFriendIds((prev) =>
-                    prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
-                  );
-                }}
-                customError={customError}
-              />
-              <button 
-                onClick={() => setShowCustomPanel(false)}
-                className="w-full mt-4 h-12 rounded-xl bg-blue-600 text-white font-bold tracking-wide hover:bg-blue-700 transition active:scale-95"
-              >
-                XONG
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Item Edit Bottom Sheet (Mobile) */}
-        {selectedItemId && (
+        {selectedItemId && showMobileEditModal && (
           <div className="absolute inset-0 z-40 pointer-events-none md:hidden">
             <div
               className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto"
-              onClick={() => setSelectedItemId(null)}
+              onClick={() => { setSelectedItemId(null); setShowMobileEditModal(false); }}
             />
             <div className="absolute bottom-0 left-0 right-0 z-50 bg-white rounded-t-[3rem] p-8 pb-12 pointer-events-auto shadow-[0_-20px_80px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom-full duration-500 ease-out">
               <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
 
               <div className="flex items-center justify-between mb-8">
                 <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Chỉnh sửa đối tượng</h3>
-                <button onClick={() => setSelectedItemId(null)} className="size-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition">
+                <button onClick={() => { setSelectedItemId(null); setShowMobileEditModal(false); }} className="size-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition">
                   <X className="size-4" />
                 </button>
               </div>
@@ -901,57 +870,11 @@ const CreateStoryModal: React.FC<Props> = ({
                 <div className="text-base font-bold text-slate-900 leading-tight">
                   {currentUserName}
                 </div>
-                <div className="flex gap-1.5 mt-2">
-                  {[
-                    { val: "PUBLIC", label: "Công khai", icon: Globe },
-                    { val: "FRIENDS", label: "Bạn bè", icon: Users },
-                    { val: "PRIVATE", label: "Riêng tư", icon: Lock },
-                    { val: "CUSTOM", label: "Tùy chỉnh", icon: Settings },
-                  ].map((v) => (
-                    <button
-                      key={v.val}
-                      onClick={() => {
-                        setVisibility(v.val);
-                        if (v.val !== "CUSTOM") {
-                           setSelectedFriendIds([]);
-                           setCustomError(null);
-                        }
-                      }}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${
-                        visibility === v.val 
-                          ? "bg-slate-900 text-white shadow-sm scale-105" 
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                      }`}
-                    >
-                      <v.icon className="size-3" />
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
+
               </div>
             </div>
 
-            {/* Custom Visibility Panel - Desktop Sidebar */}
-            {visibility === "CUSTOM" && (
-               <div className="mb-6 animate-in fade-in slide-in-from-top-2">
-                  <CustomVisibilityPanel
-                    customRuleType={customRuleType}
-                    onRuleTypeChange={setCustomRuleType}
-                    friendSearch={friendSearch}
-                    onFriendSearchChange={setFriendSearch}
-                    friendsLoading={friendsLoading}
-                    friends={filteredFriends}
-                    selectedFriendIds={selectedFriendIds}
-                    onToggleFriend={(friendId) => {
-                      setCustomError(null);
-                      setSelectedFriendIds((prev) =>
-                        prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
-                      );
-                    }}
-                    customError={customError}
-                  />
-               </div>
-            )}
+
 
             {/* Content Control Section */}
             <div className="space-y-6">

@@ -19,18 +19,6 @@ import { EmojiText } from "../chat/EmojiText";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePresence } from "../../contexts/PresenceContext";
 
-// ─── Helper: format last seen ngắn gọn ───────────────────────────────────────
-const formatLastSeenShort = (date: Date | null): string => {
-  if (!date) return "";
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return "vừa mới";
-  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} ngày trước`;
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-};
-
 // ─── Helper: lấy userId của người kia trong 1-1 chat ─────────────────────────
 const getOtherParticipantId = (conversation: any, currentUserId?: string): string | null => {
   if (conversation.type !== "private") return null;
@@ -66,19 +54,22 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const { user: authUser } = useAuth();
 
   // ── PRESENCE ──────────────────────────────────────────────────────────────
-  const { isUserOnline, getLastSeen, watchUsers } = usePresence();
+  const { isUserOnline, watchUsers } = usePresence();
   const otherUserId = getOtherParticipantId(conversation, currentUserId);
+  const relationshipStatus = String(relationship?.status || "").toUpperCase();
+  const showPresence =
+    conversation.type === "private" &&
+    !!otherUserId &&
+    relationshipStatus === "ACCEPTED";
 
   useEffect(() => {
-    if (otherUserId) {
+    if (showPresence && otherUserId) {
       watchUsers([otherUserId]);
     }
-  }, [otherUserId, watchUsers]);
+  }, [otherUserId, showPresence, watchUsers]);
 
   // Chỉ hiển thị trạng thái cho chat 1-1
-  const showPresence = conversation.type === "private" && !!otherUserId;
   const otherIsOnline = showPresence ? isUserOnline(otherUserId!) : false;
-  const otherLastSeen = showPresence ? getLastSeen(otherUserId!) : null;
   // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -359,7 +350,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       // Báo cho ChatPage biết để đóng cửa sổ chat nếu đang mở đoạn này
       window.dispatchEvent(
         new CustomEvent("chat:remove-conversation", {
-          detail: { conversationId: conversation._id },
+          detail: {
+            conversationId: conversation._id,
+            reason: "delete-history",
+          },
         }),
       );
 
@@ -470,9 +464,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <h3
                   className={`
-                font-semibold truncate transition-colors duration-200 select-none text-sm
+                truncate transition-colors duration-200 select-none text-sm
                 ${isSelected ? "text-primary-500" : "text-gray-900"}
                 ${isHovered ? "text-primary-500" : ""}
+                ${hasUnreadMessage ? "font-bold" : "font-semibold"}
               `}
                 >
                   {getConversationName()}

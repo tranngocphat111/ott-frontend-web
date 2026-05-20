@@ -28,6 +28,9 @@ export const compressImageFile = async (
     if (!file.type.startsWith("image/")) {
         return file;
     }
+    if (file.type.toLowerCase() === "image/svg+xml" || /\.svg$/i.test(file.name)) {
+        return file;
+    }
 
     const {
         maxSizeMB = 1.5,

@@ -8,9 +8,10 @@ interface Props {
   onVideoCall?: () => void;
   onMoreOptions?: () => void;
   onOpenSidebar?: () => void;
+  canShowPresence?: boolean;
 }
 
-export const ChatHeader: React.FC<Props> = ({ conversation, onCall, onVideoCall, onMoreOptions, onOpenSidebar }) => (
+export const ChatHeader: React.FC<Props> = ({ conversation, onCall, onVideoCall, onMoreOptions, onOpenSidebar, canShowPresence = false }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'white', borderBottom: '1px solid var(--color-primary-100)', boxShadow: 'var(--shadow-sm)', flexShrink: 0 }}>
     {/* Mobile back */}
     <button onClick={onOpenSidebar} className="lg:hidden transition-fast"
@@ -24,7 +25,7 @@ export const ChatHeader: React.FC<Props> = ({ conversation, onCall, onVideoCall,
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <img src={conversation.avatar} alt={conversation.name}
         style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary-100)' }} />
-      {conversation.online && (
+      {canShowPresence && conversation.online && (
         <div style={{ position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: '50%', background: '#22c55e', border: '2px solid white' }} />
       )}
     </div>
@@ -34,10 +35,10 @@ export const ChatHeader: React.FC<Props> = ({ conversation, onCall, onVideoCall,
       <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--color-primary-900)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
         {conversation.name}
       </p>
-      <p style={{ fontSize: '0.75rem', color: conversation.online ? '#22c55e' : 'var(--color-primary-400)', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
-        {conversation.online
+      <p style={{ fontSize: '0.75rem', color: canShowPresence && conversation.online ? '#22c55e' : 'var(--color-primary-400)', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+        {canShowPresence && conversation.online
           ? <><Circle size={6} fill="#22c55e" strokeWidth={0} /> Đang hoạt động</>
-          : 'Offline'}
+          : ''}
       </p>
     </div>
 

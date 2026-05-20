@@ -27,13 +27,15 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     <div className="border-t border-gray-100">
       <button
         onClick={handleClick}
-        className="w-full cursor-pointer flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+        className="w-full cursor-pointer grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2 px-4 py-2.5 hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-gray-500">{icon}</span>
-          <span className="text-[15px] font-medium text-gray-700">{title}</span>
+        <span className="flex h-6 w-6 items-center justify-center text-gray-500">
+          {icon}
+        </span>
+        <div className="min-w-0 flex items-center gap-2 text-left">
+          <span className="block min-w-0 truncate text-[15px] font-medium leading-6 text-gray-700">{title}</span>
           {badge !== undefined && badge > 0 && (
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+            <span className="shrink-0 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
               {badge}
             </span>
           )}
@@ -43,9 +45,9 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         {!onClick && showIndicator && (
           <>
             {isOpen ? (
-              <ChevronUp size={16} className="text-gray-400" />
+              <ChevronUp size={16} className="text-gray-400 justify-self-end" />
             ) : (
-              <ChevronDown size={16} className="text-gray-400" />
+              <ChevronDown size={16} className="text-gray-400 justify-self-end" />
             )}
           </>
         )}

@@ -1,21 +1,7 @@
-const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
-
-const buildApiBaseUrl = (): string => {
-  const directUrl = import.meta.env.VITE_API_URL as string | undefined;
-  if (directUrl) {
-    return normalizeBaseUrl(directUrl);
-  }
-
-  const gatewayBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (gatewayBase) {
-    return `${normalizeBaseUrl(gatewayBase)}/riff/api`;
-  }
-
-  return "http://192.168.5.116:8080/riff/api";
-};
+import { cleanEnvValue, resolveApiBaseUrl, resolveFrontendUrl } from "./runtime";
 
 export const API_CONFIG = {
-  BASE_URL: buildApiBaseUrl(),
+  BASE_URL: resolveApiBaseUrl(),
   TIMEOUT: 30000,
   HEADERS: {
     "Content-Type": "application/json",
@@ -24,8 +10,8 @@ export const API_CONFIG = {
 };
 
 export const GOOGLE_CONFIG = {
-  CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  REDIRECT_URI: `${import.meta.env.VITE_FRONTEND_URL}/auth/google/callback`,
+  CLIENT_ID: cleanEnvValue(import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined),
+  REDIRECT_URI: `${resolveFrontendUrl()}/auth/google/callback`,
   SCOPE: "openid profile email",
 };
 

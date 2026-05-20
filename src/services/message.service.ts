@@ -386,6 +386,42 @@ export class MessageService {
     }
   }
 
+  static async lockPoll(
+    conversationId: string,
+    msgId: string,
+    userId: string,
+  ) {
+    try {
+      const response = await authFetch(
+        `${API_CHAT_SERVER_URL}/messages/${msgId}/poll-lock`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({ conversationId, userId }),
+        },
+      );
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) errorMessage = errorData.error;
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error locking poll:", error);
+      throw error;
+    }
+  }
+
   static async revokeMessage(
     conversationId: string,
     msgId: string,

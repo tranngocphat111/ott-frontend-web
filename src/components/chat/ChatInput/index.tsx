@@ -49,6 +49,7 @@ const FILE_ACCEPT_TYPES =
   "image/*,video/*,audio/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,.txt,.json,.csv,.zip,.rar,.7z,.tar,.gz,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/x-7z-compressed,application/gzip,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/flac,.env,.ini,.conf,.config,.yaml,.yml,.toml,.md,.xml,.log,.js,.ts,.tsx,.jsx,.mjs,.cjs,.py,.java,.cpp,.c,.h,.hpp,.cs,.go,.rs,.php,.rb,.sh,.bat,.ps1,.sql";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
+  svg: "image/svg+xml",
   env: "text/plain",
   ini: "text/plain",
   conf: "text/plain",
@@ -100,6 +101,11 @@ const resolveMimeType = (file: File) => {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 };
+
+const IMAGE_FILE_EXTENSION_PATTERN = /\.(svg|png|jpe?g|gif|webp|bmp|heic)$/i;
+
+const isImageUploadFile = (file: File) =>
+  file.type.startsWith("image/") || IMAGE_FILE_EXTENSION_PATTERN.test(file.name);
 
 const URL_PATTERN =
   /((https?:\/\/|www\.)[^\s]+|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:\/[^\s]*)?)/i;
@@ -1019,8 +1025,8 @@ export const ChatInput = ({
       if (hasFiles) {
         setPendingFiles([]); // xoá staging ngay khi bắt đầu gửi
 
-        const images = validFiles.filter((f) => f.type.startsWith("image/"));
-        const others = validFiles.filter((f) => !f.type.startsWith("image/"));
+        const images = validFiles.filter(isImageUploadFile);
+        const others = validFiles.filter((file) => !isImageUploadFile(file));
 
         const uploadTasks: Promise<unknown>[] = [];
         if (images.length > 0) {
@@ -1134,8 +1140,8 @@ export const ChatInput = ({
 
     setIsUploading(true);
     try {
-      const images = valid.filter((f) => f.type.startsWith("image/"));
-      const others = valid.filter((f) => !f.type.startsWith("image/"));
+      const images = valid.filter(isImageUploadFile);
+      const others = valid.filter((file) => !isImageUploadFile(file));
 
       const uploadTasks: Promise<unknown>[] = [];
       if (images.length > 0) {
@@ -1504,7 +1510,7 @@ export const ChatInput = ({
 
   return (
     <div
-      className="p-4 bg-white border-t border-gray-100 relative "
+      className="chat-composer relative border-t border-gray-100 bg-white p-2 sm:p-4"
       onPaste={handlePaste}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -1636,7 +1642,7 @@ export const ChatInput = ({
       )}
 
       {isRecordingVoice ? (
-        <div className="flex items-center gap-2 rounded-2xl bg-primary-50/80 px-2 py-1 ring-1 ring-primary-100 shadow-sm animate-in fade-in zoom-in-95">
+        <div className="flex items-center gap-1.5 rounded-2xl bg-primary-50/80 px-2 py-1 ring-1 ring-primary-100 shadow-sm animate-in fade-in zoom-in-95 sm:gap-2">
           {/* Nút Hủy (Secondary Action) -> Dạng Ghost, tối giản */}
           <button
             onClick={cancelVoiceRecording}
@@ -1708,7 +1714,7 @@ export const ChatInput = ({
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2 bg-gray-50 px-2 py-1.5 rounded-2xl border border-gray-200">
+        <div className="chat-composer-bar flex min-w-0 items-center gap-0.5 rounded-2xl border border-gray-200 bg-gray-50 px-1.5 py-1.5 sm:gap-2 sm:px-2">
           <ImageInput
             disabled={isUploading}
             isUploading={isUploading}
@@ -1721,7 +1727,7 @@ export const ChatInput = ({
             <button
               onClick={() => setShowCreatePollModal(true)}
               disabled={isUploading}
-              className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+              className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-gray-600 disabled:opacity-50 sm:inline-flex"
               title="Tạo khảo sát"
             >
               <ListChecks size={20} />
@@ -1731,7 +1737,7 @@ export const ChatInput = ({
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             disabled={isUploading}
-            className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-50 transition-colors"
+            className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-slate-600 disabled:opacity-50 sm:inline-flex"
             title="Chọn emoji"
           >
             <Smile size={20} />
@@ -1740,7 +1746,7 @@ export const ChatInput = ({
           <button
             onClick={startVoiceRecording}
             disabled={isUploading}
-            className="p-2 text-slate-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+            className="hidden shrink-0 p-2 text-slate-400 transition-colors hover:text-gray-600 disabled:opacity-50 sm:inline-flex"
             title="Gửi tin nhắn thoại"
           >
             <Mic size={20} />
@@ -1752,7 +1758,7 @@ export const ChatInput = ({
               startVoiceRecording();
             }}
             disabled={isUploading || isRecordingVoice}
-            className={`p-2 rounded-xl transition-all duration-200 ${isTranscribing ? "animate-pulse text-primary-500 bg-primary-50" : "text-slate-400 hover:text-primary-500 hover:bg-primary-50"
+            className={`hidden shrink-0 rounded-xl p-2 transition-all duration-200 sm:inline-flex ${isTranscribing ? "animate-pulse text-primary-500 bg-primary-50" : "text-slate-400 hover:text-primary-500 hover:bg-primary-50"
               }`}
             title="Nhập liệu bằng giọng nói"
           >
@@ -1781,7 +1787,7 @@ export const ChatInput = ({
           {canSend && (
             <button
               onClick={() => handleSend()}
-              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
+              className="shrink-0 rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
               title="Gửi"
             >
               <SendHorizonal size={20} />

@@ -184,11 +184,12 @@ export const VideoMessage = ({
           <div
             className={`relative max-w-75 overflow-hidden bg-black shadow-sm group cursor-pointer border border-gray-100 transition-all ${borderRadius}`}
             onClick={() => !hasUploadState && onClick?.()}
+            style={{ width: "min(300px, 72vw)", aspectRatio: "16 / 9" }}
           >
             <video
               ref={videoRef}
               src={url}
-              className={`w-full h-full object-cover max-h-100 transition duration-200 ${
+              className={`w-full h-full object-cover transition duration-200 ${
                 isFlagged ? "blur-md scale-105" : ""
               }`}
               controls={false}

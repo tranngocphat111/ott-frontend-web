@@ -3,7 +3,7 @@ import React from 'react';
 export interface Conversation {
   id: string; name: string; avatar: string;
   lastMessage: string; time: string;
-  unread: number; online: boolean; isGroup?: boolean;
+  unread: number; online: boolean; isGroup?: boolean; isFriend?: boolean;
 }
 
 interface Props { conversation: Conversation; isActive: boolean; onClick: () => void; }
@@ -16,7 +16,7 @@ export const ConversationItem: React.FC<Props> = ({ conversation, isActive, onCl
   >
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <img src={conversation.avatar} alt={conversation.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: isActive ? '2px solid var(--color-primary-300)' : '2px solid transparent' }} />
-      {conversation.online && <div style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: '#22c55e', border: '2px solid white' }} />}
+      {conversation.isFriend && conversation.online && <div style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: '#22c55e', border: '2px solid white' }} />}
     </div>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>

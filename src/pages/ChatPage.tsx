@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageCircle, Phone, PhoneOff, Video, PhoneCall, X } from "lucide-react";
 import Sidebar from "../components/chat/ChatSidebarLeft";
 import { ConversationsProvider, useConversations } from "../contexts/ConversationsContext";
@@ -38,7 +39,7 @@ const AppModal: React.FC<{
   icon?: React.ReactNode;
 }> = ({ title, body, onClose, icon }) => (
   <div
-    className="fixed inset-0 z-50 flex items-center justify-center"
+    className="fixed inset-0 z-[10000] flex items-center justify-center"
     style={{ background: "rgba(35,26,16,0.45)", backdropFilter: "blur(2px)" }}
     onClick={onClose}
   >
@@ -116,6 +117,10 @@ const ChatContent: React.FC = () => {
 
   const handleConversationSelect = (item: ConversationWithParticipant) => {
     setSelectedConversation(item.conversation);
+  };
+
+  const handleBackToConversationList = () => {
+    setSelectedConversation(null);
   };
 
   // Helper thực sự mở cửa sổ gọi (sau khi đã xác nhận sẵn sàng)
@@ -421,12 +426,17 @@ const ChatContent: React.FC = () => {
   const callerAvatarSrc = callerAvatarRaw ? getFullUrl(callerAvatarRaw) : "";
   const callerInitial = (callerName || "U").charAt(0).toUpperCase();
 
+  const hasSelectedConversation = Boolean(selectedConversation);
+
   return (
-    <div className="flex h-full w-full bg-white" style={{ zoom: 0.9 }}>
+    <div
+      className="relative flex h-full min-h-0 w-full overflow-hidden bg-white"
+      style={{ zoom: 0.9 }}
+    >
 
       {/* ── INCOMING CALL MODAL (Modern Warm Brown Theme) ─────────────── */}
-      {incomingCall && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 transition-all">
+      {incomingCall && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 transition-all">
           <div className="relative w-72 rounded-[2rem] bg-stone-900 text-white shadow-2xl ring-1 ring-amber-500/20 animate-scale-in overflow-hidden">
 
             {/* Top accent glow */}
@@ -497,11 +507,12 @@ const ChatContent: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* ── GENERIC APP MODAL ─────────────── */}
-      {modalInfo && (
+      {modalInfo && createPortal(
         <AppModal
           title={modalInfo.title}
           body={modalInfo.body}
@@ -511,19 +522,30 @@ const ChatContent: React.FC = () => {
             </div>
           }
           onClose={() => setModalInfo(null)}
-        />
+        />,
+        document.body,
       )}
 
       {/* ── SIDEBAR ─────────────── */}
       <Sidebar
+        className={`w-full shrink-0 md:w-80 ${
+          hasSelectedConversation ? "hidden md:flex" : "flex"
+        }`}
         onConversationSelect={handleConversationSelect}
         selectedConversationId={selectedConversation?._id}
       />
 
       {/* ── MAIN CHAT AREA / EMPTY STATE ─────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/50">
+      <div
+        className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/50 ${
+          hasSelectedConversation ? "flex" : "hidden md:flex"
+        }`}
+      >
         {selectedConversation ? (
-          <ChatArea conversation={selectedConversation} />
+          <ChatArea
+            conversation={selectedConversation}
+            onBackToList={handleBackToConversationList}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-sm mx-auto p-8 flex flex-col items-center animate-fade-in">

@@ -29,7 +29,7 @@ import AuditLogs from "../pages/admin/AuditLogs";
 // Layout
 import MainLayout from "../layouts/MainLayout";
 import AdminLayout from "../components/admin/AdminLayout";
-import { ChatPage } from "../pages";
+import { ChatPage, ContactsPage } from "../pages";
 import JoinGroupPage from "../pages/JoinGroupPage";
 import { RequireAdmin } from "./guards";
 
@@ -102,6 +102,7 @@ export const AppRouter: React.FC = () => {
         }
       >
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/social/*" element={<SocialPage />} />
       </Route>
 

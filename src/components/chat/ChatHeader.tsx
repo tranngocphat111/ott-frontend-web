@@ -1,6 +1,6 @@
 // src/components/Chat/ChatHeader.tsx
 import React, { useEffect } from "react";
-import { Phone, Video, PanelRightOpen, PanelRightClose, Sparkles } from "lucide-react";
+import { ArrowLeft, Phone, Video, PanelRightOpen, PanelRightClose, Sparkles } from "lucide-react";
 import Avatar from "../common/Avatar";
 import type { ChatAreaProps } from "../../interfaces";
 import {
@@ -20,6 +20,8 @@ interface ChatHeaderProps extends ChatAreaProps {
   hideCallActions?: boolean;
   onSummarize?: () => void;
   isSummarizing?: boolean;
+  onBackToList?: () => void;
+  canShowPrivatePresence?: boolean;
 }
 
 // ─── Helper: format last seen ────────────────────────────────────────────────
@@ -90,6 +92,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   hideCallActions = false,
   onSummarize,
   isSummarizing = false,
+  onBackToList,
+  canShowPrivatePresence = false,
 }) => {
   const { isUserOnline, getLastSeen, watchUsers } = usePresence();
 
@@ -105,15 +109,20 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const getConversationName = (): string =>
     getConversationDisplayName(conversation, currentUserId);
 
+  const isDissolved =
+    conversation.status === "dissolved" || Boolean(conversation.is_dissolved);
+
   const getConversationAvatar = (): string | undefined =>
-    getConversationDisplayAvatar(conversation, currentUserId);
+    conversation.type === "group" && isDissolved
+      ? undefined
+      : getConversationDisplayAvatar(conversation, currentUserId);
 
   // Xác định userId của người kia (chỉ 1-1)
   const otherUserId = getOtherUserId(conversation, currentUserId);
 
   // Đăng ký theo dõi presence khi conversation thay đổi
   useEffect(() => {
-    if (otherUserId) {
+    if (otherUserId && canShowPrivatePresence) {
       watchUsers([otherUserId]);
     }
     // Với group, có thể watch tất cả members
@@ -123,7 +132,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         .filter(Boolean);
       if (ids.length > 0) watchUsers(ids);
     }
-  }, [otherUserId, conversation._id, watchUsers]);
+  }, [canShowPrivatePresence, otherUserId, conversation._id, watchUsers]);
 
   // ─── Tính trạng thái hiển thị ────────────────────────────────────────────
   let statusDot = false;
@@ -132,7 +141,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   if (conversation.is_self_conversation) {
     statusDot = false;
     statusText = "";
-  } else if (conversation.type === "private" && otherUserId) {
+  } else if (conversation.type === "private" && otherUserId && canShowPrivatePresence) {
     statusDot = isUserOnline(otherUserId);
     if (statusDot) {
       statusText = "Đang hoạt động";
@@ -140,7 +149,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       const lastSeen = getLastSeen(otherUserId);
       statusText = formatLastSeen(lastSeen);
     }
-  } else if (conversation.type === "group") {
+  } else if (conversation.type === "group" && !isDissolved) {
     const participants = conversation.participants ?? [];
     statusDot = false; // Hide dot for group member count display
     statusText = `${participants.length} thành viên`;
@@ -148,7 +157,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const canShowCallActions = !hideCallActions;
   const isGroupActiveCall =
-    conversation.type === "group" && Boolean(conversation.is_calling);
+    conversation.type === "group" &&
+    !isDissolved &&
+    Boolean(conversation.is_calling);
   const isVideoCallDisabled =
     disableCallActions ||
     Boolean(conversation.is_calling);
@@ -159,16 +170,21 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       : conversation.type === "group"
         ? "Gọi nhóm"
         : "Gọi video";
-  const videoActionLabel = isGroupActiveCall
-    ? "Tham gia"
-    : conversation.type === "group"
-      ? "Gọi nhóm"
-      : "Gọi video";
   return (
     <div className="relative flex-none z-10">
-      <div className="px-3 py-2.5 sm:px-6 sm:py-3 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-gray-100 bg-white px-2.5 py-2.5 shadow-sm sm:px-6 sm:py-3">
         {/* Left Section: Avatar & Info */}
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          {onBackToList && (
+            <button
+              type="button"
+              onClick={onBackToList}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-50 md:hidden"
+              title="Quay lại"
+            >
+              <ArrowLeft size={21} />
+            </button>
+          )}
           <Avatar
             src={getConversationAvatar()}
             name={getConversationName()}
@@ -203,7 +219,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         {/* Right Section: Actions */}
         <div className="flex shrink-0 items-center gap-1 text-gray-600">
           {canShowCallActions && (
-            <div className="hidden items-center gap-1 sm:flex">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {/* Voice Call Button - Hidden for Groups */}
               {conversation.type !== "group" && (
                 <button
@@ -232,29 +248,34 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           )}
 
           {canShowCallActions && (
-            <div className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />
+            <div className="mx-0.5 h-6 w-px bg-gray-200 sm:mx-1" />
           )}
 
-          {/* AI Tools */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onSummarize}
-              disabled={isSummarizing}
-              className={`p-2 hover:bg-gray-50 rounded-full transition-all duration-200 group relative ${isSummarizing ? "opacity-50" : ""}`}
-              title="Tóm tắt hội thoại (AI)"
-            >
-              <Sparkles size={20} className={`${isSummarizing ? "animate-spin" : "text-primary-500"}`} />
-              {isSummarizing && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
-                </span>
-              )}
-            </button>
+          {!isDissolved && onSummarize && (
+            <>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onSummarize}
+                  disabled={isSummarizing}
+                  className={`p-2 hover:bg-gray-50 rounded-full transition-all duration-200 group relative ${isSummarizing ? "opacity-50" : ""}`}
+                  title="Tóm tắt hội thoại (AI)"
+                >
+                  <Sparkles
+                    size={20}
+                    className={isSummarizing ? "animate-spin" : "text-primary-500"}
+                  />
+                  {isSummarizing && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-primary-500" />
+                    </span>
+                  )}
+                </button>
+              </div>
 
-          </div>
-
-          <div className="w-px h-6 bg-gray-200 mx-1" />
+              <div className="mx-0.5 h-6 w-px bg-gray-200 sm:mx-1" />
+            </>
+          )}
 
           {/* Sidebar Toggle Button */}
           <button
@@ -272,46 +293,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
       </div>
 
-      {canShowCallActions && (
-        <div className="border-b border-gray-100 bg-white px-3 py-2 sm:hidden">
-          <div
-            className={`grid gap-2 ${
-              conversation.type !== "group" ? "grid-cols-2" : "grid-cols-1"
-            }`}
-          >
-            {conversation.type !== "group" && (
-              <button
-                type="button"
-                onClick={onStartVoiceCall}
-                disabled={disableCallActions}
-                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700 transition-colors active:scale-[0.99] disabled:opacity-45"
-                title="Gọi thoại"
-              >
-                <Phone size={17} />
-                Gọi thoại
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onStartVideoCall}
-              disabled={isVideoCallDisabled}
-              className={`flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors active:scale-[0.99] disabled:opacity-45 ${
-                isGroupActiveCall
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border border-gray-200 bg-gray-50 text-gray-700"
-              }`}
-              title={videoCallTitle}
-            >
-              <Video size={17} />
-              {videoActionLabel}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Active Call Banner (Group Call) */}
-      {conversation.type === "group" && conversation.is_calling && (
+      {conversation.type === "group" && !isDissolved && conversation.is_calling && (
         <div className="px-3 py-2 sm:px-6 bg-emerald-50/80 backdrop-blur-md border-b border-emerald-100 flex items-center justify-between gap-3 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-200">

@@ -188,7 +188,9 @@ const getMessageDeliverySummary = ({
   conversationType?: string;
   currentUserId?: string;
 }) => {
-  const currentMsgId = String(msg?.msg_id || "").trim();
+  const currentMsgId = String(
+    msg?.msg_id || msg?._id || msg?.local_client_id || "",
+  ).trim();
   const currentUser = String(currentUserId || "").trim();
   const normalizedConversationType = String(
     conversationType || msg?.conversation_type || msg?.conversation?.type || "",
@@ -451,9 +453,28 @@ export const MessageLayout = ({
   const sender = useMessageSender(msg.sender_id, isMe, preloadedSender);
 
   const borderRadius = getMessageBorderRadius(isMe, isFirst, isLast);
-  const senderName = sender?.name || msg.sender_name || "Người lạ";
+  const participantSender = useMemo(
+    () =>
+      (participants || []).find(
+        (participant) =>
+          String(participant?.user_id || participant?._id || "") ===
+          String(msg.sender_id || ""),
+      ),
+    [msg.sender_id, participants],
+  );
+  const participantSenderName = String(
+    participantSender?.nickname ||
+      participantSender?.display_name ||
+      participantSender?.name ||
+      "",
+  ).trim();
+  const senderName =
+    participantSenderName || sender?.name || msg.sender_name || "Người lạ";
   const senderAvatarUrl =
-    sender?.avatar || msg.sender_avatar || msg.sender_avatar_url;
+    participantSender?.avatar ||
+    sender?.avatar ||
+    msg.sender_avatar ||
+    msg.sender_avatar_url;
   const avatarBg = getAvatarColor(senderName);
   const avatarLabel = getAvatarLabel(senderName);
 
@@ -747,9 +768,8 @@ export const MessageLayout = ({
   const showDeliveryStatus =
     isMe &&
     !isCentered &&
-    !String(msg.type || "").startsWith("call_") &&
     Boolean(msg.__show_delivery_status) &&
-    Boolean(msg.msg_id);
+    Boolean(msg.msg_id || msg._id || msg.local_client_id);
   const seenAvatarParticipants = deliverySummary.seenParticipants || [];
   const deliveredParticipants = deliverySummary.deliveredParticipants || [];
   const shouldCompactSeenAvatars = seenAvatarParticipants.length >= 4;
@@ -765,8 +785,7 @@ export const MessageLayout = ({
       visibleSeenAvatars.length > 0 ||
       deliverySummary.label === "Đã gửi");
   const messageTimeLabel = getMessageTimeLabel(msg);
-  const shouldShowMessageTime =
-    !isCentered && Boolean(messageTimeLabel) && isLast;
+  const shouldShowMessageTime = Boolean(messageTimeLabel) && isLast;
   const hasSeenAvatarMeta = visibleSeenAvatars.length > 0;
   const inlineMetaLabel =
     shouldShowMessageTime || showHoverTime ? messageTimeLabel : "";
@@ -1023,8 +1042,21 @@ export const MessageLayout = ({
     }
   };
 
-  const handleMessageMouseEnter = () => {
+  const isPointerInMessageActionZone = (
+    event: React.MouseEvent<HTMLElement>,
+  ) => {
+    const target = event.target;
+    return (
+      target instanceof HTMLElement &&
+      Boolean(target.closest('[data-message-action-zone="true"]'))
+    );
+  };
+
+  const handleMessageMouseEnter = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
     clearHoverTimeTimer();
+    if (isPointerInMessageActionZone(event)) return;
     if (!messageTimeLabel || shouldShowMessageTime || isCentered) return;
 
     hoverTimeTimeoutRef.current = window.setTimeout(() => {
@@ -1034,6 +1066,11 @@ export const MessageLayout = ({
   };
 
   const handleMessageMouseLeave = () => {
+    clearHoverTimeTimer();
+    setShowHoverTime(false);
+  };
+
+  const handleActionZoneMouseEnter = () => {
     clearHoverTimeTimer();
     setShowHoverTime(false);
   };
@@ -1234,6 +1271,8 @@ export const MessageLayout = ({
               canPinMessage ||
               canForwardMessage) && (
               <div
+                data-message-action-zone="true"
+                onMouseEnter={handleActionZoneMouseEnter}
                 className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 ${isMe ? "right-full mr-2" : "left-full ml-2"
                   } ${showReactionPicker || showActionMenu
                     ? "opacity-100"
@@ -1429,6 +1468,8 @@ export const MessageLayout = ({
           {/* HIỂN THỊ REACTION ĐÃ THẢ */}
           {hasReactions && (
             <div
+              data-message-action-zone="true"
+              onMouseEnter={handleActionZoneMouseEnter}
               className={`absolute ${msg.type === "video" || msg.type === "image"
                   ? "-bottom-0.5"
                   : "-bottom-2.5"

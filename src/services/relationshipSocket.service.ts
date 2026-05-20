@@ -36,7 +36,7 @@ class RelationshipSocketService {
 
     const token = localStorage.getItem("accessToken");
     const socket = io(this.endpoint, {
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       timeout: 5000,
       reconnection: false,
       auth: {

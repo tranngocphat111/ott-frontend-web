@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cleanEnvValue } from "../config/runtime";
 import { socketService } from "../services";
 
 export type CallType = "voice" | "video";
@@ -29,11 +30,13 @@ const buildRtcConfig = (): RTCConfiguration => {
     { urls: "stun:global.stun.twilio.com:3478" },
   ];
 
-  const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined;
-  const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined;
-  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as
-    | string
-    | undefined;
+  const turnUrl = cleanEnvValue(import.meta.env.VITE_TURN_URL as string | undefined);
+  const turnUsername = cleanEnvValue(
+    import.meta.env.VITE_TURN_USERNAME as string | undefined,
+  );
+  const turnCredential = cleanEnvValue(
+    import.meta.env.VITE_TURN_CREDENTIAL as string | undefined,
+  );
 
   if (turnUrl && turnUsername && turnCredential) {
     baseIceServers.push({
@@ -56,7 +59,7 @@ type WebkitAudioWindow = Window &
 
 const shouldUseFakeCallMedia = () => {
   const envValue = String(
-    import.meta.env.VITE_CALL_FAKE_MEDIA || "",
+    cleanEnvValue(import.meta.env.VITE_CALL_FAKE_MEDIA as string | undefined),
   ).toLowerCase();
   const storageValue = String(
     localStorage.getItem(FAKE_MEDIA_STORAGE_KEY) || "",

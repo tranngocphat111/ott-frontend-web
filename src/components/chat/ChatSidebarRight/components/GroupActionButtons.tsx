@@ -145,28 +145,28 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
 
   return (
     <>
-      <div className="px-4 py-2.5 border-b border-gray-100">
-      <div className={`grid ${isGroupChat ? "grid-cols-3" : isPrivateChat ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+      <div className="border-b border-gray-100 px-5 py-3">
+      <div className={`grid ${isGroupChat ? "grid-cols-3" : isPrivateChat ? "grid-cols-3" : "grid-cols-2"} gap-1`}>
         <button
           onClick={handleToggleMute}
           disabled={loading.mute}
-          className="cursor-pointer group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+          <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
             participant?.settings?.notification_status === "mute" 
-              ? "bg-primary-200/80" 
-              : "bg-gray-100 group-hover:bg-primary-100"
+              ? "bg-primary-100" 
+              : "bg-slate-100 group-hover:bg-primary-50"
           }`}>
-            <BellOff size={15} className={
+            <BellOff size={16} className={
               participant?.settings?.notification_status === "mute" 
                 ? "text-primary-700" 
-                : "text-gray-600 group-hover:text-primary-700"
+                : "text-slate-600 group-hover:text-primary-700"
             } />
           </div>
-          <span className={`text-[13px] leading-4 text-center transition-colors  ${
+          <span className={`max-w-[76px] text-center text-[12.5px] font-medium leading-4 transition-colors ${
             participant?.settings?.notification_status === "mute" 
               ? "text-primary-800" 
-              : "text-gray-700 group-hover:text-primary-800"
+              : "text-slate-700 group-hover:text-primary-800"
           }`}>
             {participant?.settings?.notification_status === "mute" ? "Bật thông báo" : "Tắt thông báo"}
           </span>
@@ -175,23 +175,23 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
         <button
           onClick={handleTogglePin}
           disabled={loading.pin}
-          className="cursor-pointer group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+          <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
             participant?.settings?.is_pinned 
-              ? "bg-primary-200/80" 
-              : "bg-gray-100 group-hover:bg-primary-100"
+              ? "bg-primary-100" 
+              : "bg-slate-100 group-hover:bg-primary-50"
           }`}>
-            <Pin size={15} className={
+            <Pin size={16} className={
               participant?.settings?.is_pinned 
                 ? "text-primary-600" 
-                : "text-gray-600 group-hover:text-primary-700"
+                : "text-slate-600 group-hover:text-primary-700"
             } />
           </div>
-          <span className={`text-[13px] leading-4 text-center transition-colors ${
+          <span className={`max-w-[76px] text-center text-[12.5px] font-medium leading-4 transition-colors ${
             participant?.settings?.is_pinned 
               ? "text-primary-600" 
-              : "text-gray-700 group-hover:text-primary-800"
+              : "text-slate-700 group-hover:text-primary-800"
           }`}>
             {participant?.settings?.is_pinned ? "Bỏ ghim" : "Ghim hội thoại"}
           </span>
@@ -202,12 +202,12 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
             onClick={() => {
               onAddMember();
             }}
-            className="group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 cursor-pointer"
+            className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50"
           >
-            <div className="w-8 h-8 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center transition-colors">
-              <UserPlus size={15} className="text-gray-600 group-hover:text-primary-700" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 transition-colors group-hover:bg-primary-50">
+              <UserPlus size={16} className="text-slate-600 group-hover:text-primary-700" />
             </div>
-            <span className="text-[13px] leading-4 text-gray-700 group-hover:text-primary-800 text-center transition-colors">Thêm thành viên</span>
+            <span className="max-w-[76px] text-center text-[12.5px] font-medium leading-4 text-slate-700 transition-colors group-hover:text-primary-800">Thêm thành viên</span>
           </button>
         )}
 
@@ -216,12 +216,12 @@ const GroupActionButtons: React.FC<GroupActionButtonsProps> = ({
             onClick={() => {
               onCreateGroup?.();
             }}
-            className="group flex flex-col items-center gap-1 p-2 rounded-xl transition-colors hover:bg-primary-50 cursor-pointer"
+            className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50"
           >
-            <div className="w-8 h-8 bg-gray-100 group-hover:bg-primary-100 rounded-full flex items-center justify-center transition-colors">
-              <Users size={15} className="text-gray-600 group-hover:text-primary-700" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 transition-colors group-hover:bg-primary-50">
+              <Users size={16} className="text-slate-600 group-hover:text-primary-700" />
             </div>
-            <span className="text-[13px] leading-4 text-gray-700 group-hover:text-primary-800 text-center transition-colors">Tạo nhóm <br /> trò chuyện</span>
+            <span className="max-w-[76px] text-center text-[12.5px] font-medium leading-4 text-slate-700 transition-colors group-hover:text-primary-800">Tạo nhóm <br /> trò chuyện</span>
           </button>
         )}
       </div>
