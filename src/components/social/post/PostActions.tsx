@@ -39,7 +39,10 @@ const PostActions: React.FC<Props> = ({
   onPickerMouseLeave,
   onToggleSave,
   onShareClick,
-}) => (
+}) => {
+  const shouldShowReactionEmoji = Boolean(reaction && reaction !== "like" && reactionEmoji);
+
+  return (
   <div className="px-4 py-1 border-t border-primary-100 flex">
     <div
       className="flex-1 relative"
@@ -58,9 +61,9 @@ const PostActions: React.FC<Props> = ({
         onClick={onLikeClick}
         className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${reactionColor
           }`}>
-        {reactionEmoji ?
+        {shouldShowReactionEmoji ?
           <span className="text-lg leading-none">{reactionEmoji}</span>
-          : <ThumbsUp className="size-5" />}
+          : <ThumbsUp className={`size-5 ${reaction === "like" ? "fill-current" : ""}`} />}
         <span className="hidden sm:inline">{reactionLabel}</span>
       </button>
     </div>
@@ -95,6 +98,7 @@ const PostActions: React.FC<Props> = ({
       <span className="hidden sm:inline">{isSaved ? 'Đã lưu' : 'Lưu'}</span>
     </button>
   </div>
-);
+  );
+};
 
 export default PostActions;

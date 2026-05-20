@@ -35,7 +35,14 @@ export const ChatNotification: React.FC<ChatNotificationProps> = ({
       : "Có lời mời kết bạn mới";
   }
 
-  if (sender_id && currentUserId && String(sender_id) === String(currentUserId)) {
+  if (
+    type === "system_friend_request" &&
+    sender_id &&
+    currentUserId &&
+    String(sender_id) === String(currentUserId)
+  ) {
+    displayContent = "Tôi đã gửi lời mời kết bạn";
+  } else if (sender_id && currentUserId && String(sender_id) === String(currentUserId)) {
     if (sender_name && content.startsWith(sender_name)) {
       displayContent = "Bạn" + content.slice(sender_name.length);
     } else if (sender_name && displayContent.startsWith(sender_name)) {

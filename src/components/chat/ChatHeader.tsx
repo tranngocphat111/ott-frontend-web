@@ -21,6 +21,7 @@ interface ChatHeaderProps extends ChatAreaProps {
   onSummarize?: () => void;
   isSummarizing?: boolean;
   onBackToList?: () => void;
+  canShowPrivatePresence?: boolean;
 }
 
 // ─── Helper: format last seen ────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onSummarize,
   isSummarizing = false,
   onBackToList,
+  canShowPrivatePresence = false,
 }) => {
   const { isUserOnline, getLastSeen, watchUsers } = usePresence();
 
@@ -120,7 +122,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   // Đăng ký theo dõi presence khi conversation thay đổi
   useEffect(() => {
-    if (otherUserId) {
+    if (otherUserId && canShowPrivatePresence) {
       watchUsers([otherUserId]);
     }
     // Với group, có thể watch tất cả members
@@ -130,7 +132,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         .filter(Boolean);
       if (ids.length > 0) watchUsers(ids);
     }
-  }, [otherUserId, conversation._id, watchUsers]);
+  }, [canShowPrivatePresence, otherUserId, conversation._id, watchUsers]);
 
   // ─── Tính trạng thái hiển thị ────────────────────────────────────────────
   let statusDot = false;
@@ -139,7 +141,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   if (conversation.is_self_conversation) {
     statusDot = false;
     statusText = "";
-  } else if (conversation.type === "private" && otherUserId) {
+  } else if (conversation.type === "private" && otherUserId && canShowPrivatePresence) {
     statusDot = isUserOnline(otherUserId);
     if (statusDot) {
       statusText = "Đang hoạt động";

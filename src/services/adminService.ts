@@ -9,23 +9,17 @@ import type {
   ModerationDashboardResponse,
   OverviewResponse,
   PaginatedAuditLogsResponse,
-  PaginatedRecentUsersResponse,
   TimeRange,
   UserSummary,
 } from "../interfaces/admin.interface";
-import { resolveGatewayBaseUrl } from "../config/runtime";
+import { API_CONFIG } from "../config/api";
 
-// 1. Khởi tạo Axios Instance
 const adminApiClient = axios.create({
-  baseURL: resolveGatewayBaseUrl(),
-  timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT,
+  headers: API_CONFIG.HEADERS,
 });
 
-// 2. Interceptor tự động nhét Token vào Header
 adminApiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("accessToken");
@@ -54,14 +48,131 @@ interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-// 3. Hàm gọi API chung cực kỳ gọn nhẹ nhờ Axios (Xóa bỏ hoàn toàn buildUrl thủ công)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const toFiniteNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+};
+
+const toNullableFiniteNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = toFiniteNumber(value, Number.NaN);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const unwrapResponseData = <T>(value: unknown): T => {
+  if (typeof value === "string") {
+    throw new AdminApiError(502, "Analytics API returned a non-JSON response");
+  }
+
+  if (!isRecord(value)) {
+    return value as T;
+  }
+
+  if ("data" in value) {
+    return value.data as T;
+  }
+
+  if ("result" in value) {
+    return value.result as T;
+  }
+
+  if ("payload" in value) {
+    return value.payload as T;
+  }
+
+  return value as T;
+};
+
+const normalizeOverviewResponse = (value: unknown): OverviewResponse => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    totalUsers: toFiniteNumber(record.totalUsers),
+    totalLogins: toFiniteNumber(record.totalLogins),
+    totalMessages: toFiniteNumber(record.totalMessages),
+    totalPosts: toFiniteNumber(record.totalPosts),
+    dau: toFiniteNumber(record.dau),
+    mau: toFiniteNumber(record.mau),
+    userDelta: toNullableFiniteNumber(record.userDelta),
+    loginDelta: toNullableFiniteNumber(record.loginDelta),
+    messageDelta: toNullableFiniteNumber(record.messageDelta),
+    postDelta: toNullableFiniteNumber(record.postDelta),
+  };
+};
+
+const normalizeMessageTypesResponse = (value: unknown): MessageTypesResponse => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    text: toFiniteNumber(record.text),
+    image: toFiniteNumber(record.image),
+    voice: toFiniteNumber(record.voice),
+  };
+};
+
+const normalizeLoginMethodCount = (value: unknown): LoginMethodCount => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    method:
+      typeof record.method === "string" && record.method.trim() !== ""
+        ? record.method
+        : "unknown",
+    count: toFiniteNumber(record.count),
+  };
+};
+
+const normalizeDailyUserTrendPoint = (value: unknown): DailyUserTrendPoint => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    date: typeof record.date === "string" ? record.date : "",
+    registrations: toFiniteNumber(record.registrations),
+    logins: toFiniteNumber(record.logins),
+  };
+};
+
+const asArray = <T>(value: unknown): T[] => {
+  const unwrapped = unwrapResponseData<unknown>(value);
+  return Array.isArray(unwrapped) ? unwrapped : [];
+};
+
+const asPaginatedResponse = <T>(value: unknown): PaginatedResponse<T> => {
+  const unwrapped = unwrapResponseData<unknown>(value);
+  const record = isRecord(unwrapped) ? unwrapped : {};
+  const items = Array.isArray(record.items) ? (record.items as T[]) : [];
+
+  return {
+    items,
+    totalElements:
+      typeof record.totalElements === "number" ? record.totalElements : items.length,
+    page: typeof record.page === "number" ? record.page : 0,
+    size: typeof record.size === "number" ? record.size : items.length,
+    totalPages: typeof record.totalPages === "number" ? record.totalPages : 1,
+  };
+};
+
 async function getJson<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
   try {
-    const response = await adminApiClient.get<T>(path, { params });
-    return response.data;
+    const response = await adminApiClient.get<unknown>(path, { params });
+    return unwrapResponseData<T>(response.data);
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
     const status = axiosError.response?.status ?? 500;
@@ -77,61 +188,79 @@ async function getPaginatedItems<T>(
   path: string,
   timeRange?: TimeRange,
 ): Promise<T[]> {
-  const response = await getJson<PaginatedResponse<T>>(path, { timeRange });
-  return response.items;
+  const response = await getJson<unknown>(path, { timeRange });
+  return asPaginatedResponse<T>(response).items;
+}
+
+async function getArrayJson<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>,
+): Promise<T[]> {
+  const response = await getJson<unknown>(path, params);
+  return asArray<T>(response);
 }
 
 function isNotFoundError(error: unknown): error is AdminApiError {
   return error instanceof AdminApiError && error.status === 404;
 }
 
-// 4. Các Service Methods
 export const adminService = {
-  getOverview: (timeRange: TimeRange = "allTime") =>
-    getJson<OverviewResponse>("/api/v1/admin/analytics/overview", {
+  getOverview: async (timeRange: TimeRange = "allTime") => {
+    const response = await getJson<unknown>("/v1/admin/analytics/overview", {
       timeRange,
-    }),
+    });
+
+    return normalizeOverviewResponse(response);
+  },
 
   getRecentUsers: (timeRange: TimeRange = "allTime") =>
     getPaginatedItems<UserSummary>(
-      "/api/v1/admin/analytics/users/recent",
+      "/v1/admin/analytics/users/recent",
       timeRange,
     ),
 
-  getMessageTypes: (timeRange: TimeRange = "allTime") =>
-    getJson<MessageTypesResponse>("/api/v1/admin/analytics/messages/types", {
+  getMessageTypes: async (timeRange: TimeRange = "allTime") => {
+    const response = await getJson<unknown>("/v1/admin/analytics/messages/types", {
       timeRange,
-    }),
+    });
 
-  getLoginMethods: (timeRange: TimeRange = "allTime") =>
-    getJson<LoginMethodCount[]>("/api/v1/admin/analytics/logins/methods", {
+    return normalizeMessageTypesResponse(response);
+  },
+
+  getLoginMethods: async (timeRange: TimeRange = "allTime") => {
+    const response = await getArrayJson<unknown>("/v1/admin/analytics/logins/methods", {
       timeRange,
-    }),
+    });
+
+    return response.map(normalizeLoginMethodCount);
+  },
 
   getRecentUsersPage: (
     timeRange: TimeRange = "allTime",
     params?: { query?: string; page?: number; size?: number },
   ) =>
-    getJson<PaginatedRecentUsersResponse>(
-      "/api/v1/admin/analytics/users/recent",
+    getJson<unknown>("/v1/admin/analytics/users/recent", {
+      timeRange,
+      query: params?.query,
+      page: params?.page ?? 0,
+      size: params?.size ?? 10,
+    }).then(asPaginatedResponse<UserSummary>),
+
+  getUserDailyTrend: async (timeRange: TimeRange = "allTime") => {
+    const response = await getArrayJson<unknown>(
+      "/v1/admin/analytics/users/daily-trend",
       {
         timeRange,
-        query: params?.query,
-        page: params?.page ?? 0,
-        size: params?.size ?? 10,
       },
-    ),
+    );
 
-  getUserDailyTrend: (timeRange: TimeRange = "allTime") =>
-    getJson<DailyUserTrendPoint[]>(
-      "/api/v1/admin/analytics/users/daily-trend",
-      { timeRange },
-    ),
+    return response.map(normalizeDailyUserTrendPoint);
+  },
 
   getDailyActivity: async (timeRange: TimeRange = "allTime") => {
     try {
-      return await getJson<DailyActivityPoint[]>(
-        "/api/v1/admin/analytics/social/activity/daily",
+      return await getArrayJson<DailyActivityPoint>(
+        "/v1/admin/analytics/social/activity/daily",
         { timeRange },
       );
     } catch (error) {
@@ -139,8 +268,8 @@ export const adminService = {
         throw error;
       }
 
-      const legacyPosts = await getJson<DailyPostPoint[]>(
-        "/api/v1/admin/analytics/social/posts/daily",
+      const legacyPosts = await getArrayJson<DailyPostPoint>(
+        "/v1/admin/analytics/social/posts/daily",
         { timeRange },
       );
 
@@ -153,18 +282,27 @@ export const adminService = {
   },
 
   getDailyPosts: (timeRange: TimeRange = "allTime") =>
-    getJson<DailyPostPoint[]>("/api/v1/admin/analytics/social/posts/daily", {
+    getArrayJson<DailyPostPoint>("/v1/admin/analytics/social/posts/daily", {
       timeRange,
     }),
 
   getAuditLogsPage: (params?: { page?: number; size?: number }) =>
-    getJson<PaginatedAuditLogsResponse>("/api/v1/admin/analytics/audit-logs", {
+    getJson<unknown>("/v1/admin/analytics/audit-logs", {
       page: params?.page ?? 0,
       size: params?.size ?? 10,
-    }),
+    }).then(asPaginatedResponse<PaginatedAuditLogsResponse["items"][number]>),
 
-  getModerationDashboard: () =>
-    getJson<ModerationDashboardResponse>(
-      "/api/v1/analytics/moderation/dashboard",
-    ),
+  getModerationDashboard: async () => {
+    const response = await getJson<Partial<ModerationDashboardResponse>>(
+      "/v1/analytics/moderation/dashboard",
+    );
+
+    return {
+      totalBannedUsers:
+        typeof response.totalBannedUsers === "number"
+          ? response.totalBannedUsers
+          : 0,
+      recentLogs: Array.isArray(response.recentLogs) ? response.recentLogs : [],
+    };
+  },
 };

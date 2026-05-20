@@ -25,11 +25,24 @@ const createSvgPreviewUrl = async (blob: Blob) => {
   );
 };
 
+const canFetchPreviewUrl = (url: string): boolean => {
+  if (!url) return false;
+  if (/^(blob:|data:)/i.test(url)) return true;
+
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
 const createImagePreview = async (url: string): Promise<string> => {
   if (!url) return url;
 
   const cached = imagePreviewCache.get(url);
   if (cached) return cached;
+  if (!canFetchPreviewUrl(url)) return url;
 
   const response = await fetch(url, { cache: "force-cache" });
   if (!response.ok) return url;

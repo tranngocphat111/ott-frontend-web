@@ -8,7 +8,7 @@ import {
 
 interface StatCardProps {
   title: string;
-  value: number;
+  value?: number | string | null;
   delta?: number | null;
   description?: string;
   icon?: ReactNode;
@@ -23,6 +23,17 @@ const toneStyles = {
   violet: "bg-violet-50 text-violet-700",
 };
 
+const toDisplayNumber = (value: StatCardProps["value"]) => {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : 0;
+
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
 const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
@@ -31,21 +42,24 @@ const StatCard: React.FC<StatCardProps> = ({
   icon,
   tone = "neutral",
 }) => {
+  const displayValue = toDisplayNumber(value);
+  const displayDelta = typeof delta === "number" && Number.isFinite(delta) ? delta : null;
+
   const deltaClassName =
-    delta === null
+    displayDelta === null
       ? "bg-slate-100 text-slate-600"
-      : delta > 0
+      : displayDelta > 0
         ? "bg-emerald-50 text-emerald-700"
-        : delta < 0
+        : displayDelta < 0
           ? "bg-red-50 text-red-700"
           : "bg-slate-100 text-slate-600";
 
   const DeltaIcon =
-    delta === null
+    displayDelta === null
       ? ArrowRight
-      : delta > 0
+      : displayDelta > 0
         ? ArrowUpRight
-        : delta < 0
+        : displayDelta < 0
           ? ArrowDownRight
           : ArrowRight;
 
@@ -55,7 +69,7 @@ const StatCard: React.FC<StatCardProps> = ({
         <div>
           <p className="text-sm font-medium text-slate-500">{title}</p>
           <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {value.toLocaleString()}
+            {displayValue.toLocaleString()}
           </p>
           {description && <p className="mt-2 text-sm text-slate-500">{description}</p>}
         </div>
@@ -64,13 +78,13 @@ const StatCard: React.FC<StatCardProps> = ({
         ) : null}
       </div>
 
-      {delta !== null && (
+      {displayDelta !== null && (
         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${deltaClassName}`}
           >
             <DeltaIcon className="h-3.5 w-3.5" />
-            {Math.abs(delta).toFixed(1)}%
+            {Math.abs(displayDelta).toFixed(1)}%
           </span>
           <span className="text-xs text-slate-400">vs previous period</span>
         </div>

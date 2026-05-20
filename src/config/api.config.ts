@@ -15,6 +15,7 @@ const AWS_REGION = "ap-southeast-1";
 
 export const API_BASE_URL = resolveApiBaseUrl();
 export const API_CHAT_SERVER_URL = `${API_BASE_URL}/chat`;
+export const API_AI_SERVER_URL = `${API_BASE_URL}/ai`;
 export const SOCKET_CHAT_SERVER_URL = resolveChatSocketUrl();
 export const SOCKET_CHAT_TRANSPORTS = resolveSocketTransports(SOCKET_CHAT_SERVER_URL);
 export const API_MEDIA_SERVER_URL = `${API_BASE_URL}/media`;

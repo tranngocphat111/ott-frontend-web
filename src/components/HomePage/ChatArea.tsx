@@ -30,6 +30,7 @@ export const ChatArea: React.FC<Props> = ({ conversation, messages, currentUserI
         onVideoCall={() => {}}
         onMoreOptions={() => {}}
         onOpenSidebar={onOpenSidebar}
+        canShowPresence={Boolean(conversation.isFriend)}
       />
 
       <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--color-primary-50)' }}>
