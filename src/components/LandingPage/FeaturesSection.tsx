@@ -7,7 +7,6 @@ type Feature = {
   description: string;
   accent: string;
   bg: string;
-  image: string;
 };
 
 const FEATURES: Feature[] = [
@@ -17,7 +16,6 @@ const FEATURES: Feature[] = [
     description: 'Gửi tin nhắn, hình ảnh, video tức thì. Hỗ trợ nhóm lên đến 500 người.',
     accent: 'var(--color-primary-500)',
     bg: 'var(--color-primary-50)',
-    image: '/images/feature-chat.jpg',
   },
   {
     icon: Video,
@@ -25,7 +23,6 @@ const FEATURES: Feature[] = [
     description: 'Chất lượng cao, ổn định ngay cả khi mạng yếu. Nhóm video lên đến 50 người.',
     accent: 'var(--color-primary-600)',
     bg: 'var(--color-primary-100)',
-    image: '/images/feature-video.jpg',
   },
   {
     icon: Shield,
@@ -33,7 +30,6 @@ const FEATURES: Feature[] = [
     description: 'Mã hóa end-to-end, xác thực 2 lớp, quản lý thiết bị đăng nhập.',
     accent: 'var(--color-primary-700)',
     bg: 'var(--color-primary-50)',
-    image: '/images/feature-security.jpg',
   },
   {
     icon: Users,
@@ -41,7 +37,6 @@ const FEATURES: Feature[] = [
     description: 'Tạo nhóm chat, kênh cộng đồng để kết nối bạn bè và đồng nghiệp.',
     accent: 'var(--color-primary-500)',
     bg: 'var(--color-primary-100)',
-    image: '/images/feature-groups.jpg',
   },
   {
     icon: QrCode,
@@ -49,7 +44,6 @@ const FEATURES: Feature[] = [
     description: 'Quét mã QR — đăng nhập ngay lập tức, không cần nhập mật khẩu.',
     accent: 'var(--color-primary-600)',
     bg: 'var(--color-primary-50)',
-    image: '/images/feature-qr.jpg',
   },
   {
     icon: Globe,
@@ -57,13 +51,12 @@ const FEATURES: Feature[] = [
     description: 'Web, iOS, Android, Windows, macOS. Đồng bộ tin nhắn trên mọi thiết bị.',
     accent: 'var(--color-primary-700)',
     bg: 'var(--color-primary-100)',
-    image: '/images/feature-platform.jpg',
   },
 ];
 
 type FeatureCardProps = Feature & { index: number };
 
-const FeatureCard = ({ icon: Icon, title, description, accent, bg, image, index }: FeatureCardProps) => (
+const FeatureCard = ({ icon: Icon, title, description, accent, bg, index }: FeatureCardProps) => (
   <div
     className="group relative rounded-2xl overflow-hidden transition-all duration-500 hover-lift"
     style={{
@@ -72,22 +65,27 @@ const FeatureCard = ({ icon: Icon, title, description, accent, bg, image, index 
       animationDelay: `${index * 75}ms`,
     }}
   >
-    {/* Image strip */}
-    <div className="relative h-44 overflow-hidden">
-      <img
-        src={image}
-        alt={title}
-        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-        onError={(e) => {
-          const el = e.currentTarget;
-          el.style.display = 'none';
-          if (el.parentElement) el.parentElement.style.background = 'var(--color-primary-200)';
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{ background: 'linear-gradient(to top, rgba(35,26,16,0.15), transparent)' }}
-      />
+    {/* Product-style preview strip */}
+    <div className="relative h-44 overflow-hidden bg-white/70 p-4">
+      <div className="h-full rounded-2xl border border-primary-100 bg-white p-4 shadow-sm transition-transform duration-500 group-hover:-translate-y-1">
+        <div className="mb-4 flex items-center gap-2">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-white"
+            style={{ background: accent }}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="space-y-1">
+            <div className="h-2.5 w-24 rounded-full bg-primary-100" />
+            <div className="h-2 w-16 rounded-full bg-primary-50" />
+          </div>
+        </div>
+        <div className="space-y-2.5">
+          <div className="h-8 w-4/5 rounded-2xl rounded-tl-md bg-primary-50" />
+          <div className="ml-auto h-8 w-3/5 rounded-2xl rounded-tr-md bg-primary-200/80" />
+          <div className="h-8 w-2/3 rounded-2xl rounded-tl-md bg-primary-50" />
+        </div>
+      </div>
     </div>
 
     {/* Content */}

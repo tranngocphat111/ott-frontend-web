@@ -4,7 +4,14 @@ import { authApi, profileApi, userApi } from "../services/api";
 import type { UserProfileResponse } from "../types";
 import { isAdminAccountType } from "../types/enums/user.enum";
 import type { AdminRole } from "../types";
-import { emitAuthLogoutSignal } from "../utils/authLogoutSignal";
+import {
+  beginManualLogout,
+  clearForcedLogoutNotice,
+  emitAuthLogoutSignal,
+  endManualLogout,
+  isManualLogoutInProgress,
+  rememberForcedLogoutNotice,
+} from "../utils/authLogoutSignal";
 
 interface AuthContextType {
   user: UserProfileResponse | null;
@@ -42,6 +49,35 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const getErrorCode = (error: unknown): number | undefined => {
+  const candidate = error as {
+    code?: unknown;
+    status?: unknown;
+    details?: { code?: unknown; status?: unknown };
+    response?: { status?: unknown; data?: { code?: unknown } };
+  };
+
+  const value =
+    candidate?.response?.data?.code ??
+    candidate?.details?.code ??
+    candidate?.response?.status ??
+    candidate?.status ??
+    candidate?.code;
+
+  return typeof value === "number" ? value : undefined;
+};
+
+const isSessionInvalidationError = (error: unknown) => {
+  const code = getErrorCode(error);
+  return code === 401 || code === 403 || code === 1006 || code === 2005 || code === 2006 || code === 7001;
+};
+
+const rememberForcedLogoutNoticeIfNeeded = () => {
+  if (!isManualLogoutInProgress()) {
+    rememberForcedLogoutNotice();
+  }
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfileResponse | null>(null);
@@ -124,8 +160,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const refreshToken = localStorage.getItem("refreshToken");
     if (token || refreshToken) {
       console.log("AuthContext: Found token in localStorage, fetching user...");
-      fetchUser().catch(() => {
+      fetchUser().catch((error) => {
         console.log("AuthContext: Initial fetch failed");
+        if (isSessionInvalidationError(error)) {
+          rememberForcedLogoutNoticeIfNeeded();
+        }
         clearLocalSession();
         emitAuthLogoutSignal();
         if (!window.location.pathname.includes("/login")) {
@@ -163,7 +202,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (now - lastTokenCheckAt < 15000) return;
       lastTokenCheckAt = now;
 
-      ensureCurrentTokenActive().catch(() => {
+      ensureCurrentTokenActive().catch((error) => {
+        if (isSessionInvalidationError(error)) {
+          rememberForcedLogoutNoticeIfNeeded();
+        }
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -224,6 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const myDeviceId = localStorage.getItem("deviceId");
 
       if (action === "ALL") {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -232,6 +275,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         payload.deviceId &&
         myDeviceId === payload.deviceId
       ) {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -240,11 +284,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         myDeviceId &&
         payload.revokedDeviceIds?.includes(myDeviceId)
       ) {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
       } else if (action === "SPECIFIC" || action === "OTHERS") {
-        fetchUser().catch(() => {
+        fetchUser().catch((error) => {
+          if (isSessionInvalidationError(error)) {
+            rememberForcedLogoutNoticeIfNeeded();
+          }
+          clearLocalSession();
           emitAuthLogoutSignal();
           window.location.href = "/login";
         });
@@ -403,6 +452,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log("AuthContext: Logout initiated");
+    beginManualLogout();
     const rawUser = user as {
       id?: string;
       user_id?: string;
@@ -440,6 +490,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       socketService?.disconnect();
 
       clearLocalSession();
+      clearForcedLogoutNotice();
+      endManualLogout();
       console.log("AuthContext: Logout completed, tokens cleared");
     }
   };

@@ -686,8 +686,8 @@ body,
 #root,
 .app-zoom-shell {
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
 }
 
 body {

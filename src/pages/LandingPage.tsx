@@ -6,7 +6,10 @@ import DownloadSection from '../components/LandingPage/DownloadSection';
 import Footer from '../components/LandingPage/Footer';
 
 const LandingPage = () => (
-  <div className="min-h-screen" style={{ fontFamily: 'var(--font-body)' }}>
+  <div
+    className="min-h-screen overflow-x-hidden bg-[#fbf6f1]"
+    style={{ fontFamily: 'var(--font-body)' }}
+  >
     <Navbar />
     <HeroSection />
     <FeaturesSection />

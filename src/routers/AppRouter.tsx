@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { FORCED_LOGOUT_NOTICE_KEY } from "../utils/authLogoutSignal";
 
 import LandingPage from "../pages/LandingPage";
 import LoginPage from "../pages/LoginPage";
@@ -49,6 +50,9 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
+  const hasForcedLogoutNotice =
+    typeof window !== "undefined" &&
+    Boolean(localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY));
 
   if (isLoading)
     return (
@@ -56,6 +60,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="w-12 h-12 border-b-2 border-blue-600 rounded-full animate-spin"></div>
       </div>
     );
+  if (hasForcedLogoutNotice) return <>{children}</>;
   return !isAuthenticated ? <>{children}</> : <Navigate to="/chat" replace />;
 };
 
@@ -63,7 +68,14 @@ export const AppRouter: React.FC = () => {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<LandingPage />} />
+      <Route
+        path="/"
+        element={
+          <PublicRoute>
+            <LandingPage />
+          </PublicRoute>
+        }
+      />
       <Route
         path="/login"
         element={
