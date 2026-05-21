@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import {
   MessageCircle,
-  Phone,
   Dribbble,
 } from "lucide-react";
 import { useConversations } from "../../contexts/ConversationsContext";
@@ -47,12 +46,6 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       label: "Mạng xã hội",
       isActive: activeItem === "social",
     },
-    {
-      id: "call",
-      icon: <Phone className="w-6 h-6" />,
-      label: "Gọi video",
-      isActive: activeItem === "call",
-    },
   ];
 
   return (
@@ -61,16 +54,14 @@ const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       <UserProfile />
 
       {/* Navigation Items */}
-      <div className="flex-1 flex flex-col space-y-2">
+      <div className="mt-8 flex flex-col space-y-2">
         {navigationItems.map((item) => (
           <NavigationItem key={item.id} item={item} onItemClick={onItemClick} />
         ))}
-      </div>
-
-      {/* Profile & Settings & Notifications */}
-      <div className="flex flex-col space-y-2">
         <NotificationMenu />
       </div>
+
+      <div className="flex-1" />
     </div>
   );
 };
