@@ -6,6 +6,25 @@ import { SUCCESS_MESSAGES, getErrorMessage } from '../utils/messageMapping';
 
 export type PhoneLoginStep = 'credentials' | '2fa';
 
+const LOGIN_CREDENTIAL_ERROR_MESSAGE = 'Tài khoản hoặc mật khẩu không chính xác';
+const LOGIN_CREDENTIAL_ERROR_CODES = new Set([1100, 1200, 2001, 5001, 5002]);
+
+const getLoginCredentialErrorMessage = (error: unknown): string => {
+  const apiError = error as { code?: number; message?: string; details?: { code?: number; message?: string } };
+  const code = apiError?.details?.code ?? apiError?.code;
+  const message = apiError?.details?.message ?? apiError?.message ?? '';
+
+  if (code && LOGIN_CREDENTIAL_ERROR_CODES.has(code)) {
+    return LOGIN_CREDENTIAL_ERROR_MESSAGE;
+  }
+
+  if (/phone|email|identifier|mật khẩu|password|không chính xác|format|định dạng/i.test(message)) {
+    return LOGIN_CREDENTIAL_ERROR_MESSAGE;
+  }
+
+  return getErrorMessage(error);
+};
+
 export interface UsePhoneLoginReturn {
   step: PhoneLoginStep;
   identifier: string;
@@ -55,7 +74,7 @@ export const usePhoneLogin = (onSuccess: () => void): UsePhoneLoginReturn => {
         onSuccess();
       }
     } catch (err: unknown) {
-      showToast(getErrorMessage(err), 'error', 'Đăng nhập thất bại');
+      showToast(getLoginCredentialErrorMessage(err), 'error', 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }

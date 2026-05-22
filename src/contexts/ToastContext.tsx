@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -20,10 +20,10 @@ const ToastContext = createContext<ToastCtx>({ showToast: () => {} });
 export const useToast = () => useContext(ToastContext);
 
 const ICONS: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2 size={15} />,
-  error:   <XCircle size={15} />,
-  info:    <Info size={15} />,
-  warning: <Info size={15} />,
+  success: <CheckCircle2 size={18} />,
+  error:   <XCircle size={18} />,
+  info:    <Info size={18} />,
+  warning: <AlertTriangle size={18} />,
 };
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
@@ -60,8 +60,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     title?: string,
     duration = 4500,
   ) => {
-    const id = crypto.randomUUID();
-    setToasts(p => [...p, { id, type, message, title, duration }]);
+    const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    const normalizedMessage = String(message || '').replace(/\s+/g, ' ').trim();
+    const normalizedTitle = title?.replace(/\s+/g, ' ').trim();
+    setToasts(p => [...p.slice(-3), { id, type, message: normalizedMessage, title: normalizedTitle, duration }]);
     setTimeout(() => dismiss(id), duration);
   }, [dismiss]);
 

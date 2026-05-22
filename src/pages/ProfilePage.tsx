@@ -23,7 +23,7 @@ const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, updateProfile: updateProfileLocal } = useAuth();
   const { updateProfile: updateProfileApi } = useProfile();
-  const { sessions, revokeSession, revokeAllOtherSessions, revokeAllSessions } = useSessions();
+  const { sessions } = useSessions();
   const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('info');
   const [minLoadDone, setMinLoadDone] = useState(false);
@@ -48,7 +48,7 @@ const ProfilePage: React.FC = () => {
 
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background-image-gradient-subtle)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ height: '100vh', overflowY: 'auto', background: 'var(--background-image-gradient-subtle)', fontFamily: 'var(--font-body)' }}>
 
       {/* Sticky nav */}
       <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(255,252,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--color-primary-100)', boxShadow: 'var(--shadow-sm)' }}>
@@ -138,8 +138,8 @@ const ProfilePage: React.FC = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   <InfoRow label="Họ và tên" value={user.fullName} />
-                  <InfoRow label="Số điện thoại" value={user.phone} verified={user.isPhoneVerified} />
-                  <InfoRow label="Email" value={user.email} verified={user.isEmailVerified} />
+                  <InfoRow label="Số điện thoại" value={user.phone} />
+                  <InfoRow label="Email" value={user.email} />
                   <InfoRow label="Giới thiệu" value={user.bio || undefined} />
                   <InfoRow label="Công việc" value={user.work || undefined} />
                   <InfoRow label="Địa điểm" value={user.location || undefined} />
@@ -160,8 +160,6 @@ const ProfilePage: React.FC = () => {
                 user={user}
                 onChangePassword={() => navigate('/account/password/change')}
                 onSetPassword={() => navigate('/account/password/set')}
-                onChangeEmail={() => navigate('/account/email/change')}
-                onChangePhone={() => navigate('/account/phone/change')}
                 onManageSessions={() => setActiveTab('sessions')}
                 onToggle2FA={() => navigate('/security/2fa')}
                 onDeleteAccount={() => navigate('/account/delete')}
@@ -174,9 +172,6 @@ const ProfilePage: React.FC = () => {
             {activeTab === 'sessions' && sessions && (
               <SessionsList
                 sessions={sessions.sessions}
-                onRevokeSession={revokeSession}
-                onRevokeAllOthers={revokeAllOtherSessions}
-                onRevokeAll={revokeAllSessions}
               />
             )}
           </div>
@@ -192,7 +187,7 @@ const ProfilePage: React.FC = () => {
 };
 
 /* ── InfoRow ── */
-const InfoRow: React.FC<{ label: string; value?: string; verified?: boolean }> = ({ label, value, verified }) => (
+const InfoRow: React.FC<{ label: string; value?: string }> = ({ label, value }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-primary-50)' }}
     className="transition-fast"
     onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-primary-50)')}
@@ -203,11 +198,6 @@ const InfoRow: React.FC<{ label: string; value?: string; verified?: boolean }> =
       <span style={{ fontSize: '0.875rem', color: value ? 'var(--color-primary-900)' : 'var(--color-primary-300)', fontStyle: value ? 'normal' : 'italic' }}>
         {value || 'Chưa cập nhật'}
       </span>
-      {verified && (
-        <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--color-success-bg)', color: 'var(--color-success-text)', fontSize: '0.6875rem', fontWeight: 700, border: '1px solid var(--color-success-border)' }}>
-          Đã xác thực
-        </span>
-      )}
     </div>
   </div>
 );

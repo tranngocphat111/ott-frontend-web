@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, Phone, Smartphone, Trash2, ChevronRight, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Smartphone, Trash2, ChevronRight, AlertCircle } from 'lucide-react';
 import type { UserProfileResponse } from '../../types';
 
 interface Props {
   user: UserProfileResponse;
   onChangePassword: () => void; onSetPassword: () => void;
-  onChangeEmail: () => void; onChangePhone: () => void;
   onManageSessions: () => void; onToggle2FA: () => void; onDeleteAccount: () => void;
 }
 
-export const SecuritySettings: React.FC<Props> = ({ user, onChangePassword, onSetPassword, onChangeEmail, onChangePhone, onManageSessions, onToggle2FA, onDeleteAccount }) => {
+export const SecuritySettings: React.FC<Props> = ({ user, onChangePassword, onSetPassword, onManageSessions, onToggle2FA, onDeleteAccount }) => {
   const [showDelete, setShowDelete] = useState(false);
 
   
@@ -29,8 +28,6 @@ export const SecuritySettings: React.FC<Props> = ({ user, onChangePassword, onSe
       desc: user.hasPassword ? 'Cập nhật mật khẩu hiện tại' : 'Tạo mật khẩu để đăng nhập',
       onClick: user.hasPassword ? onChangePassword : onSetPassword,
     },
-    { icon: Mail, label: 'Thay đổi email', desc: user.email || 'Chưa liên kết email', onClick: onChangeEmail },
-    { icon: Phone, label: 'Thay đổi số điện thoại', desc: user.phone, onClick: onChangePhone },
     { icon: Smartphone, label: 'Quản lý thiết bị', desc: 'Xem thiết bị đã đăng nhập', onClick: onManageSessions },
   ];
   

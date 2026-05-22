@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoginTabs, PhoneLoginForm, EmailOTPLoginForm, QRCodeLogin, GoogleLoginButton } from '../components/LoginPage';
+import { ConfirmModal } from '../components/modal/ConfirmModal';
+import { FORCED_LOGOUT_NOTICE_KEY } from '../utils/authLogoutSignal';
 import logo from '../assets/logo_tach_nen.jpg';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'phone' | 'email' | 'qr'>('phone');
+  const [forcedLogoutMessage, setForcedLogoutMessage] = useState<string | null>(() =>
+    localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY),
+  );
+
+  useEffect(() => {
+    const message = localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY);
+    setForcedLogoutMessage(message);
+  }, []);
+
+  const dismissForcedLogoutNotice = () => {
+    localStorage.removeItem(FORCED_LOGOUT_NOTICE_KEY);
+    setForcedLogoutMessage(null);
+  };
 
   const handleLoginSuccess = () => {
     // Kiểm tra nếu có pending group invite từ trước khi đăng nhập
@@ -26,6 +41,24 @@ const LoginPage: React.FC = () => {
     >
       <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '350px', height: '350px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(174,127,83,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '-80px', left: '-80px', width: '280px', height: '280px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(208,169,126,0.11) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+      <ConfirmModal
+        isOpen={Boolean(forcedLogoutMessage)}
+        title="Phiên đăng nhập đã kết thúc"
+        message={
+          <div className="space-y-2">
+            <p>{forcedLogoutMessage}</p>
+            <p className="text-primary-500">
+              Nếu đây không phải bạn, hãy đổi mật khẩu ngay sau khi đăng nhập lại.
+            </p>
+          </div>
+        }
+        confirmText="Tôi đã hiểu"
+        hideCancelButton
+        maxWidthClassName="max-w-md"
+        onConfirm={dismissForcedLogoutNotice}
+        onCancel={dismissForcedLogoutNotice}
+      />
 
       <div className="w-full max-w-md animate-scale-in">
         <div className="flex flex-col items-center mb-7">

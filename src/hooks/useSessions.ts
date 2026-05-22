@@ -33,52 +33,6 @@ export const useSessions = () => {
     }
   }, [logout, showToast]);
 
-  const revokeSession = async (sessionId: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      await sessionApi.revokeSession(sessionId);
-      showToast('Đã đăng xuất thiết bị thành công', 'success');
-      await fetchSessions();
-      
-      return true;
-    } catch (err: unknown) {
-      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất thiết bị');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const revokeAllOtherSessions = async (): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      await sessionApi.revokeAllOtherSessions();
-      showToast('Đã đăng xuất các thiết bị khác thành công', 'success');
-      await fetchSessions();
-      return true;
-    } catch (err: unknown) {
-      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất thiết bị khác');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const revokeAllSessions = async (): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      await sessionApi.revokeAllSessions();
-      showToast('Đã đăng xuất khỏi tất cả thiết bị', 'success');
-      await logout();
-      return true;
-    } catch (err: unknown) {
-      showToast(getErrorMessage(err), 'error', 'Lỗi đăng xuất');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
@@ -87,8 +41,5 @@ export const useSessions = () => {
     sessions,
     isLoading,
     fetchSessions,
-    revokeSession,
-    revokeAllOtherSessions,
-    revokeAllSessions,
   };
 };

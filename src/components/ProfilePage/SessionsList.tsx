@@ -1,12 +1,9 @@
 import React from 'react';
-import { Smartphone, Monitor, Tablet, X, Shield, MapPin, Clock, LogOut } from 'lucide-react';
+import { Smartphone, Monitor, Tablet, Shield, MapPin, Clock } from 'lucide-react';
 import type { SessionInfo } from '../../types';
 
 interface Props {
   sessions: SessionInfo[];
-  onRevokeSession: (id: string) => void;
-  onRevokeAllOthers: () => void;
-  onRevokeAll: () => void;
 }
 
 const DEVICE_ICONS: Record<string, typeof Monitor> = {
@@ -22,25 +19,18 @@ const formatDate = (d: string) => {
   return new Date(d).toLocaleDateString('vi-VN');
 };
 
-export const SessionsList: React.FC<Props> = ({ sessions, onRevokeSession, onRevokeAll }) => {
-  const others = sessions.filter(s => !s.isCurrent);
-
+export const SessionsList: React.FC<Props> = ({ sessions }) => {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 700, color: 'var(--color-primary-900)' }}>
-          Thiết bị đã đăng nhập
-        </h2>
-        {others.length > 0 && (
-          <>
-            <button onClick={onRevokeAll} className="transition-fast"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-error-text)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px 8px', borderRadius: 8, fontFamily: 'var(--font-body)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-error-bg)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              <LogOut size={13} /> Đăng xuất tất cả thiết bị
-            </button>
-          </>
-        )}
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.0625rem', fontWeight: 700, color: 'var(--color-primary-900)' }}>
+            Thiết bị đã đăng nhập
+          </h2>
+          <p style={{ marginTop: 3, fontSize: '0.8125rem', color: 'var(--color-primary-400)' }}>
+            Bạn có thể xem các phiên đang hoạt động. Riff tự thay phiên cũ khi đăng nhập trên thiết bị cùng loại.
+          </p>
+        </div>
       </div>
 
       {sessions.length === 0 ? (
@@ -95,14 +85,6 @@ export const SessionsList: React.FC<Props> = ({ sessions, onRevokeSession, onRev
                   </div>
                 </div>
 
-                {!s.isCurrent && (
-                  <button onClick={() => onRevokeSession(s.id)} className="transition-fast"
-                    style={{ width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary-300)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-error-bg)'; (e.currentTarget.querySelector('svg') as SVGElement).style.color = 'var(--color-error-text)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; (e.currentTarget.querySelector('svg') as SVGElement).style.color = 'var(--color-primary-300)'; }}>
-                    <X size={14} />
-                  </button>
-                )}
               </div>
             );
           })}

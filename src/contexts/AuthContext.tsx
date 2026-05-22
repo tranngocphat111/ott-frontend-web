@@ -4,7 +4,14 @@ import { authApi, profileApi, userApi } from "../services/api";
 import type { UserProfileResponse } from "../types";
 import { isAdminAccountType } from "../types/enums/user.enum";
 import type { AdminRole } from "../types";
-import { emitAuthLogoutSignal } from "../utils/authLogoutSignal";
+import {
+  beginManualLogout,
+  clearForcedLogoutNotice,
+  emitAuthLogoutSignal,
+  endManualLogout,
+  isManualLogoutInProgress,
+  rememberForcedLogoutNotice,
+} from "../utils/authLogoutSignal";
 
 interface AuthContextType {
   user: UserProfileResponse | null;
@@ -43,6 +50,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getErrorCode = (error: unknown): number | undefined => {
+  const candidate = error as {
+    code?: unknown;
+    status?: unknown;
+    details?: { code?: unknown; status?: unknown };
+    response?: { status?: unknown; data?: { code?: unknown } };
+  };
+
+  const value =
+    candidate?.response?.data?.code ??
+    candidate?.details?.code ??
+    candidate?.response?.status ??
+    candidate?.status ??
+    candidate?.code;
+
+  return typeof value === "number" ? value : undefined;
+};
+
+const isSessionInvalidationError = (error: unknown) => {
+  const code = getErrorCode(error);
+  return code === 401 || code === 403 || code === 1006 || code === 2005 || code === 2006 || code === 7001;
+};
+
+const rememberForcedLogoutNoticeIfNeeded = () => {
+  if (!isManualLogoutInProgress()) {
+    rememberForcedLogoutNotice();
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,9 +93,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       : null;
   const isAdmin = userRole !== null;
 
+  const refreshStoredSession = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) {
+      throw new Error("No refresh token");
+    }
+
+    const response = await authApi.refresh({
+      token: refreshToken,
+      deviceId: localStorage.getItem("deviceId") ?? undefined,
+    });
+
+    const nextToken = response.result?.token;
+    const nextRefreshToken = response.result?.refreshToken;
+
+    if (!nextToken || !nextRefreshToken) {
+      throw new Error("Invalid refresh response");
+    }
+
+    localStorage.setItem("accessToken", nextToken);
+    localStorage.setItem("refreshToken", nextRefreshToken);
+
+    return nextToken;
+  };
+
+  const ensureCurrentTokenActive = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      await refreshStoredSession();
+      return;
+    }
+
+    const response = await authApi.introspect({ token });
+    if (response.result?.valid) {
+      return;
+    }
+
+    await refreshStoredSession();
+  };
+
   const fetchUser = async () => {
     try {
       console.log("AuthContext: Fetching user profile...");
+      await ensureCurrentTokenActive();
       const response = await profileApi.getCurrentProfile();
 
       if (response.result) {
@@ -84,8 +160,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const refreshToken = localStorage.getItem("refreshToken");
     if (token || refreshToken) {
       console.log("AuthContext: Found token in localStorage, fetching user...");
-      fetchUser().catch(() => {
+      fetchUser().catch((error) => {
         console.log("AuthContext: Initial fetch failed");
+        if (isSessionInvalidationError(error)) {
+          rememberForcedLogoutNoticeIfNeeded();
+        }
+        clearLocalSession();
+        emitAuthLogoutSignal();
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
       });
     } else {
       console.log("AuthContext: No token found");
@@ -112,13 +196,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       socketServiceRef.refreshPresence?.(user.id);
     };
 
+    let lastTokenCheckAt = 0;
+    const checkCurrentSession = () => {
+      const now = Date.now();
+      if (now - lastTokenCheckAt < 15000) return;
+      lastTokenCheckAt = now;
+
+      ensureCurrentTokenActive().catch((error) => {
+        if (isSessionInvalidationError(error)) {
+          rememberForcedLogoutNoticeIfNeeded();
+        }
+        clearLocalSession();
+        emitAuthLogoutSignal();
+        window.location.href = "/login";
+      });
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        checkCurrentSession();
         syncPresence();
       }
     };
 
     const handleWindowFocus = () => {
+      checkCurrentSession();
       syncPresence();
     };
 
@@ -164,6 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const myDeviceId = localStorage.getItem("deviceId");
 
       if (action === "ALL") {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -172,6 +275,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         payload.deviceId &&
         myDeviceId === payload.deviceId
       ) {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -180,11 +284,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         myDeviceId &&
         payload.revokedDeviceIds?.includes(myDeviceId)
       ) {
+        rememberForcedLogoutNoticeIfNeeded();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
       } else if (action === "SPECIFIC" || action === "OTHERS") {
-        fetchUser().catch(() => {
+        fetchUser().catch((error) => {
+          if (isSessionInvalidationError(error)) {
+            rememberForcedLogoutNoticeIfNeeded();
+          }
+          clearLocalSession();
           emitAuthLogoutSignal();
           window.location.href = "/login";
         });
@@ -199,12 +308,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       socketService.connect();
       socketService.joinUserRoom(user.id);
       socketService.refreshPresence(user.id);
+      checkCurrentSession();
 
       socketService.onUserInfoUpdated(handleUserInfoUpdated);
       socketService.onForceLogout(handleForceLogout);
 
       presenceHeartbeatTimer = window.setInterval(() => {
         if (document.visibilityState === "visible") {
+          checkCurrentSession();
           socketService.refreshPresence(user.id);
         }
       }, 20000);
@@ -341,6 +452,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log("AuthContext: Logout initiated");
+    beginManualLogout();
     const rawUser = user as {
       id?: string;
       user_id?: string;
@@ -364,7 +476,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const token = localStorage.getItem("accessToken");
       if (token) {
-        await authApi.logout({ token });
+        await authApi.logout({
+          token,
+          deviceId: localStorage.getItem("deviceId") ?? undefined,
+        });
         console.log("AuthContext: Logout API call successful");
       }
     } catch (error) {
@@ -375,6 +490,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       socketService?.disconnect();
 
       clearLocalSession();
+      clearForcedLogoutNotice();
+      endManualLogout();
       console.log("AuthContext: Logout completed, tokens cleared");
     }
   };

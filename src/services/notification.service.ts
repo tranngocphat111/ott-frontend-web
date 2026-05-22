@@ -44,6 +44,18 @@ class NotificationService {
     }
   }
 
+  async markAllAsRead(userId: string): Promise<boolean> {
+    try {
+      await axios.put(`${API_NOTIFICATION_SERVER_URL}/notifications/inapp/${userId}/read-all`, {}, {
+        headers: this.getHeaders(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      return false;
+    }
+  }
+
   async deleteNotification(notificationId: string): Promise<boolean> {
     try {
       await axios.delete(`${API_NOTIFICATION_SERVER_URL}/notifications/inapp/${notificationId}`, {
