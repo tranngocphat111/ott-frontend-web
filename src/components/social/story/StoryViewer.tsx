@@ -25,6 +25,7 @@ import { REACTIONS } from "../post/reactions";
 import type { ReactionKey } from "../post/reactions";
 import { toggleLike, fetchPostReactions } from "../../../services/post.service";
 import { checkIsSaved, toggleSaveContent, recordViewHistory } from "../../../services/social.service";
+import { mediaSocketService, type PostActivityPayload } from "../../../services/mediaSocket.service";
 import type { StoryItem, StoryUserGroup } from "../types";
 
 interface Props {
@@ -111,11 +112,24 @@ const StoryViewer: React.FC<Props> = ({
     checkIsSaved(activeStory.id).then(setIsSaved);
 
     let cancelled = false;
-    (async () => {
+    const fetchCounts = async () => {
       const counts = await fetchPostReactions(activeStory.id);
       if (!cancelled) setReactionMap(counts);
-    })();
-    return () => { cancelled = true; };
+    };
+    void fetchCounts();
+
+    const handleActivity = (payload: PostActivityPayload) => {
+      if (payload.postId === activeStory.id && payload.activityType === 'REACTION') {
+        void fetchCounts();
+      }
+    };
+
+    mediaSocketService.onPostActivity(handleActivity);
+
+    return () => { 
+      cancelled = true; 
+      mediaSocketService.offPostActivity(handleActivity);
+    };
   }, [activeStory?.id]);
 
   const handleLike = async (key: ReactionKey) => {
