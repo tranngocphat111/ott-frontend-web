@@ -15,6 +15,7 @@ import {
   fetchStoryViewers,
   mapStory,
 } from "../../../services/story.service";
+import { mediaSocketService, type MediaRealtimePayload, type PostActivityPayload } from "../../../services/mediaSocket.service";
 import CreateStoryModal from "./CreateStoryModal";
 import StoryViewer from "./StoryViewer";
 import { X } from "lucide-react";
@@ -106,6 +107,33 @@ export const StoryFeed: React.FC<Props> = ({
       }
     }
   }, [currentUserId]);
+
+  useEffect(() => {
+    const handleMediaUpdate = (payload: MediaRealtimePayload) => {
+      if (!payload?.contentId) return;
+      if (payload.contentTargetType === 'STORY') {
+        void loadStories();
+      }
+    };
+
+    const handleActivity = (payload: PostActivityPayload) => {
+      if (!payload.postId) return;
+      // Since story IDs are completely distinct from post IDs, we can check 
+      // if it exists in our current storyGroups.
+      const isStory = storyGroups.some(g => g.stories.some(s => s.id === payload.postId));
+      if (isStory) {
+        void loadStories();
+      }
+    };
+
+    mediaSocketService.onMediaUpdate(handleMediaUpdate);
+    mediaSocketService.onPostActivity(handleActivity);
+
+    return () => {
+      mediaSocketService.offMediaUpdate(handleMediaUpdate);
+      mediaSocketService.offPostActivity(handleActivity);
+    };
+  }, [loadStories, storyGroups]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -349,16 +377,21 @@ export const StoryFeed: React.FC<Props> = ({
       };
     }
 
-    const startTime = Date.now();
+    let lastTime = Date.now();
     const timerId = window.setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(1, elapsed / STORY_DURATION_MS);
-      setStoryProgress(progress);
-      if (progress >= 1) {
-        window.clearInterval(timerId);
-        handleNext();
-      }
-    }, 120);
+      const now = Date.now();
+      const delta = now - lastTime;
+      lastTime = now;
+      
+      setStoryProgress((prev) => {
+        const next = Math.min(1, prev + delta / STORY_DURATION_MS);
+        if (next >= 1) {
+          window.clearInterval(timerId);
+          setTimeout(handleNext, 0);
+        }
+        return next;
+      });
+    }, 100);
 
     return () => window.clearInterval(timerId);
   }, [
