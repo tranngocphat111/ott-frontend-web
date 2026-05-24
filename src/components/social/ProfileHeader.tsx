@@ -50,7 +50,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   return (
     <>
       {/* Cover Photo */}
-      <div className="relative h-56 md:h-72 rounded-b-2xl overflow-hidden bg-linear-to-r from-purple-400 via-pink-500 to-red-500">
+      <div className="relative h-56 md:h-72 rounded-b-2xl overflow-hidden bg-linear-to-br from-primary-200 via-primary-100 to-primary-500">
         {coverUrl && (
           <img
             src={coverUrl}
@@ -61,7 +61,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         {isOwner && (
           <button
             onClick={onEditCover}
-            className="absolute bottom-20 right-4 bg-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-100 transition text-sm font-medium shadow">
+            className="absolute bottom-20 right-4 bg-white px-4 py-2 rounded-lg flex items-center gap-2 text-primary-800 hover:bg-primary-50 transition text-sm font-medium shadow">
             <Camera className="size-4" />
             <span className="hidden md:inline">Chỉnh sửa ảnh bìa</span>
           </button>
@@ -97,7 +97,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 <button
                   onClick={onEditAvatar}
                   title="Đổi ảnh đại diện"
-                  className="absolute bottom-2 right-2 bg-gray-200 p-2 rounded-full hover:bg-gray-300 transition shadow">
+                  className="absolute bottom-2 right-2 bg-primary-100 p-2 rounded-full text-primary-700 hover:bg-primary-200 transition shadow">
                   <Camera className="size-4" />
                 </button>
               )}

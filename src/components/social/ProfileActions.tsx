@@ -251,7 +251,7 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
       {isOwner ?
         <button
           onClick={onEditProfile}
-          className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium text-sm">
+          className="bg-primary-100 text-primary-800 px-6 py-2 rounded-lg hover:bg-primary-200 transition font-medium text-sm">
           Chỉnh sửa trang cá nhân
         </button>
       : <>
@@ -259,32 +259,32 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
             <button
               onClick={profileAction.actionFn}
               disabled={currentStatus === "BLOCKED" || undefined}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition font-medium text-sm">
+              className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 disabled:bg-primary-200 disabled:text-primary-500 disabled:cursor-not-allowed transition font-medium text-sm shadow-sm">
               {profileAction.currentAction}
             </button>
 
             {/* Popup Menu */}
             {isPopUpShown && (
-              <ul className="absolute left-0 mt-2 w-48 bg-white border border-gray-100 rounded-lg shadow-lg z-50 py-1">
+              <ul className="absolute left-0 mt-2 w-48 bg-white border border-primary-100 rounded-lg shadow-lg z-50 py-1">
                 {currentStatus === "PENDING" &&
                   relationship?.requesterId !== currentUserId && (
                     <li
                       onClick={handleAccept}
-                      className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors">
+                      className="px-4 py-2 text-sm text-primary-800 hover:bg-primary-50 cursor-pointer transition-colors">
                       Đồng ý
                     </li>
                   )}
                 {currentStatus === "PENDING" && (
                   <li
                     onClick={handleReject}
-                    className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors">
+                    className="px-4 py-2 text-sm text-primary-800 hover:bg-primary-50 cursor-pointer transition-colors">
                     Xóa lời mời kết bạn
                   </li>
                 )}
                 {currentStatus === "ACCEPTED" && (
                   <li
                     onClick={handleUnfriend}
-                    className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition-colors">
+                    className="px-4 py-2 text-sm text-primary-800 hover:bg-primary-50 cursor-pointer transition-colors">
                     Xóa kết bạn
                   </li>
                 )}
@@ -297,7 +297,7 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
             )}
           </div>
 
-          <button className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium text-sm">
+          <button className="bg-primary-50 text-primary-900 px-6 py-2 rounded-lg border border-primary-100 hover:bg-primary-100 transition font-medium text-sm">
             Nhắn tin
           </button>
         </>
