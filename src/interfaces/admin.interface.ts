@@ -85,6 +85,28 @@ export interface ModerationDashboardResponse {
   recentLogs: AuditLog[];
 }
 
+export type ViolationSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface ModerationRule {
+  id: string;
+  term: string;
+  normalizedTerm: string;
+  category: string;
+  language: string;
+  severity: ViolationSeverity;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModerationRuleRequest {
+  term: string;
+  category: string;
+  language: string;
+  severity: ViolationSeverity;
+  enabled?: boolean;
+}
+
 export interface AdminNavItem {
   label: string;
   path: string;

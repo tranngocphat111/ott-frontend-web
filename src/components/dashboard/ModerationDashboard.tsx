@@ -10,6 +10,7 @@ import {
 import StatCard from "../admin/StatCard";
 import AdminTable from "../admin/AdminTable";
 import ErrorState from "../admin/ErrorState";
+import ModerationRulesManager from "./ModerationRulesManager";
 import { adminService } from "../../services/adminService";
 import type {
   AuditLog,
@@ -275,6 +276,8 @@ const ModerationDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ModerationRulesManager />
     </motion.section>
   );
 };

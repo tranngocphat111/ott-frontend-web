@@ -7,6 +7,8 @@ import type {
   LoginMethodCount,
   MessageTypesResponse,
   ModerationDashboardResponse,
+  ModerationRule,
+  ModerationRuleRequest,
   OverviewResponse,
   PaginatedAuditLogsResponse,
   TimeRange,
@@ -184,6 +186,26 @@ async function getJson<T>(
   }
 }
 
+async function sendJson<T>(
+  method: "post" | "put" | "patch",
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  try {
+    const response = await adminApiClient[method]<unknown>(path, body);
+    return unwrapResponseData<T>(response.data);
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string; error?: string }>;
+    const status = axiosError.response?.status ?? 500;
+    throw new AdminApiError(
+      status,
+      axiosError.response?.data?.message ??
+        axiosError.response?.data?.error ??
+        `Request failed with status ${status}`,
+    );
+  }
+}
+
 async function getPaginatedItems<T>(
   path: string,
   timeRange?: TimeRange,
@@ -203,6 +225,29 @@ async function getArrayJson<T>(
 function isNotFoundError(error: unknown): error is AdminApiError {
   return error instanceof AdminApiError && error.status === 404;
 }
+
+const normalizeModerationRule = (value: unknown): ModerationRule => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    id: typeof record.id === "string" ? record.id : "",
+    term: typeof record.term === "string" ? record.term : "",
+    normalizedTerm:
+      typeof record.normalizedTerm === "string" ? record.normalizedTerm : "",
+    category: typeof record.category === "string" ? record.category : "",
+    language: typeof record.language === "string" ? record.language : "",
+    severity:
+      record.severity === "LOW" ||
+      record.severity === "MEDIUM" ||
+      record.severity === "HIGH" ||
+      record.severity === "CRITICAL"
+        ? record.severity
+        : "MEDIUM",
+    enabled: typeof record.enabled === "boolean" ? record.enabled : false,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+  };
+};
 
 export const adminService = {
   getOverview: async (timeRange: TimeRange = "allTime") => {
@@ -304,5 +349,40 @@ export const adminService = {
           : 0,
       recentLogs: Array.isArray(response.recentLogs) ? response.recentLogs : [],
     };
+  },
+
+  getModerationRules: async () => {
+    const response = await getArrayJson<unknown>("/v1/moderation/rules");
+    return response.map(normalizeModerationRule);
+  },
+
+  createModerationRule: async (payload: ModerationRuleRequest) => {
+    const response = await sendJson<unknown>(
+      "post",
+      "/v1/moderation/rules",
+      payload,
+    );
+    return normalizeModerationRule(response);
+  },
+
+  updateModerationRule: async (
+    id: string,
+    payload: ModerationRuleRequest,
+  ) => {
+    const response = await sendJson<unknown>(
+      "put",
+      `/v1/moderation/rules/${encodeURIComponent(id)}`,
+      payload,
+    );
+    return normalizeModerationRule(response);
+  },
+
+  updateModerationRuleStatus: async (id: string, enabled: boolean) => {
+    const response = await sendJson<unknown>(
+      "patch",
+      `/v1/moderation/rules/${encodeURIComponent(id)}/enabled`,
+      { enabled },
+    );
+    return normalizeModerationRule(response);
   },
 };
