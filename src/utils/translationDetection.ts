@@ -131,14 +131,19 @@ const FOREIGN_MEANINGFUL_WORDS = new Set([
   "can",
   "cannot",
   "check",
+  "client",
   "code",
   "color",
   "come",
   "comment",
   "could",
   "danke",
+  "database",
   "date",
   "day",
+  "deadline",
+  "deploy",
+  "design",
   "did",
   "do",
   "does",
@@ -148,7 +153,9 @@ const FOREIGN_MEANINGFUL_WORDS = new Set([
   "error",
   "estoy",
   "file",
+  "fix",
   "for",
+  "frontend",
   "from",
   "good",
   "gracias",
@@ -161,6 +168,7 @@ const FOREIGN_MEANINGFUL_WORDS = new Set([
   "ich",
   "issue",
   "job",
+  "backend",
   "login",
   "merci",
   "message",
@@ -186,6 +194,8 @@ const FOREIGN_MEANINGFUL_WORDS = new Set([
   "support",
   "sure",
   "task",
+  "test",
+  "testing",
   "than",
   "thank",
   "thanks",
@@ -350,12 +360,21 @@ export const getMessageTranslationCandidate = (text: string): MessageTranslation
       FOREIGN_MEANINGFUL_WORDS.has(word) &&
       (!VIETNAMESE_ROMANIZED_WORDS.has(word) || !AMBIGUOUS_WORDS.has(word)),
   ).length;
-  const shapeHits = normalizedWords.filter(hasForeignWordShape).length;
+  const foreignShapeHits = normalizedWords.filter(
+    (word) =>
+      !VIETNAMESE_ROMANIZED_WORDS.has(word) &&
+      !FOREIGN_MEANINGFUL_WORDS.has(word) &&
+      hasForeignWordShape(word),
+  ).length;
   const gibberishHits = normalizedWords.filter(isLikelyGibberishWord).length;
-  const meaningfulForeignHits = foreignHits + Math.max(0, shapeHits - foreignHits);
+  const meaningfulForeignHits = foreignHits + foreignShapeHits;
 
   if (gibberishHits > 0 && normalizedWords.length <= 3) {
     return { shouldOffer: false, reason: "gibberish" };
+  }
+
+  if (vietnameseHits > 0 && meaningfulForeignHits >= 1 && gibberishHits / normalizedWords.length <= 0.35) {
+    return { shouldOffer: true, reason: "code_mixed_foreign" };
   }
 
   if (vietnameseHits >= Math.max(2, meaningfulForeignHits + 1)) {

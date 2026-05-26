@@ -137,7 +137,7 @@ export const TextMessage = ({
                   setIsTranslatingLocal(false);
                 }
               }}
-              className="mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-primary-50/70 px-2 py-1 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100 disabled:cursor-wait disabled:opacity-70"
+              className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary-500 hover:text-primary-600 transition-colors bg-primary-50/50 hover:bg-primary-50 px-2 py-0.5 rounded-md w-fit"
               aria-label="Dịch tin nhắn"
               title="Dịch tin nhắn"
             >
@@ -146,7 +146,7 @@ export const TextMessage = ({
               ) : (
                 <Languages size={12} />
               )}
-              {isTranslatingLocal ? "Đang dịch..." : "Dịch"}
+              {isTranslatingLocal ? "Đang dịch..." : "Dịch tin nhắn"}
             </button>
           )}
           {renderMessageMeta() && (
