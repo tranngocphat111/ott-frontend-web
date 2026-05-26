@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Message } from "../../../types";
 import { EmojiText } from "../EmojiText";
 import { MessageLayout } from "./MessageLayout";
 import { AiService } from "../../../services";
 import { Languages, Loader2 } from "lucide-react";
+import { getMessageTranslationCandidate } from "../../../utils/translationDetection";
 
 export const TextMessage = ({
   msg,
@@ -40,6 +41,7 @@ export const TextMessage = ({
 }) => {
   const [manualTranslatedText, setManualTranslatedText] = useState<string | null>(null);
   const [isTranslatingLocal, setIsTranslatingLocal] = useState(false);
+  const [translationUnavailable, setTranslationUnavailable] = useState(false);
 
   const text = useMemo(() => {
     const raw = msg.content;
@@ -49,26 +51,24 @@ export const TextMessage = ({
     return typeof raw === 'string' ? raw : (raw as any)?.text || String(raw || "");
   }, [msg.content]);
 
-  const hasForeignLanguage = useMemo(() => {
-    if (!text || text.trim().length < 3) return false;
-    
-    const trimmedText = text.trim();
-    // Bỏ qua các chuỗi vô nghĩa không có nguyên âm (gibberish)
-    // Nguyên âm tiếng Việt và tiếng Anh cơ bản
-    const vowels = /[aeiouyàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]/i;
-    if (!vowels.test(trimmedText)) {
-      return false;
-    }
-
-    // Chứa các ký tự đặc trưng của ngoại ngữ (w, f, j, z)
-    const foreignChars = /[fwjz]/i;
-    // Chứa các từ tiếng Anh thông dụng
-    const commonEnglish = /\b(the|and|for|with|you|your|have|this|that|from|shoes|size|hello|need|what|how|where|when|are|is|can|will|but|not|yes|no)\b/i;
-    // Hoàn toàn không có dấu tiếng Việt
-    const noVnAccents = !/[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(trimmedText);
-    
-    return foreignChars.test(trimmedText) || commonEnglish.test(trimmedText) || noVnAccents;
+  useEffect(() => {
+    setManualTranslatedText(null);
+    setIsTranslatingLocal(false);
+    setTranslationUnavailable(false);
   }, [text]);
+
+  const translationCandidate = useMemo(
+    () => getMessageTranslationCandidate(text),
+    [text],
+  );
+  const shownTranslatedText = translatedText || manualTranslatedText;
+  const shouldShowTranslationButton =
+    !isMe &&
+    !translatedText &&
+    !manualTranslatedText &&
+    !translationUnavailable &&
+    Boolean(text.trim()) &&
+    translationCandidate.shouldOffer;
 
   return (
     <MessageLayout
@@ -103,41 +103,50 @@ export const TextMessage = ({
             emojiSize={18}
             emojiClassName="inline-block align-[-0.2em] me-1"
           />
-          {text.trim() && (translatedText || manualTranslatedText) && (translatedText || manualTranslatedText)?.trim() !== text.trim() && (
+          {text.trim() && shownTranslatedText && shownTranslatedText.trim() !== text.trim() && (
             <div className="mt-2 pt-2 border-t border-black/5 dark:border-white/5 opacity-90 italic text-[14px]">
               <div className="flex items-center gap-1.5 mb-1 opacity-60 not-italic">
                 <span className="text-[10px] font-bold uppercase tracking-tighter">Bản dịch</span>
               </div>
               <EmojiText
-                text={(translatedText || manualTranslatedText) || ""}
+                text={shownTranslatedText}
                 emojiSize={16}
                 emojiClassName="inline-block align-[-0.2em] me-1"
               />
             </div>
           )}
 
-          {!isMe && !translatedText && !manualTranslatedText && text.trim() && hasForeignLanguage && (
+          {shouldShowTranslationButton && (
             <button
+              type="button"
+              disabled={isTranslatingLocal}
               onClick={async () => {
                 if (isTranslatingLocal) return;
                 setIsTranslatingLocal(true);
                 try {
                   const result = await AiService.translateText(text);
-                  setManualTranslatedText(result);
+                  if (result) {
+                    setManualTranslatedText(result);
+                  } else {
+                    setTranslationUnavailable(true);
+                  }
                 } catch (err) {
                   console.error("Manual translation error:", err);
+                  setTranslationUnavailable(true);
                 } finally {
                   setIsTranslatingLocal(false);
                 }
               }}
-              className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary-500 hover:text-primary-600 transition-colors bg-primary-50/50 hover:bg-primary-50 px-2 py-0.5 rounded-md w-fit"
+              className="mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-primary-50/70 px-2 py-1 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100 disabled:cursor-wait disabled:opacity-70"
+              aria-label="Dịch tin nhắn"
+              title="Dịch tin nhắn"
             >
               {isTranslatingLocal ? (
                 <Loader2 size={12} className="animate-spin" />
               ) : (
                 <Languages size={12} />
               )}
-              {isTranslatingLocal ? "Đang dịch..." : "Dịch tin nhắn"}
+              {isTranslatingLocal ? "Đang dịch..." : "Dịch"}
             </button>
           )}
           {renderMessageMeta() && (
