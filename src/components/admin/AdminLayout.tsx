@@ -16,7 +16,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
-        Checking admin access...
+        Đang kiểm tra quyền quản trị...
       </div>
     );
   }
@@ -31,9 +31,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 text-center shadow-2xl">
           <h1 className="mb-2 text-4xl font-extrabold text-red-600">403</h1>
           <p className="mb-4 text-lg text-slate-100">
-            You do not have permission to access the admin analytics console.
+            Bạn không có quyền truy cập bảng quản trị.
           </p>
-          <p className="text-sm text-slate-400">Current role: {userRole ?? "-"}</p>
+          <p className="text-sm text-slate-400">Vai trò hiện tại: {userRole ?? "-"}</p>
         </div>
       </div>
     );

@@ -86,7 +86,7 @@ const StatCard: React.FC<StatCardProps> = ({
             <DeltaIcon className="h-3.5 w-3.5" />
             {Math.abs(displayDelta).toFixed(1)}%
           </span>
-          <span className="text-xs text-slate-400">vs previous period</span>
+          <span className="text-xs text-slate-400">so với kỳ trước</span>
         </div>
       )}
     </div>

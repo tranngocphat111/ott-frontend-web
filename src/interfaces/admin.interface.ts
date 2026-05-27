@@ -17,6 +17,8 @@ export interface UserSummary {
   userId: string;
   email: string | null;
   fullName: string | null;
+  registeredAt?: string | null;
+  profileSynced?: boolean;
 }
 
 export interface PaginatedRecentUsersResponse {
@@ -83,16 +85,39 @@ export interface PaginatedAuditLogsResponse {
 export interface ModerationDashboardResponse {
   totalBannedUsers: number;
   recentLogs: AuditLog[];
+  totalContentViolations: number;
+  recentContentViolations: ContentViolationLog[];
+}
+
+export interface ContentViolationLog {
+  id: string;
+  violationId: string;
+  sourceService: string | null;
+  contentType: string | null;
+  contentRefId: string | null;
+  userId: string | null;
+  severity: string | null;
+  violationType: string | null;
+  matchedLabels: string | null;
+  detectedAt: string;
+  loggedAt: string;
 }
 
 export type ViolationSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type ModerationRuleCategory =
+  | "abuse"
+  | "fraud"
+  | "security"
+  | "profanity"
+  | "general";
+export type ModerationRuleLanguage = "vi" | "en";
 
 export interface ModerationRule {
   id: string;
   term: string;
   normalizedTerm: string;
-  category: string;
-  language: string;
+  category: ModerationRuleCategory | string;
+  language: ModerationRuleLanguage | string;
   severity: ViolationSeverity;
   enabled: boolean;
   createdAt: string;
@@ -101,8 +126,8 @@ export interface ModerationRule {
 
 export interface ModerationRuleRequest {
   term: string;
-  category: string;
-  language: string;
+  category: ModerationRuleCategory;
+  language: ModerationRuleLanguage;
   severity: ViolationSeverity;
   enabled?: boolean;
 }

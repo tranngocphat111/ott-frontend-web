@@ -44,7 +44,7 @@ const AuditLogs: React.FC = () => {
         });
       } catch (err) {
         console.error("Failed to load audit logs", err);
-        setError("The audit log feed could not be loaded.");
+        setError("Không thể tải nhật ký quản trị.");
       } finally {
         setLoading(false);
       }
@@ -57,7 +57,7 @@ const AuditLogs: React.FC = () => {
     () =>
       logs.map((log) => ({
         ...log,
-        createdAt: new Date(log.createdAt).toLocaleString("en-GB"),
+        createdAt: new Date(log.createdAt).toLocaleString("vi-VN"),
       })),
     [logs],
   );
@@ -69,7 +69,7 @@ const AuditLogs: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Audit log view is unavailable"
+        title="Không thể hiển thị nhật ký"
         description={error}
         onRetry={() => setRetryNonce((current) => current + 1)}
       />
@@ -79,7 +79,7 @@ const AuditLogs: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
-        Loading audit logs...
+        Đang tải nhật ký...
       </div>
     );
   }
@@ -94,13 +94,13 @@ const AuditLogs: React.FC = () => {
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
-            Audit
+            Nhật ký
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Audit Logs
+            Nhật ký quản trị
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            {pagination.totalElements} records - page {pagination.page + 1} of{" "}
+            {pagination.totalElements} bản ghi - trang {pagination.page + 1}/
             {Math.max(pagination.totalPages, 1)}
           </p>
         </div>
@@ -108,11 +108,11 @@ const AuditLogs: React.FC = () => {
 
       <AdminTable
         columns={[
-          { key: "id", label: "Log ID", className: "font-medium text-slate-900" },
-          { key: "adminId", label: "Actor" },
-          { key: "actionType", label: "Action" },
-          { key: "targetUserId", label: "Target User" },
-          { key: "createdAt", label: "Timestamp" },
+          { key: "id", label: "Mã log", className: "font-medium text-slate-900" },
+          { key: "adminId", label: "Người thực hiện" },
+          { key: "actionType", label: "Hành động" },
+          { key: "targetUserId", label: "Người dùng bị tác động" },
+          { key: "createdAt", label: "Thời gian" },
         ]}
         rows={rows}
       />
@@ -124,11 +124,11 @@ const AuditLogs: React.FC = () => {
           disabled={page <= 0}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Previous
+          Trước
         </button>
 
         <span className="text-sm text-slate-500">
-          Showing {rows.length} of {pagination.totalElements} records
+          Hiển thị {rows.length}/{pagination.totalElements} bản ghi
         </span>
 
         <button
@@ -139,7 +139,7 @@ const AuditLogs: React.FC = () => {
           }
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Next
+          Sau
         </button>
       </div>
     </motion.section>

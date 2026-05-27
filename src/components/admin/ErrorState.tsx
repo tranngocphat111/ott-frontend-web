@@ -8,8 +8,8 @@ interface ErrorStateProps {
 }
 
 const ErrorState: React.FC<ErrorStateProps> = ({
-  title = "Analytics data is unavailable",
-  description = "The admin analytics module could not load data from the backend.",
+  title = "Không thể tải dữ liệu phân tích",
+  description = "Module quản trị không thể lấy dữ liệu từ backend.",
   onRetry,
 }) => {
   return (
@@ -20,7 +20,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold uppercase tracking-wide text-red-600">
-            Data error
+            Lỗi dữ liệu
           </p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">{title}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
@@ -31,7 +31,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
               className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               <RefreshCw className="h-4 w-4" />
-              Retry
+              Thử lại
             </button>
           )}
         </div>

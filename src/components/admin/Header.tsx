@@ -4,10 +4,10 @@ import { useAdminAnalytics } from "./AdminAnalyticsContext";
 import type { TimeRange } from "../../interfaces/admin.interface";
 
 const timeRangeOptions: Array<{ label: string; value: TimeRange }> = [
-  { label: "Today", value: "today" },
-  { label: "Last 7 days", value: "last7Days" },
-  { label: "Last 30 days", value: "last30Days" },
-  { label: "All time", value: "allTime" },
+  { label: "Hôm nay", value: "today" },
+  { label: "7 ngày qua", value: "last7Days" },
+  { label: "30 ngày qua", value: "last30Days" },
+  { label: "Tất cả", value: "allTime" },
 ];
 
 const Header: React.FC = () => {
@@ -19,16 +19,16 @@ const Header: React.FC = () => {
         <div className="min-w-0">
           <div className="flex items-center gap-2 font-semibold text-slate-900">
             <Shield className="h-5 w-5 text-indigo-600" />
-            <h1 className="truncate text-lg">OTT Admin Analytics</h1>
+            <h1 className="truncate text-lg">Bảng quản trị OTT</h1>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Platform health, moderation activity, and user operations.
+            Theo dõi sức khỏe nền tảng, kiểm duyệt và hoạt động người dùng.
           </p>
         </div>
 
         <label className="flex items-center gap-3 text-sm text-slate-600">
           <span className="hidden whitespace-nowrap font-medium sm:inline">
-            Time range
+            Khoảng thời gian
           </span>
           <div className="relative">
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -36,7 +36,7 @@ const Header: React.FC = () => {
               value={timeRange}
               onChange={(event) => setTimeRange(event.target.value as TimeRange)}
               className="min-w-44 appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-10 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-indigo-400 focus:bg-white"
-              aria-label="Select time range"
+              aria-label="Chọn khoảng thời gian"
             >
               {timeRangeOptions.map((option) => (
                 <option key={option.value} value={option.value}>

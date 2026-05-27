@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
       setUserTrend(trendData);
     } catch (err) {
       console.error("Failed to load admin dashboard", err);
-      setError("The dashboard could not load analytics data from the backend.");
+      setError("Không thể tải dữ liệu phân tích từ backend.");
     } finally {
       setLoading(false);
     }
@@ -94,16 +94,16 @@ const Dashboard: React.FC = () => {
 
   const messageChartData: EventReport[] = useMemo(
     () => [
-      { title: "Text", value: messageTypes.text, color: "#6366f1" },
-      { title: "Image", value: messageTypes.image, color: "#22c55e" },
-      { title: "Voice", value: messageTypes.voice, color: "#f59e0b" },
+      { title: "Văn bản", value: messageTypes.text, color: "#6366f1" },
+      { title: "Hình ảnh", value: messageTypes.image, color: "#22c55e" },
+      { title: "Giọng nói", value: messageTypes.voice, color: "#f59e0b" },
     ],
     [messageTypes],
   );
 
   const loginMethodChartData: EventReport[] = useMemo(() => {
     const labelMap: Record<string, string> = {
-      local: "Local",
+      local: "Mật khẩu",
       google: "Google",
       qr_code: "QR Code",
       otp: "OTP",
@@ -173,45 +173,45 @@ const Dashboard: React.FC = () => {
 
   const handleExportCsv = () => {
     const rows: Array<Array<string | number>> = [
-      ["Overview"],
-      ["Metric", "Value"],
-      ["Total Users", overview.totalUsers],
-      ["Total Logins", overview.totalLogins],
-      ["Total Messages", overview.totalMessages],
-      ["Total Posts", overview.totalPosts],
+      ["Tổng quan"],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng người dùng", overview.totalUsers],
+      ["Lượt đăng nhập", overview.totalLogins],
+      ["Tin nhắn", overview.totalMessages],
+      ["Bài viết", overview.totalPosts],
       ["DAU", overview.dau],
       ["MAU", overview.mau],
-      ["Registrations (Range)", totalRegistrationsInRange],
-      ["Logins (Range)", totalLoginEventsInRange],
-      ["Avg Registrations / Day", avgDailyRegistrations],
-      ["Avg Logins / Day", avgDailyLogins],
+      ["Đăng ký trong kỳ", totalRegistrationsInRange],
+      ["Đăng nhập trong kỳ", totalLoginEventsInRange],
+      ["Đăng ký trung bình / ngày", avgDailyRegistrations],
+      ["Đăng nhập trung bình / ngày", avgDailyLogins],
     ];
 
     if (peakRegistrationDay) {
       rows.push([
-        "Peak Registration Day",
+        "Ngày đăng ký cao nhất",
         `${peakRegistrationDay.date} (${peakRegistrationDay.registrations})`,
       ]);
     }
 
     if (peakLoginDay) {
       rows.push([
-        "Peak Login Day",
+        "Ngày đăng nhập cao nhất",
         `${peakLoginDay.date} (${peakLoginDay.logins})`,
       ]);
     }
 
-    rows.push([""], ["Message Types"], ["Type", "Count"]);
+    rows.push([""], ["Loại tin nhắn"], ["Loại", "Số lượng"]);
     messageChartData.forEach((item) => {
       rows.push([item.title, item.value]);
     });
 
-    rows.push([""], ["Login Methods"], ["Method", "Count"]);
+    rows.push([""], ["Phương thức đăng nhập"], ["Phương thức", "Số lượng"]);
     loginMethodChartData.forEach((item) => {
       rows.push([item.title, item.value]);
     });
 
-    rows.push([""], ["User Trend"], ["Date", "Registrations", "Logins"]);
+    rows.push([""], ["Xu hướng người dùng"], ["Ngày", "Đăng ký", "Đăng nhập"]);
     userTrendChartData.forEach((item) => {
       rows.push([item.date, item.registrations, item.logins]);
     });
@@ -226,7 +226,7 @@ const Dashboard: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Dashboard is unavailable"
+        title="Không thể hiển thị tổng quan"
         description={error}
         onRetry={() => void load()}
       />
@@ -236,7 +236,7 @@ const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
-        Loading admin dashboard...
+        Đang tải bảng tổng quan...
       </div>
     );
   }
@@ -251,60 +251,59 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
-            Overview
+            Tổng quan
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            OTT Platform Operations
+            Vận hành nền tảng OTT
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-            Monitor growth, engagement, and service health across the analytics
-            event pipeline.
+            Theo dõi tăng trưởng, tương tác và sức khỏe dịch vụ qua pipeline sự kiện.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Source: <span className="font-medium text-slate-900">analytic-service</span>
+            Nguồn: <span className="font-medium text-slate-900">analytic-service</span>
           </div>
           <button
             type="button"
             onClick={handleExportCsv}
             className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Export CSV
+            Xuất CSV
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Total users"
+          title="Tổng người dùng"
           value={overview.totalUsers}
           delta={overview.userDelta ?? null}
-          description="Registered accounts in the selected range."
+          description="Tài khoản đã đăng ký trong khoảng thời gian đã chọn."
           icon={<Users className="h-5 w-5" />}
           tone="violet"
         />
         <StatCard
-          title="Login events"
+          title="Lượt đăng nhập"
           value={overview.totalLogins}
           delta={overview.loginDelta ?? null}
-          description="Authentication activity captured by event consumers."
+          description="Hoạt động xác thực được ghi nhận từ sự kiện."
           icon={<LogIn className="h-5 w-5" />}
           tone="info"
         />
         <StatCard
-          title="Messages"
+          title="Tin nhắn"
           value={overview.totalMessages}
           delta={overview.messageDelta ?? null}
-          description="Total message throughput ingested for analytics."
+          description="Tổng số tin nhắn đã được ghi nhận."
           icon={<MessageSquareText className="h-5 w-5" />}
           tone="success"
         />
         <StatCard
-          title="Posts"
+          title="Bài viết"
           value={overview.totalPosts}
           delta={overview.postDelta ?? null}
-          description="Social content creation volume in the selected range."
+          description="Số lượng nội dung mạng xã hội trong khoảng đã chọn."
           icon={<FileText className="h-5 w-5" />}
           tone="neutral"
         />
@@ -312,45 +311,45 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Daily active users"
+          title="Người dùng hoạt động ngày"
           value={overview.dau}
-          description="Distinct users active per day."
+          description="Số người dùng hoạt động trong ngày."
           icon={<Activity className="h-5 w-5" />}
           tone="info"
         />
         <StatCard
-          title="Monthly active users"
+          title="Người dùng hoạt động tháng"
           value={overview.mau}
-          description="Distinct users active per month."
+          description="Số người dùng hoạt động trong 30 ngày."
           icon={<Database className="h-5 w-5" />}
           tone="neutral"
         />
         <StatCard
-          title="Registrations in range"
+          title="Đăng ký trong kỳ"
           value={totalRegistrationsInRange}
-          description="New accounts aggregated from registration events."
+          description="Tài khoản mới từ sự kiện đăng ký."
         />
         <StatCard
-          title="Logins in range"
+          title="Đăng nhập trong kỳ"
           value={totalLoginEventsInRange}
-          description="Authentication events inside the selected period."
+          description="Sự kiện đăng nhập trong khoảng đã chọn."
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Avg registrations / day"
+          title="Đăng ký TB / ngày"
           value={avgDailyRegistrations}
-          description="Average daily signups in this period."
+          description="Số đăng ký trung bình mỗi ngày."
         />
         <StatCard
-          title="Avg logins / day"
+          title="Đăng nhập TB / ngày"
           value={avgDailyLogins}
-          description="Average daily authentication load."
+          description="Số đăng nhập trung bình mỗi ngày."
         />
         {peakRegistrationDay && (
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Peak registration day</p>
+            <p className="text-sm font-medium text-slate-500">Ngày đăng ký cao nhất</p>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
               {peakRegistrationDay.registrations.toLocaleString()}
             </p>
@@ -359,7 +358,7 @@ const Dashboard: React.FC = () => {
         )}
         {peakLoginDay && (
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">Peak login day</p>
+            <p className="text-sm font-medium text-slate-500">Ngày đăng nhập cao nhất</p>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
               {peakLoginDay.logins.toLocaleString()}
             </p>
@@ -370,53 +369,53 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Charts
-          title="Message type distribution"
+          title="Phân bố loại tin nhắn"
           data={messageChartData}
           variant="pie"
         />
         <Charts
-          title="Login method distribution"
+          title="Phân bố phương thức đăng nhập"
           data={loginMethodChartData}
           variant="pie"
         />
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-semibold text-slate-900">
-            Service posture
+            Trạng thái dịch vụ
           </h3>
           <ul className="space-y-3 text-sm text-slate-600">
             <li className="flex items-center justify-between">
               <span>Analytics API</span>
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                Online
+                Đang hoạt động
               </span>
             </li>
             <li className="flex items-center justify-between">
-              <span>Data source</span>
+              <span>Nguồn dữ liệu</span>
               <span className="font-medium text-slate-900">analytic-service :8092</span>
             </li>
             <li className="flex items-center justify-between">
-              <span>Ingestion mode</span>
-              <span className="font-medium text-slate-900">RabbitMQ events</span>
+              <span>Chế độ ghi nhận</span>
+              <span className="font-medium text-slate-900">Sự kiện RabbitMQ</span>
             </li>
           </ul>
         </div>
       </div>
 
       <Charts
-        title="User registrations and logins by day"
+        title="Đăng ký và đăng nhập theo ngày"
         data={userTrendChartData}
         variant="area"
         series={[
           {
             key: "registrations",
-            label: "Registrations",
+            label: "Đăng ký",
             stroke: "#8b5cf6",
             fillId: "fillRegistrations",
             gradientStop: "#8b5cf6",
           },
           {
             key: "logins",
-            label: "Logins",
+            label: "Đăng nhập",
             stroke: "#06b6d4",
             fillId: "fillLogins",
             gradientStop: "#06b6d4",

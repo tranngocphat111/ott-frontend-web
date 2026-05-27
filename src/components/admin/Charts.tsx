@@ -43,7 +43,7 @@ type ChartsProps = PieChartsProps | AreaChartsProps;
 
 const defaultColors = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6"];
 
-const formatNumber = new Intl.NumberFormat("en-US");
+const formatNumber = new Intl.NumberFormat("vi-VN");
 
 const Charts: React.FC<ChartsProps> = (props) => {
   const { title, variant, data } = props;
@@ -54,14 +54,14 @@ const Charts: React.FC<ChartsProps> = (props) => {
         ? [
             {
               key: "posts",
-              label: "Posts",
+              label: "Bài viết",
               stroke: "#6366f1",
               fillId: "fillPosts",
               gradientStop: "#6366f1",
             },
             {
               key: "messages",
-              label: "Messages",
+              label: "Tin nhắn",
               stroke: "#0ea5e9",
               fillId: "fillMessages",
               gradientStop: "#0ea5e9",
@@ -80,7 +80,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
           <p className="mt-1 text-sm text-slate-500">
-            No data points were returned for this range.
+            Không có điểm dữ liệu trong khoảng thời gian này.
           </p>
         </div>
         <EmptyState />
@@ -98,7 +98,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Near real-time analytics aggregated from platform event streams.
+          Dữ liệu được tổng hợp gần thời gian thực từ các luồng sự kiện.
         </p>
       </div>
       {variant === "pie" ? (
@@ -125,7 +125,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
               <Tooltip
                 formatter={(value) => [
                   formatNumber.format(Number(value ?? 0)),
-                  "Count",
+                  "Số lượng",
                 ]}
               />
               <Legend />
@@ -174,7 +174,7 @@ const Charts: React.FC<ChartsProps> = (props) => {
                   areaSeries.find((series) => series.key === name)?.label ??
                     String(name),
                 ]}
-                labelFormatter={(label) => `Date ${label}`}
+                labelFormatter={(label) => `Ngày ${label}`}
               />
               <Legend
                 formatter={(value) =>

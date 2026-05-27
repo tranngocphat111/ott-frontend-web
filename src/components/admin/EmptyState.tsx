@@ -8,8 +8,8 @@ interface EmptyStateProps {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
-  title = "No analytics data for this view",
-  description = "Adjust the time range or wait for more events to arrive from the platform services.",
+  title = "Chưa có dữ liệu cho màn hình này",
+  description = "Hãy đổi khoảng thời gian hoặc chờ thêm sự kiện từ các dịch vụ nền tảng.",
 }) => {
   return (
     <motion.div

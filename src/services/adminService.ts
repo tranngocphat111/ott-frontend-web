@@ -77,7 +77,7 @@ const toNullableFiniteNumber = (value: unknown): number | null => {
 
 const unwrapResponseData = <T>(value: unknown): T => {
   if (typeof value === "string") {
-    throw new AdminApiError(502, "Analytics API returned a non-JSON response");
+    throw new AdminApiError(502, "API phân tích trả về dữ liệu không hợp lệ");
   }
 
   if (!isRecord(value)) {
@@ -181,7 +181,7 @@ async function getJson<T>(
     throw new AdminApiError(
       status,
       axiosError.response?.data?.message ??
-        `Request failed with status ${status}`,
+        `Yêu cầu thất bại với mã ${status}`,
     );
   }
 }
@@ -201,7 +201,7 @@ async function sendJson<T>(
       status,
       axiosError.response?.data?.message ??
         axiosError.response?.data?.error ??
-        `Request failed with status ${status}`,
+        `Yêu cầu thất bại với mã ${status}`,
     );
   }
 }
@@ -249,6 +249,20 @@ const normalizeModerationRule = (value: unknown): ModerationRule => {
   };
 };
 
+const normalizeUserSummary = (value: unknown): UserSummary => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    userId: typeof record.userId === "string" ? record.userId : "",
+    email: typeof record.email === "string" ? record.email : null,
+    fullName: typeof record.fullName === "string" ? record.fullName : null,
+    registeredAt:
+      typeof record.registeredAt === "string" ? record.registeredAt : null,
+    profileSynced:
+      typeof record.profileSynced === "boolean" ? record.profileSynced : false,
+  };
+};
+
 export const adminService = {
   getOverview: async (timeRange: TimeRange = "allTime") => {
     const response = await getJson<unknown>("/v1/admin/analytics/overview", {
@@ -262,7 +276,7 @@ export const adminService = {
     getPaginatedItems<UserSummary>(
       "/v1/admin/analytics/users/recent",
       timeRange,
-    ),
+    ).then((items) => items.map(normalizeUserSummary)),
 
   getMessageTypes: async (timeRange: TimeRange = "allTime") => {
     const response = await getJson<unknown>("/v1/admin/analytics/messages/types", {
@@ -289,7 +303,12 @@ export const adminService = {
       query: params?.query,
       page: params?.page ?? 0,
       size: params?.size ?? 10,
-    }).then(asPaginatedResponse<UserSummary>),
+    })
+      .then(asPaginatedResponse<unknown>)
+      .then((response) => ({
+        ...response,
+        items: response.items.map(normalizeUserSummary),
+      })),
 
   getUserDailyTrend: async (timeRange: TimeRange = "allTime") => {
     const response = await getArrayJson<unknown>(
@@ -348,6 +367,13 @@ export const adminService = {
           ? response.totalBannedUsers
           : 0,
       recentLogs: Array.isArray(response.recentLogs) ? response.recentLogs : [],
+      totalContentViolations:
+        typeof response.totalContentViolations === "number"
+          ? response.totalContentViolations
+          : 0,
+      recentContentViolations: Array.isArray(response.recentContentViolations)
+        ? response.recentContentViolations
+        : [],
     };
   },
 

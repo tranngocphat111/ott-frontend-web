@@ -15,11 +15,26 @@ import {
 import { adminService } from "../../services/adminService";
 import type {
   ModerationRule,
+  ModerationRuleCategory,
+  ModerationRuleLanguage,
   ModerationRuleRequest,
   ViolationSeverity,
 } from "../../interfaces/admin.interface";
 
 const severityOptions: ViolationSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+const categoryOptions: Array<{ value: ModerationRuleCategory; label: string }> = [
+  { value: "general", label: "Chung" },
+  { value: "profanity", label: "Từ ngữ tục tĩu" },
+  { value: "fraud", label: "Lừa đảo" },
+  { value: "abuse", label: "Quấy rối / lạm dụng" },
+  { value: "security", label: "An toàn hệ thống" },
+];
+
+const languageOptions: Array<{ value: ModerationRuleLanguage; label: string }> = [
+  { value: "vi", label: "Tiếng Việt" },
+  { value: "en", label: "Tiếng Anh" },
+];
 
 const emptyForm: ModerationRuleRequest = {
   term: "",
@@ -28,6 +43,12 @@ const emptyForm: ModerationRuleRequest = {
   severity: "HIGH",
   enabled: true,
 };
+
+const isKnownCategory = (value: string): value is ModerationRuleCategory =>
+  categoryOptions.some((option) => option.value === value);
+
+const isKnownLanguage = (value: string): value is ModerationRuleLanguage =>
+  languageOptions.some((option) => option.value === value);
 
 const severityClassName = (severity: ViolationSeverity) => {
   switch (severity) {
@@ -49,24 +70,45 @@ const formatTimestamp = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 };
 
+const severityLabel = (severity: ViolationSeverity) => {
+  switch (severity) {
+    case "LOW":
+      return "Thấp";
+    case "MEDIUM":
+      return "Trung bình";
+    case "HIGH":
+      return "Cao";
+    case "CRITICAL":
+      return "Rất cao";
+    default:
+      return severity;
+  }
+};
+
+const categoryLabel = (category: string) =>
+  categoryOptions.find((option) => option.value === category)?.label ?? category;
+
+const languageLabel = (language: string) =>
+  languageOptions.find((option) => option.value === language)?.label ?? language;
+
 const buildPayload = (form: ModerationRuleRequest): ModerationRuleRequest => ({
   term: form.term.trim(),
-  category: form.category.trim(),
-  language: form.language.trim().toLowerCase(),
+  category: form.category,
+  language: form.language,
   severity: form.severity,
   enabled: form.enabled ?? true,
 });
 
 const isValidForm = (form: ModerationRuleRequest) =>
   form.term.trim() !== "" &&
-  form.category.trim() !== "" &&
-  form.language.trim() !== "" &&
+  categoryOptions.some((option) => option.value === form.category) &&
+  languageOptions.some((option) => option.value === form.language) &&
   severityOptions.includes(form.severity);
 
 const ModerationRulesManager: React.FC = () => {
@@ -93,7 +135,7 @@ const ModerationRulesManager: React.FC = () => {
       setRules(response);
     } catch (err) {
       console.error("Failed to load moderation rules", err);
-      setError("Moderation rules could not be loaded.");
+      setError("Không thể tải danh sách quy tắc kiểm duyệt.");
     } finally {
       setLoading(false);
     }
@@ -110,11 +152,14 @@ const ModerationRulesManager: React.FC = () => {
   };
 
   const beginEdit = (rule: ModerationRule) => {
+    const category = isKnownCategory(rule.category) ? rule.category : "general";
+    const language = isKnownLanguage(rule.language) ? rule.language : "vi";
+
     setEditingRuleId(rule.id);
     setForm({
       term: rule.term,
-      category: rule.category,
-      language: rule.language,
+      category,
+      language,
       severity: rule.severity,
       enabled: rule.enabled,
     });
@@ -127,7 +172,7 @@ const ModerationRulesManager: React.FC = () => {
     setNotice(null);
 
     if (!isValidForm(form)) {
-      setError("Term, category, language, and severity are required.");
+      setError("Vui lòng nhập từ khóa và chọn đầy đủ nhóm, ngôn ngữ, mức độ.");
       return;
     }
 
@@ -144,13 +189,13 @@ const ModerationRulesManager: React.FC = () => {
         if (!editingRuleId) return [saved, ...current];
         return current.map((rule) => (rule.id === saved.id ? saved : rule));
       });
-      setNotice(editingRuleId ? "Rule updated." : "Rule added.");
+      setNotice(editingRuleId ? "Đã cập nhật quy tắc." : "Đã thêm quy tắc.");
       setForm(emptyForm);
       setEditingRuleId(null);
     } catch (err) {
       console.error("Failed to save moderation rule", err);
       setError(
-        err instanceof Error ? err.message : "Moderation rule could not be saved.",
+        err instanceof Error ? err.message : "Không thể lưu quy tắc kiểm duyệt.",
       );
     } finally {
       setSaving(false);
@@ -170,13 +215,13 @@ const ModerationRulesManager: React.FC = () => {
       setRules((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
-      setNotice(updated.enabled ? "Rule enabled." : "Rule disabled.");
+      setNotice(updated.enabled ? "Đã bật quy tắc." : "Đã tắt quy tắc.");
     } catch (err) {
       console.error("Failed to update moderation rule status", err);
       setError(
         err instanceof Error
           ? err.message
-          : "Moderation rule status could not be updated.",
+          : "Không thể cập nhật trạng thái quy tắc.",
       );
     } finally {
       setTogglingRuleId(null);
@@ -188,14 +233,14 @@ const ModerationRulesManager: React.FC = () => {
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Dictionary
+            Từ điển kiểm duyệt
           </p>
           <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-            Moderation Rules
+            Quy tắc kiểm duyệt
           </h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-            Terms are normalized by moderation-service and reloaded into the
-            in-memory scanner after each committed change.
+            Các từ khóa được chuẩn hóa và nạp vào bộ quét trong bộ nhớ của
+            moderation-service sau mỗi lần thêm hoặc cập nhật qua giao diện.
           </p>
         </div>
         <button
@@ -205,7 +250,7 @@ const ModerationRulesManager: React.FC = () => {
           className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          Tải lại
         </button>
       </div>
 
@@ -224,12 +269,12 @@ const ModerationRulesManager: React.FC = () => {
             </div>
             <div>
               <h4 className="text-sm font-semibold text-slate-950">
-                {editingRule ? "Edit rule" : "Add rule"}
+                {editingRule ? "Chỉnh sửa quy tắc" : "Thêm quy tắc"}
               </h4>
               <p className="text-sm text-slate-500">
                 {editingRule
-                  ? `Editing ${editingRule.normalizedTerm}`
-                  : "Create a term rule for realtime text scanning."}
+                  ? `Đang chỉnh sửa ${editingRule.normalizedTerm}`
+                  : "Tạo từ khóa dùng để quét tin nhắn văn bản theo thời gian gần thực."}
               </p>
             </div>
           </div>
@@ -240,15 +285,15 @@ const ModerationRulesManager: React.FC = () => {
               className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
             >
               <RotateCcw className="h-4 w-4" />
-              Cancel
+              Hủy
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_110px_150px_110px]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_150px_110px]">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Term
+              Từ khóa
             </span>
             <input
               value={form.term}
@@ -262,41 +307,51 @@ const ModerationRulesManager: React.FC = () => {
 
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Category
+              Nhóm
             </span>
-            <input
+            <select
               value={form.category}
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  category: event.target.value,
+                  category: event.target.value as ModerationRuleCategory,
                 }))
               }
               className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none transition focus:border-red-300 focus:ring-2 focus:ring-red-100"
-              placeholder="fraud"
-            />
+            >
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Language
+              Ngôn ngữ
             </span>
-            <input
+            <select
               value={form.language}
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  language: event.target.value,
+                  language: event.target.value as ModerationRuleLanguage,
                 }))
               }
               className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none transition focus:border-red-300 focus:ring-2 focus:ring-red-100"
-              placeholder="vi"
-            />
+            >
+              {languageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Severity
+              Mức độ
             </span>
             <select
               value={form.severity}
@@ -310,7 +365,7 @@ const ModerationRulesManager: React.FC = () => {
             >
               {severityOptions.map((severity) => (
                 <option key={severity} value={severity}>
-                  {severity}
+                  {severityLabel(severity)}
                 </option>
               ))}
             </select>
@@ -318,7 +373,7 @@ const ModerationRulesManager: React.FC = () => {
 
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Enabled
+              Trạng thái
             </span>
             <button
               type="button"
@@ -339,7 +394,7 @@ const ModerationRulesManager: React.FC = () => {
               ) : (
                 <X className="h-4 w-4" />
               )}
-              {form.enabled ?? true ? "On" : "Off"}
+              {form.enabled ?? true ? "Bật" : "Tắt"}
             </button>
           </label>
         </div>
@@ -359,7 +414,7 @@ const ModerationRulesManager: React.FC = () => {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {editingRule ? "Save changes" : "Add rule"}
+            {editingRule ? "Lưu thay đổi" : "Thêm quy tắc"}
           </button>
         </div>
       </form>
@@ -369,25 +424,25 @@ const ModerationRulesManager: React.FC = () => {
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Term
+                Từ khóa
               </th>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Normalized
+                Chuẩn hóa
               </th>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Category
+                Nhóm
               </th>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Severity
+                Mức độ
               </th>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Updated
+                Cập nhật
               </th>
               <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide">
-                Status
+                Trạng thái
               </th>
               <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide">
-                Actions
+                Thao tác
               </th>
             </tr>
           </thead>
@@ -397,14 +452,14 @@ const ModerationRulesManager: React.FC = () => {
                 <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading moderation rules...
+                    Đang tải quy tắc kiểm duyệt...
                   </span>
                 </td>
               </tr>
             ) : rules.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
-                  No moderation rules yet.
+                  Chưa có quy tắc kiểm duyệt.
                 </td>
               </tr>
             ) : (
@@ -417,16 +472,16 @@ const ModerationRulesManager: React.FC = () => {
                     {rule.normalizedTerm}
                   </td>
                   <td className="px-5 py-4 align-top text-slate-700">
-                    <div>{rule.category}</div>
+                    <div>{categoryLabel(rule.category)}</div>
                     <div className="mt-1 text-xs uppercase text-slate-400">
-                      {rule.language}
+                      {languageLabel(rule.language)}
                     </div>
                   </td>
                   <td className="px-5 py-4 align-top">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${severityClassName(rule.severity)}`}
                     >
-                      {rule.severity}
+                      {severityLabel(rule.severity)}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 align-top text-slate-600">
@@ -441,7 +496,7 @@ const ModerationRulesManager: React.FC = () => {
                       }`}
                     >
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      {rule.enabled ? "Enabled" : "Disabled"}
+                      {rule.enabled ? "Đang bật" : "Đang tắt"}
                     </span>
                   </td>
                   <td className="px-5 py-4 align-top">
@@ -450,7 +505,7 @@ const ModerationRulesManager: React.FC = () => {
                         type="button"
                         onClick={() => beginEdit(rule)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50"
-                        title="Edit rule"
+                        title="Chỉnh sửa quy tắc"
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
@@ -459,7 +514,7 @@ const ModerationRulesManager: React.FC = () => {
                         onClick={() => void toggleRule(rule)}
                         disabled={togglingRuleId === rule.id}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        title={rule.enabled ? "Disable rule" : "Enable rule"}
+                        title={rule.enabled ? "Tắt quy tắc" : "Bật quy tắc"}
                       >
                         {togglingRuleId === rule.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
