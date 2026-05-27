@@ -161,11 +161,22 @@ export interface MessageMediaWarning {
   key?: string;
   source?: string;
   reason?: string;
+  severity?: string;
+  violation_id?: string;
+  request_id?: string;
+  detected_at?: string;
 }
 
 export interface MessageSystemMeta {
   media_policy_status?: "flagged" | "clean" | string;
   media_warnings?: MessageMediaWarning[];
+  moderation_status?: "rejected" | "approved" | string;
+  moderation_violation_id?: string;
+  moderation_request_id?: string;
+  moderation_severity?: string;
+  moderation_violation_type?: string;
+  moderation_matched_labels?: string[];
+  moderation_detected_at?: string;
 }
 
 export interface ImageSendDraft {

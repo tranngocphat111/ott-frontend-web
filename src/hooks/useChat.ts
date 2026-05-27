@@ -504,6 +504,7 @@ export const useChat = (conversationId: string, userId?: string) => {
             pinned_at: null,
             pinned_by: null,
             reactions: [],
+            system_meta: payload.system_meta ?? message.system_meta ?? null,
           };
         }),
       );

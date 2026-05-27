@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Check, Copy } from "lucide-react";
 import AdminTable from "../../components/admin/AdminTable";
 import { useAdminAnalytics } from "../../components/admin/AdminAnalyticsContext";
 import ErrorState from "../../components/admin/ErrorState";
@@ -10,6 +11,22 @@ import type {
 } from "../../interfaces/admin.interface";
 
 const PAGE_SIZE = 10;
+
+const shortenUserId = (userId: string) => {
+  if (userId.length <= 14) return userId;
+  return `${userId.slice(0, 8)}...${userId.slice(-6)}`;
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "Chưa ghi nhận";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+};
 
 const buildCsv = (rows: Array<Array<string | number | null | undefined>>) => {
   const escapeCell = (value: string | number | null | undefined) => {
@@ -45,6 +62,7 @@ const UserManagement: React.FC = () => {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     totalElements: 0,
     totalPages: 0,
@@ -79,7 +97,7 @@ const UserManagement: React.FC = () => {
           });
         } catch (err) {
           console.error("Failed to load recent users", err);
-          setError("The recent users dataset could not be loaded.");
+          setError("Không thể tải danh sách người dùng gần đây.");
         } finally {
           setLoading(false);
         }
@@ -94,8 +112,8 @@ const UserManagement: React.FC = () => {
   const emptyMessage = useMemo(
     () =>
       query.trim()
-        ? "No users matched the current search query."
-        : "No recent users were returned for the selected time range.",
+        ? "Không tìm thấy người dùng phù hợp với từ khóa hiện tại."
+        : "Chưa có người dùng nào trong khoảng thời gian đã chọn.",
     [query],
   );
 
@@ -105,21 +123,33 @@ const UserManagement: React.FC = () => {
 
   const handleExportCsv = () => {
     const rows: Array<Array<string | number>> = [
-      ["User ID", "Email", "Full Name"],
+      ["ID người dùng", "Email", "Họ tên", "Thời gian đăng ký", "Trạng thái đồng bộ"],
       ...users.map((user) => [
         user.userId,
         user.email ?? "",
         user.fullName ?? "",
+        user.registeredAt ?? "",
+        user.profileSynced ? "Đã đồng bộ" : "Chưa đồng bộ",
       ]),
     ];
 
     downloadCsv(`recent-users-${timeRange}-page-${page + 1}.csv`, rows);
   };
 
+  const handleCopyUserId = async (userId: string) => {
+    try {
+      await navigator.clipboard.writeText(userId);
+      setCopiedUserId(userId);
+      window.setTimeout(() => setCopiedUserId(null), 1500);
+    } catch (err) {
+      console.error("Failed to copy user ID", err);
+    }
+  };
+
   if (error) {
     return (
       <ErrorState
-        title="Recent users view is unavailable"
+        title="Không thể hiển thị danh sách người dùng"
         description={error}
         onRetry={() => setRetryNonce((current) => current + 1)}
       />
@@ -129,7 +159,7 @@ const UserManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
-        Loading recent users...
+        Đang tải danh sách người dùng...
       </div>
     );
   }
@@ -144,27 +174,27 @@ const UserManagement: React.FC = () => {
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
-            Users
+            Người dùng
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Recent User Intake
+            Người dùng gần đây
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            {pagination.totalElements} records - page {pagination.page + 1} of{" "}
+            {pagination.totalElements} bản ghi - trang {pagination.page + 1}/
             {Math.max(pagination.totalPages, 1)}
           </p>
         </div>
 
         <div className="flex w-full flex-col gap-3 md:flex-1 md:flex-row md:items-end md:justify-end">
           <label className="flex flex-1 flex-col gap-1 md:max-w-md">
-            <span className="text-sm font-medium text-slate-600">Search</span>
+            <span className="text-sm font-medium text-slate-600">Tìm kiếm</span>
             <input
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setPage(0);
               }}
-              placeholder="Search by user ID, email, or full name"
+              placeholder="Tìm theo ID, email hoặc họ tên"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
             />
           </label>
@@ -173,7 +203,7 @@ const UserManagement: React.FC = () => {
             onClick={handleExportCsv}
             className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Export CSV
+            Xuất CSV
           </button>
         </div>
       </div>
@@ -187,11 +217,67 @@ const UserManagement: React.FC = () => {
           columns={[
             {
               key: "userId",
-              label: "User ID",
+              label: "ID người dùng",
               className: "whitespace-nowrap font-medium text-slate-900",
+              render: (user) => (
+                <div className="flex items-center gap-2">
+                  <span title={user.userId}>{shortenUserId(user.userId)}</span>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyUserId(user.userId)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                    title="Sao chép ID"
+                    aria-label="Sao chép ID người dùng"
+                  >
+                    {copiedUserId === user.userId ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+              ),
             },
-            { key: "email", label: "Email" },
-            { key: "fullName", label: "Full Name" },
+            {
+              key: "email",
+              label: "Email",
+              render: (user) =>
+                user.email ? (
+                  user.email
+                ) : (
+                  <span className="text-amber-600">Chưa đồng bộ</span>
+                ),
+            },
+            {
+              key: "fullName",
+              label: "Họ tên",
+              render: (user) =>
+                user.fullName ? (
+                  user.fullName
+                ) : (
+                  <span className="text-amber-600">Chưa đồng bộ</span>
+                ),
+            },
+            {
+              key: "registeredAt",
+              label: "Đăng ký lúc",
+              render: (user) => formatDateTime(user.registeredAt),
+            },
+            {
+              key: "profileSynced",
+              label: "Đồng bộ",
+              render: (user) => (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    user.profileSynced
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {user.profileSynced ? "Đã đồng bộ" : "Thiếu hồ sơ"}
+                </span>
+              ),
+            },
           ]}
           rows={users}
         />
@@ -204,11 +290,11 @@ const UserManagement: React.FC = () => {
           disabled={page <= 0}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Previous
+          Trước
         </button>
 
         <span className="text-sm text-slate-500">
-          Showing {users.length} of {pagination.totalElements} records
+          Hiển thị {users.length}/{pagination.totalElements} bản ghi
         </span>
 
         <button
@@ -219,7 +305,7 @@ const UserManagement: React.FC = () => {
           }
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Next
+          Sau
         </button>
       </div>
     </motion.section>

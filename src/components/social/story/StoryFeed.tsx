@@ -15,7 +15,11 @@ import {
   fetchStoryViewers,
   mapStory,
 } from "../../../services/story.service";
-import { mediaSocketService, type MediaRealtimePayload, type PostActivityPayload } from "../../../services/mediaSocket.service";
+import {
+  mediaSocketService,
+  type MediaRealtimePayload,
+  type PostActivityPayload,
+} from "../../../services/mediaSocket.service";
 import CreateStoryModal from "./CreateStoryModal";
 import StoryViewer from "./StoryViewer";
 import { X } from "lucide-react";
@@ -59,17 +63,17 @@ export const StoryFeed: React.FC<Props> = ({
     setIsLoading(true);
     try {
       const groups = await fetchStoryGroups(currentUserId);
-      setStoryGroups(prev => {
+      setStoryGroups((prev) => {
         // Create a map of IDs we want to keep from local state (if recently updated)
         const recentlyUpdatedIds = new Set();
-        const localUserGroup = prev.find(g => g.userId === currentUserId);
-        
+        const localUserGroup = prev.find((g) => g.userId === currentUserId);
+
         if (Date.now() - lastLocalUpdateRef.current < 3000 && localUserGroup) {
-          localUserGroup.stories.forEach(s => recentlyUpdatedIds.add(s.id));
+          localUserGroup.stories.forEach((s) => recentlyUpdatedIds.add(s.id));
         }
 
         // Merge logic: For each group from server, filter out stories that we are protecting locally
-        const mergedGroups = groups.map(g => {
+        const mergedGroups = groups.map((g) => {
           if (g.userId === currentUserId && recentlyUpdatedIds.size > 0) {
             // Keep local version for current user if protecting
             return localUserGroup!;
@@ -79,14 +83,16 @@ export const StoryFeed: React.FC<Props> = ({
 
         // Final safety check: ensure NO duplicate story IDs across ALL groups
         const seenIds = new Set();
-        return mergedGroups.map(group => ({
-          ...group,
-          stories: group.stories.filter(s => {
-            if (seenIds.has(s.id)) return false;
-            seenIds.add(s.id);
-            return true;
-          })
-        })).filter(g => g.stories.length > 0);
+        return mergedGroups
+          .map((group) => ({
+            ...group,
+            stories: group.stories.filter((s) => {
+              if (seenIds.has(s.id)) return false;
+              seenIds.add(s.id);
+              return true;
+            }),
+          }))
+          .filter((g) => g.stories.length > 0);
       });
 
       const data = groups;
@@ -111,16 +117,18 @@ export const StoryFeed: React.FC<Props> = ({
   useEffect(() => {
     const handleMediaUpdate = (payload: MediaRealtimePayload) => {
       if (!payload?.contentId) return;
-      if (payload.contentTargetType === 'STORY') {
+      if (payload.contentTargetType === "STORY") {
         void loadStories();
       }
     };
 
     const handleActivity = (payload: PostActivityPayload) => {
       if (!payload.postId) return;
-      // Since story IDs are completely distinct from post IDs, we can check 
+      // Since story IDs are completely distinct from post IDs, we can check
       // if it exists in our current storyGroups.
-      const isStory = storyGroups.some(g => g.stories.some(s => s.id === payload.postId));
+      const isStory = storyGroups.some((g) =>
+        g.stories.some((s) => s.id === payload.postId),
+      );
       if (isStory) {
         void loadStories();
       }
@@ -170,13 +178,15 @@ export const StoryFeed: React.FC<Props> = ({
     [activeStoryIndex, selectedUserStories],
   );
 
-  const currentGroupIndex = useMemo(() =>
-    storyGroups.findIndex(g => g.userId === activeStory?.userId),
-    [activeStory?.userId, storyGroups]
+  const currentGroupIndex = useMemo(
+    () => storyGroups.findIndex((g) => g.userId === activeStory?.userId),
+    [activeStory?.userId, storyGroups],
   );
 
-  const canGoPrev = activeStoryIndex > 0 || (currentGroupIndex > 0);
-  const canGoNext = activeStoryIndex < selectedUserStories.length - 1 || (currentGroupIndex !== -1 && currentGroupIndex < storyGroups.length - 1);
+  const canGoPrev = activeStoryIndex > 0 || currentGroupIndex > 0;
+  const canGoNext =
+    activeStoryIndex < selectedUserStories.length - 1 ||
+    (currentGroupIndex !== -1 && currentGroupIndex < storyGroups.length - 1);
 
   const handlePrev = useCallback(() => {
     if (activeStoryIndex > 0) {
@@ -202,9 +212,14 @@ export const StoryFeed: React.FC<Props> = ({
     } else {
       // Find current user's group index
       const currentUserGroupId = activeStory?.userId;
-      const currentGroupIndex = storyGroups.findIndex(g => g.userId === currentUserGroupId);
+      const currentGroupIndex = storyGroups.findIndex(
+        (g) => g.userId === currentUserGroupId,
+      );
 
-      if (currentGroupIndex !== -1 && currentGroupIndex < storyGroups.length - 1) {
+      if (
+        currentGroupIndex !== -1 &&
+        currentGroupIndex < storyGroups.length - 1
+      ) {
         // Move to next user's stories
         openUserStories(storyGroups[currentGroupIndex + 1].stories);
       } else {
@@ -212,7 +227,14 @@ export const StoryFeed: React.FC<Props> = ({
         closeViewer();
       }
     }
-  }, [activeStory?.userId, activeStoryIndex, closeViewer, openUserStories, selectedUserStories.length, storyGroups]);
+  }, [
+    activeStory?.userId,
+    activeStoryIndex,
+    closeViewer,
+    openUserStories,
+    selectedUserStories.length,
+    storyGroups,
+  ]);
 
   const handleTogglePause = useCallback(() => {
     setIsPaused((prev) => !prev);
@@ -239,6 +261,12 @@ export const StoryFeed: React.FC<Props> = ({
   }, []);
 
   const handleEditStory = useCallback((story: StoryItem) => {
+    // Close viewer state without clearing editingStory to keep update mode stable.
+    setIsViewerOpen(false);
+    setSelectedUserStories([]);
+    setActiveStoryIndex(0);
+    setStoryProgress(0);
+    setIsPaused(false);
     setEditingStory(story);
     setIsStoryModalOpen(true);
   }, []);
@@ -266,7 +294,9 @@ export const StoryFeed: React.FC<Props> = ({
         if (selectedUserStories.length <= 1) {
           closeViewer();
         } else {
-          const nextStories = selectedUserStories.filter((s) => s.id !== storyId);
+          const nextStories = selectedUserStories.filter(
+            (s) => s.id !== storyId,
+          );
           setSelectedUserStories(nextStories);
           setActiveStoryIndex((prev) => Math.min(prev, nextStories.length - 1));
         }
@@ -274,58 +304,66 @@ export const StoryFeed: React.FC<Props> = ({
     },
     [closeViewer, selectedUserStories],
   );
-  
-  const handleStoryCreated = useCallback((apiStory: any) => {
-    if (!apiStory) return;
-    const newStory = mapStory(apiStory);
-    lastLocalUpdateRef.current = Date.now();
-    
-    setStoryGroups((prev) => {
-      const targetUserId = newStory.userId || currentUserId;
-      
-      // Filter out any existing story with the same ID to prevent duplication
-      const filteredGroups = prev.map(group => ({
-        ...group,
-        stories: group.stories.filter(s => s.id !== newStory.id)
-      }));
 
-      const userGroupIndex = filteredGroups.findIndex((g) => g.userId === targetUserId);
-      if (userGroupIndex !== -1) {
-        const newGroups = [...filteredGroups];
-        const group = newGroups[userGroupIndex];
-        
-        newGroups[userGroupIndex] = {
+  const handleStoryCreated = useCallback(
+    (apiStory: any) => {
+      if (!apiStory) return;
+      const newStory = mapStory(apiStory);
+      lastLocalUpdateRef.current = Date.now();
+
+      setStoryGroups((prev) => {
+        const targetUserId = newStory.userId || currentUserId;
+
+        // Filter out any existing story with the same ID to prevent duplication
+        const filteredGroups = prev.map((group) => ({
           ...group,
-          stories: [newStory, ...group.stories.filter(s => s.id !== newStory.id)],
-        };
-        return newGroups;
-      } else {
-        return [
-          {
-            userId: targetUserId!,
-            name: newStory.name || currentUserName,
-            avatarUrl: newStory.avatarUrl || currentUserAvatar,
-            stories: [newStory],
-          },
-          ...filteredGroups,
-        ];
-      }
-    });
+          stories: group.stories.filter((s) => s.id !== newStory.id),
+        }));
 
-    // Update current viewer state if it's showing the user's stories
-    setSelectedUserStories((prev) => {
-      const storyIndex = prev.findIndex((s) => s.id === newStory.id);
-      if (storyIndex !== -1) {
-        const next = [...prev];
-        next[storyIndex] = newStory;
-        return next;
-      }
-      return prev;
-    });
-    
-    // Refresh background data
-    loadStories();
-  }, [currentUserId, currentUserName, currentUserAvatar, loadStories]);
+        const userGroupIndex = filteredGroups.findIndex(
+          (g) => g.userId === targetUserId,
+        );
+        if (userGroupIndex !== -1) {
+          const newGroups = [...filteredGroups];
+          const group = newGroups[userGroupIndex];
+
+          newGroups[userGroupIndex] = {
+            ...group,
+            stories: [
+              newStory,
+              ...group.stories.filter((s) => s.id !== newStory.id),
+            ],
+          };
+          return newGroups;
+        } else {
+          return [
+            {
+              userId: targetUserId!,
+              name: newStory.name || currentUserName,
+              avatarUrl: newStory.avatarUrl || currentUserAvatar,
+              stories: [newStory],
+            },
+            ...filteredGroups,
+          ];
+        }
+      });
+
+      // Update current viewer state if it's showing the user's stories
+      setSelectedUserStories((prev) => {
+        const storyIndex = prev.findIndex((s) => s.id === newStory.id);
+        if (storyIndex !== -1) {
+          const next = [...prev];
+          next[storyIndex] = newStory;
+          return next;
+        }
+        return prev;
+      });
+
+      // Refresh background data
+      loadStories();
+    },
+    [currentUserId, currentUserName, currentUserAvatar, loadStories],
+  );
 
   useEffect(() => {
     if (!isViewerOpen || !activeStory) return;
@@ -382,7 +420,7 @@ export const StoryFeed: React.FC<Props> = ({
       const now = Date.now();
       const delta = now - lastTime;
       lastTime = now;
-      
+
       setStoryProgress((prev) => {
         const next = Math.min(1, prev + delta / STORY_DURATION_MS);
         if (next >= 1) {
@@ -409,31 +447,39 @@ export const StoryFeed: React.FC<Props> = ({
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900">Người xem ({viewers.length})</h3>
+            <h3 className="text-lg font-bold text-gray-900">
+              Người xem ({viewers.length})
+            </h3>
             <button
               onClick={() => {
                 setIsViewersModalOpen(false);
                 setIsPaused(false);
               }}
-              className="p-2 hover:bg-gray-100 rounded-full transition"
-            >
+              className="p-2 hover:bg-gray-100 rounded-full transition">
               <X className="size-5 text-gray-500" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {viewers.length === 0 ? (
-              <p className="text-center text-gray-500 py-10">Chưa có ai xem story này.</p>
-            ) : (
-              viewers.map((viewer) => (
+            {viewers.length === 0 ?
+              <p className="text-center text-gray-500 py-10">
+                Chưa có ai xem story này.
+              </p>
+            : viewers.map((viewer) => (
                 <div key={viewer.id} className="flex items-center gap-3">
-                  <img src={viewer.avatarUrl || avatar} alt={viewer.username} className="size-10 rounded-full object-cover" />
+                  <img
+                    src={viewer.avatarUrl || avatar}
+                    alt={viewer.username}
+                    className="size-10 rounded-full object-cover"
+                  />
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{viewer.displayName || viewer.username}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {viewer.displayName || viewer.username}
+                    </p>
                     <p className="text-xs text-gray-500">@{viewer.username}</p>
                   </div>
                 </div>
               ))
-            )}
+            }
           </div>
         </div>
       </div>

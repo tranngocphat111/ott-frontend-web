@@ -7,6 +7,8 @@ import type {
   LoginMethodCount,
   MessageTypesResponse,
   ModerationDashboardResponse,
+  ModerationRule,
+  ModerationRuleRequest,
   OverviewResponse,
   PaginatedAuditLogsResponse,
   TimeRange,
@@ -75,7 +77,7 @@ const toNullableFiniteNumber = (value: unknown): number | null => {
 
 const unwrapResponseData = <T>(value: unknown): T => {
   if (typeof value === "string") {
-    throw new AdminApiError(502, "Analytics API returned a non-JSON response");
+    throw new AdminApiError(502, "API phân tích trả về dữ liệu không hợp lệ");
   }
 
   if (!isRecord(value)) {
@@ -179,7 +181,27 @@ async function getJson<T>(
     throw new AdminApiError(
       status,
       axiosError.response?.data?.message ??
-        `Request failed with status ${status}`,
+        `Yêu cầu thất bại với mã ${status}`,
+    );
+  }
+}
+
+async function sendJson<T>(
+  method: "post" | "put" | "patch",
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  try {
+    const response = await adminApiClient[method]<unknown>(path, body);
+    return unwrapResponseData<T>(response.data);
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string; error?: string }>;
+    const status = axiosError.response?.status ?? 500;
+    throw new AdminApiError(
+      status,
+      axiosError.response?.data?.message ??
+        axiosError.response?.data?.error ??
+        `Yêu cầu thất bại với mã ${status}`,
     );
   }
 }
@@ -204,6 +226,43 @@ function isNotFoundError(error: unknown): error is AdminApiError {
   return error instanceof AdminApiError && error.status === 404;
 }
 
+const normalizeModerationRule = (value: unknown): ModerationRule => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    id: typeof record.id === "string" ? record.id : "",
+    term: typeof record.term === "string" ? record.term : "",
+    normalizedTerm:
+      typeof record.normalizedTerm === "string" ? record.normalizedTerm : "",
+    category: typeof record.category === "string" ? record.category : "",
+    language: typeof record.language === "string" ? record.language : "",
+    severity:
+      record.severity === "LOW" ||
+      record.severity === "MEDIUM" ||
+      record.severity === "HIGH" ||
+      record.severity === "CRITICAL"
+        ? record.severity
+        : "MEDIUM",
+    enabled: typeof record.enabled === "boolean" ? record.enabled : false,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+  };
+};
+
+const normalizeUserSummary = (value: unknown): UserSummary => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    userId: typeof record.userId === "string" ? record.userId : "",
+    email: typeof record.email === "string" ? record.email : null,
+    fullName: typeof record.fullName === "string" ? record.fullName : null,
+    registeredAt:
+      typeof record.registeredAt === "string" ? record.registeredAt : null,
+    profileSynced:
+      typeof record.profileSynced === "boolean" ? record.profileSynced : false,
+  };
+};
+
 export const adminService = {
   getOverview: async (timeRange: TimeRange = "allTime") => {
     const response = await getJson<unknown>("/v1/admin/analytics/overview", {
@@ -217,7 +276,7 @@ export const adminService = {
     getPaginatedItems<UserSummary>(
       "/v1/admin/analytics/users/recent",
       timeRange,
-    ),
+    ).then((items) => items.map(normalizeUserSummary)),
 
   getMessageTypes: async (timeRange: TimeRange = "allTime") => {
     const response = await getJson<unknown>("/v1/admin/analytics/messages/types", {
@@ -244,7 +303,12 @@ export const adminService = {
       query: params?.query,
       page: params?.page ?? 0,
       size: params?.size ?? 10,
-    }).then(asPaginatedResponse<UserSummary>),
+    })
+      .then(asPaginatedResponse<unknown>)
+      .then((response) => ({
+        ...response,
+        items: response.items.map(normalizeUserSummary),
+      })),
 
   getUserDailyTrend: async (timeRange: TimeRange = "allTime") => {
     const response = await getArrayJson<unknown>(
@@ -303,6 +367,48 @@ export const adminService = {
           ? response.totalBannedUsers
           : 0,
       recentLogs: Array.isArray(response.recentLogs) ? response.recentLogs : [],
+      totalContentViolations:
+        typeof response.totalContentViolations === "number"
+          ? response.totalContentViolations
+          : 0,
+      recentContentViolations: Array.isArray(response.recentContentViolations)
+        ? response.recentContentViolations
+        : [],
     };
+  },
+
+  getModerationRules: async () => {
+    const response = await getArrayJson<unknown>("/v1/moderation/rules");
+    return response.map(normalizeModerationRule);
+  },
+
+  createModerationRule: async (payload: ModerationRuleRequest) => {
+    const response = await sendJson<unknown>(
+      "post",
+      "/v1/moderation/rules",
+      payload,
+    );
+    return normalizeModerationRule(response);
+  },
+
+  updateModerationRule: async (
+    id: string,
+    payload: ModerationRuleRequest,
+  ) => {
+    const response = await sendJson<unknown>(
+      "put",
+      `/v1/moderation/rules/${encodeURIComponent(id)}`,
+      payload,
+    );
+    return normalizeModerationRule(response);
+  },
+
+  updateModerationRuleStatus: async (id: string, enabled: boolean) => {
+    const response = await sendJson<unknown>(
+      "patch",
+      `/v1/moderation/rules/${encodeURIComponent(id)}/enabled`,
+      { enabled },
+    );
+    return normalizeModerationRule(response);
   },
 };

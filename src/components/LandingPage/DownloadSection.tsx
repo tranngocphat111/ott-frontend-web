@@ -5,40 +5,127 @@ type Platform = {
   icon: LucideIcon;
   title: string;
   sub: string;
-  image: string;
+  preview: 'mobile' | 'web' | 'desktop';
   action: {
     label: string;
     href: string;
+    download?: string;
   };
 };
+
+const ANDROID_APK_URL = import.meta.env.VITE_ANDROID_APK_URL || '/downloads/riff.apk';
 
 const PLATFORMS: Platform[] = [
   {
     icon: Smartphone,
     title: 'Mobile App',
     sub: 'iOS & Android',
-    image: '/images/platform-mobile.jpg',
-    action: { label: 'Tải về', href: '#' },
+    preview: 'mobile',
+    action: { label: 'Tải về', href: ANDROID_APK_URL, download: 'Riff.apk' },
   },
   {
     icon: Globe,
     title: 'Web App',
     sub: 'Mọi trình duyệt',
-    image: '/images/platform-web.jpg',
+    preview: 'web',
     action: { label: 'Sử dụng ngay', href: '/login' },
   },
   {
     icon: MessageCircle,
     title: 'Desktop App',
     sub: 'Windows & macOS',
-    image: '/images/platform-desktop.jpg',
+    preview: 'desktop',
     action: { label: 'Tải về', href: '#' },
   },
 ];
 
 type PlatformCardProps = Platform;
 
-const PlatformCard = ({ icon: Icon, title, sub, image, action }: PlatformCardProps) => (
+const PlatformPreview = ({ type }: { type: Platform['preview'] }) => {
+  if (type === 'mobile') {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(145deg,rgba(255,252,250,0.16),rgba(188,145,102,0.06))]">
+        <div className="relative h-34 w-18 rounded-[1.4rem] border border-primary-200/35 bg-primary-900/80 p-1.5 shadow-2xl">
+          <div className="mx-auto mb-1 h-1 w-7 rounded-full bg-primary-200/45" />
+          <div className="h-[calc(100%-0.5rem)] rounded-[1rem] bg-[#fff8f1] p-2">
+            <div className="mb-2 flex items-center gap-1.5">
+              <span className="h-4 w-4 rounded-full bg-primary-400" />
+              <span className="h-1.5 w-10 rounded-full bg-primary-200" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="h-4 w-11 rounded-lg rounded-tl-sm bg-white" />
+              <div className="ml-auto h-4 w-9 rounded-lg rounded-tr-sm bg-primary-300/80" />
+              <div className="h-4 w-12 rounded-lg rounded-tl-sm bg-white" />
+            </div>
+            <div className="absolute bottom-3 left-1/2 h-1 w-7 -translate-x-1/2 rounded-full bg-primary-200" />
+          </div>
+        </div>
+        <div className="absolute left-10 top-7 h-10 w-10 rounded-2xl bg-primary-300/25 blur-xl" />
+        <div className="absolute right-12 bottom-6 h-14 w-14 rounded-full bg-primary-500/20 blur-2xl" />
+      </div>
+    );
+  }
+
+  if (type === 'web') {
+    return (
+      <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(255,252,250,0.16),rgba(188,145,102,0.05))] p-6">
+        <div className="h-full overflow-hidden rounded-2xl border border-primary-200/25 bg-white/12 shadow-2xl">
+          <div className="flex items-center gap-1.5 border-b border-white/10 bg-white/10 px-3 py-2">
+            <span className="h-2 w-2 rounded-full bg-red-300" />
+            <span className="h-2 w-2 rounded-full bg-amber-300" />
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+            <span className="ml-auto h-2 w-20 rounded-full bg-white/18" />
+          </div>
+          <div className="grid h-full grid-cols-[56px_1fr]">
+            <div className="space-y-2 border-r border-white/10 bg-primary-900/35 p-2">
+              <span className="block h-8 w-8 rounded-xl bg-primary-400" />
+              <span className="block h-8 w-8 rounded-xl bg-white/10" />
+              <span className="block h-8 w-8 rounded-xl bg-white/10" />
+            </div>
+            <div className="p-3">
+              <div className="mb-3 h-5 w-28 rounded-full bg-white/18" />
+              <div className="grid grid-cols-3 gap-2">
+                <span className="h-16 rounded-xl bg-primary-300/35" />
+                <span className="h-16 rounded-xl bg-white/14" />
+                <span className="h-16 rounded-xl bg-primary-500/24" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(255,252,250,0.16),rgba(188,145,102,0.04))] p-6">
+      <div className="relative h-full">
+        <div className="absolute left-2 top-2 h-24 w-40 overflow-hidden rounded-2xl border border-primary-200/25 bg-white/12 shadow-xl">
+          <div className="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
+            <span className="h-2 w-2 rounded-full bg-red-300" />
+            <span className="h-2 w-2 rounded-full bg-amber-300" />
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+          </div>
+          <div className="space-y-2 p-3">
+            <div className="h-3 w-24 rounded-full bg-white/20" />
+            <div className="h-3 w-16 rounded-full bg-primary-300/40" />
+          </div>
+        </div>
+        <div className="absolute bottom-0 right-1 h-24 w-36 rounded-2xl border border-primary-200/25 bg-primary-900/42 p-3 shadow-2xl">
+          <div className="mb-3 flex items-center gap-2">
+            <MessageCircle className="h-4 w-4 text-primary-300" />
+            <span className="h-2 w-16 rounded-full bg-white/20" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-24 rounded-lg bg-white/14" />
+            <div className="ml-auto h-4 w-20 rounded-lg bg-primary-300/35" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PlatformCard = ({ icon: Icon, title, sub, preview, action }: PlatformCardProps) => (
   <div
     className="group relative rounded-2xl overflow-hidden text-left transition-all duration-500 hover-lift"
     style={{
@@ -47,16 +134,8 @@ const PlatformCard = ({ icon: Icon, title, sub, image, action }: PlatformCardPro
     }}
   >
     <div className="relative h-40 overflow-hidden">
-      <img
-        src={image}
-        alt={title}
-        className="w-full h-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
-        onError={(e) => {
-          const el = e.currentTarget;
-          el.style.display = 'none';
-          if (el.parentElement) el.parentElement.style.background = 'rgba(223,192,164,0.1)';
-        }}
-      />
+      <PlatformPreview type={preview} />
+      <div className="absolute inset-0 bg-gradient-to-t from-primary-900/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
     </div>
 
     <div className="p-6">
@@ -72,6 +151,7 @@ const PlatformCard = ({ icon: Icon, title, sub, image, action }: PlatformCardPro
       </p>
       <a
         href={action.href}
+        download={action.download}
         className="btn-ripple transition-base inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg"
         style={{ background: 'var(--color-primary-500)', color: 'white' }}
       >

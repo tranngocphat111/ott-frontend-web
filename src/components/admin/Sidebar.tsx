@@ -11,22 +11,22 @@ import type { AdminNavItem } from "../../interfaces/admin.interface";
 
 const navItems: Array<AdminNavItem & { icon: React.ReactNode }> = [
   {
-    label: "Overview",
+    label: "Tổng quan",
     path: "/admin",
     icon: <LayoutDashboard className="h-4 w-4" />,
   },
   {
-    label: "Moderation",
+    label: "Kiểm duyệt",
     path: "/admin/moderation",
     icon: <ShieldAlert className="h-4 w-4" />,
   },
   {
-    label: "Users",
+    label: "Người dùng",
     path: "/admin/users",
     icon: <Users className="h-4 w-4" />,
   },
   {
-    label: "Audit Logs",
+    label: "Nhật ký",
     path: "/admin/audit-logs",
     icon: <ScrollText className="h-4 w-4" />,
   },
@@ -43,19 +43,19 @@ const Sidebar: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                OTT Admin
+                Quản trị OTT
               </p>
-              <h2 className="text-base font-semibold text-white">Analytics Console</h2>
+              <h2 className="text-base font-semibold text-white">Bảng điều khiển</h2>
             </div>
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Operational visibility for user growth, moderation, and platform activity.
+            Theo dõi tăng trưởng người dùng, kiểm duyệt và hoạt động nền tảng.
           </p>
         </div>
 
         <div className="mt-6">
           <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Workspace
+            Khu vực
           </p>
         </div>
 
@@ -81,25 +81,25 @@ const Sidebar: React.FC = () => {
 
         <div className="mt-auto rounded-xl border border-slate-800 bg-slate-900/70 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Data Sources
+            Nguồn dữ liệu
           </p>
           <ul className="mt-3 space-y-2 text-sm text-slate-300">
             <li className="flex items-center justify-between">
               <span>User Service</span>
               <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
-                Events
+                Sự kiện
               </span>
             </li>
             <li className="flex items-center justify-between">
               <span>RabbitMQ</span>
               <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
-                Streaming
+                Luồng
               </span>
             </li>
             <li className="flex items-center justify-between">
               <span>PostgreSQL</span>
               <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs text-sky-300">
-                Storage
+                Lưu trữ
               </span>
             </li>
           </ul>

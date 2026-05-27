@@ -63,6 +63,11 @@ const getNotificationKind = (type?: string) => {
   return "Riff";
 };
 
+const isDisplayableNotification = (notification: InAppNotification) => {
+  const normalized = String(notification.type || "").toLowerCase();
+  return !normalized.includes("message") && !normalized.includes("chat");
+};
+
 const formatTime = (isoString: string) => {
   if (!isoString) return "";
   const date = new Date(isoString);
@@ -102,7 +107,7 @@ const NotificationMenu: React.FC = () => {
   const loadNotifications = async () => {
     if (!user?.id) return;
     const data = await notificationService.getNotifications(user.id);
-    const sorted = [...data].sort(
+    const sorted = data.filter(isDisplayableNotification).sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
@@ -115,6 +120,7 @@ const NotificationMenu: React.FC = () => {
     }
 
     const handleNewNotification = (notification: InAppNotification) => {
+      if (!isDisplayableNotification(notification)) return;
       setNotifications((prev) => [notification, ...prev]);
     };
 

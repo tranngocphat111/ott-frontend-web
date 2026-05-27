@@ -27,8 +27,8 @@ const ProfileTabs: React.FC<ProfileTabsProps> = ({
             onClick={() => onTabChange(tab.key)}
             className={`px-6 py-4 font-medium whitespace-nowrap transition text-sm ${
               activeTab === tab.key ?
-                "text-blue-500 border-b-2 border-blue-500"
-              : "text-gray-600 hover:bg-gray-100 rounded-t-lg"
+                "text-primary-600 border-b-2 border-primary-600"
+              : "text-gray-600 hover:bg-primary-50 hover:text-primary-700 rounded-t-lg"
             }`}>
             {tab.label}
           </button>

@@ -14,10 +14,24 @@ export const apiClient: AxiosInstance = axios.create({
   headers: API_CONFIG.HEADERS,
 });
 
+const AUTH_HEADER_SKIP_ROUTES = [
+  '/auth/login',
+  '/auth/google',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/introspect',
+  '/password/forgot',
+  '/password/forgot/otp/verify',
+  '/password/forgot/verify',
+];
+
+const shouldSkipAuthHeader = (url?: string) =>
+  AUTH_HEADER_SKIP_ROUTES.some((route) => String(url || '').includes(route));
+
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('accessToken');
-    if (token && config.headers) {
+    if (token && config.headers && !shouldSkipAuthHeader(config.url)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -70,19 +84,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('refreshToken');
 
-      const publicRoutes = [
-        '/password/forgot',
-        '/password/forgot/otp/verify',
-        '/password/forgot/verify',
-        '/auth/login',
-        '/auth/register',
-      ];
-
-      const isPublicRoute = publicRoutes.some(route =>
-        originalRequest.url?.includes(route)
-      );
-
-      if (isPublicRoute) {
+      if (shouldSkipAuthHeader(originalRequest.url)) {
         return Promise.reject(apiError);
       }
 
