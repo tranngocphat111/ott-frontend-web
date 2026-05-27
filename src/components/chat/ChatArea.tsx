@@ -2361,10 +2361,27 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       if (!targetElement) return false;
 
+      const syncJumpScrollButton = () => {
+        const activeContainer = messagesContainerRef.current;
+        if (!activeContainer) return;
+
+        const hasScrollableOverflow =
+          activeContainer.scrollHeight > activeContainer.clientHeight + 8;
+        const distanceToBottom =
+          activeContainer.scrollHeight -
+          activeContainer.scrollTop -
+          activeContainer.clientHeight;
+        const isNearBottom = distanceToBottom < 100;
+
+        wasNearBottomRef.current = isNearBottom;
+        lastScrollTopRef.current = activeContainer.scrollTop;
+        setShowScrollButton(hasScrollableOverflow && distanceToBottom >= 100);
+      };
+
       // Ensure auto-scroll doesn't override our manual scroll.
       suppressAutoScrollUntilRef.current = Date.now() + 1000;
       wasNearBottomRef.current = false;
-      setShowScrollButton(true);
+      setShowScrollButton(false);
 
       centerTargetInContainer(targetElement);
       await waitForNextFrame();
@@ -2372,6 +2389,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       if (targetElement.isConnected) {
         centerTargetInContainer(targetElement);
       }
+
+      syncJumpScrollButton();
+      window.requestAnimationFrame(syncJumpScrollButton);
 
       if (!highlight) return true;
 
@@ -3093,7 +3113,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const shouldShowScrollToBottomButton = useCallback(
     (container: HTMLDivElement | null = messagesContainerRef.current) => {
       if (messages.length === 0) return false;
-      if (hasMoreAfter) return true;
       if (!container) return false;
 
       const hasScrollableOverflow =
@@ -3105,7 +3124,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       return distanceToBottom >= 100;
     },
-    [hasMoreAfter, messages.length],
+    [messages.length],
   );
 
   const captureScrollAnchor = useCallback(
@@ -4519,7 +4538,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         {showScrollButton && !isChatOverlayOpen && (
           <button
             onClick={scrollToBottom}
-            className="absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
+            className="absolute left-1/2 z-[65] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
             style={{ bottom: Math.max(composerHeight + 18, 112) }}
             title="Scroll to bottom"
           >

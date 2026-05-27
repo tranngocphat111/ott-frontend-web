@@ -1,5 +1,5 @@
 import React from "react";
-import { ListChecks, MessageSquare, ArrowRight } from "lucide-react";
+import { ArrowRight, ListChecks, Lock, MessageSquare } from "lucide-react";
 import type { Message } from "../../../../types";
 import { formatChatTimestamp } from "../../../../utils";
 
@@ -33,6 +33,7 @@ const PollsList: React.FC<PollsListProps> = ({ messages, conversationId, onJump 
           (sum, opt) => sum + (opt.voters?.length || 0),
           0
         );
+        const isLocked = Boolean(msg.poll_locked);
 
         return (
           <div
@@ -45,9 +46,17 @@ const PollsList: React.FC<PollsListProps> = ({ messages, conversationId, onJump 
                 <ListChecks size={20} className="text-primary-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="text-[15px] font-bold text-slate-800 leading-tight line-clamp-2">
-                  {msg.poll_question || "Khảo sát"}
-                </h4>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="min-w-0 text-[15px] font-bold text-slate-800 leading-tight line-clamp-2">
+                    {msg.poll_question || "Khảo sát"}
+                  </h4>
+                  {isLocked && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white">
+                      <Lock size={12} />
+                      Đã khóa
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-1.5">
                   <span className="text-[12px] text-slate-500 font-medium">
                     {msg.sender_name || "Thành viên"}
