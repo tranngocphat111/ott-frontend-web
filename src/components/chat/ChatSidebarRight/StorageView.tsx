@@ -15,6 +15,7 @@ import {
 import { URL_S3 } from "../../../config/api.config";
 import type { StorageViewProps, StorageTab } from "../../../interfaces";
 import Avatar from "../../common/Avatar";
+import { getFullUrl } from "../../../utils";
 import { getFileTypeData, getFileTypeLabel } from "../../../utils/fileTypeUtils";
 
 type DatePreset = "all" | "7d" | "30d" | "90d" | "custom";
@@ -63,6 +64,11 @@ const fileNameFromKey = (key: string) => {
   const match = rawName.match(/^[a-f0-9]+_(.+)$/i);
   return match ? match[1] : rawName;
 };
+
+const contentKeyFromItem = (item: any) =>
+  typeof item === "string"
+    ? item
+    : String(item?.url || item?.content || item?.text || "");
 
 const groupByDate = <T extends BaseItem>(items: T[]) => {
   const grouped = new Map<string, T[]>();
@@ -179,7 +185,7 @@ const StorageView: React.FC<StorageViewProps> = ({
 
       if (type === "image" || type === "video") {
         contentArray.forEach((item: any, index: number) => {
-          const key = typeof item === "string" ? item : item?.url;
+          const key = contentKeyFromItem(item);
           if (!key) return;
 
           mediaItems.push({
@@ -196,9 +202,9 @@ const StorageView: React.FC<StorageViewProps> = ({
         });
       }
 
-      if (type === "file") {
+      if (type === "file" || type === "audio") {
         contentArray.forEach((item: any, index: number) => {
-          const key = typeof item === "string" ? item : item?.url;
+          const key = contentKeyFromItem(item);
           if (!key) return;
 
           fileItems.push({
@@ -541,6 +547,7 @@ const StorageView: React.FC<StorageViewProps> = ({
             "Word",
             "PowerPoint",
             "Excel",
+            "Audio",
             "Khác",
           ].map((item) => (
             <button
@@ -719,7 +726,7 @@ const StorageView: React.FC<StorageViewProps> = ({
                               toggleItemSelection(item.id);
                               return;
                             }
-                            window.open(`${URL_S3}${item.key}`, "_blank", "noopener,noreferrer");
+                            window.open(getFullUrl(item.key), "_blank", "noopener,noreferrer");
                           }}
                           className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-2 text-left hover:bg-gray-50 ${
                             isSelectMode && selectedItemIds.has(item.id)

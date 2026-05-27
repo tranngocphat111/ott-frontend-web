@@ -671,7 +671,39 @@ export class MessageService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const fileMessages = await response.json();
+
+      if (skip > 0) {
+        return fileMessages;
+      }
+
+      const latestMessages = await this.getMessages(conversationId).catch(
+        () => [],
+      );
+      const audioMessages = (latestMessages || []).filter(
+        (message: any) => String(message?.type || "").toLowerCase() === "audio",
+      );
+      const byId = new Map<string, any>();
+
+      [...(Array.isArray(fileMessages) ? fileMessages : []), ...audioMessages]
+        .filter(Boolean)
+        .forEach((message: any) => {
+          const id = String(message?.msg_id || message?._id || "").trim();
+          if (!id) return;
+          byId.set(id, message);
+        });
+
+      return Array.from(byId.values())
+        .sort((left: any, right: any) => {
+          const leftTime = new Date(
+            left?.createdAt || left?.created_at || 0,
+          ).getTime();
+          const rightTime = new Date(
+            right?.createdAt || right?.created_at || 0,
+          ).getTime();
+          return rightTime - leftTime;
+        })
+        .slice(0, limit);
     } catch (error) {
       console.error("Error fetching file messages:", error);
       throw error;

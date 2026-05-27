@@ -26,12 +26,12 @@ export const getFileTypeData = (ext: string): FileTypeData => {
   }
 
   // 2. Video
-  if (["mp4", "mov", "avi", "mkv", "webm"].includes(extension)) {
+  if (["mp4", "mov", "avi", "mkv"].includes(extension)) {
     return { Icon: FileVideo, color: "text-indigo-700", bg: "bg-indigo-100" };
   }
 
   // 3. Audio
-  if (["mp3", "wav", "m4a", "ogg", "flac"].includes(extension)) {
+  if (["mp3", "wav", "m4a", "ogg", "flac", "webm", "aac"].includes(extension)) {
     return { Icon: FileAudio, color: "text-sky-700", bg: "bg-sky-100" };
   }
 
@@ -111,6 +111,7 @@ export const getFileTypeLabel = (ext: string): string => {
   if (["xls", "xlsx", "csv"].includes(extension)) return "Excel";
   if (["ppt", "pptx", "key", "odp"].includes(extension)) return "PowerPoint";
   if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) return "Nén";
+  if (["mp3", "wav", "m4a", "ogg", "flac", "webm", "aac"].includes(extension)) return "Audio";
   if (["txt"].includes(extension)) return "TXT";
 
   return "Khác";

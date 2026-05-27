@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Clock3, Download, Ellipsis, Reply } from "lucide-react";
-import { URL_S3 } from "../../../../config/api.config";
 import type { Message } from "../../../../types";
 import {
   getFileTypeData,
   getFileTypeLabel,
 } from "../../../../utils/fileTypeUtils";
+import { getFullUrl } from "../../../../utils";
 import { MessageService } from "../../../../services";
 
 interface FilesListProps {
@@ -39,9 +39,7 @@ const FilesList: React.FC<FilesListProps> = ({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const validMessages = (messages || []).filter(
-    (msg) => msg && msg._id && Array.isArray(msg.content),
-  );
+  const validMessages = (messages || []).filter((msg) => msg && msg._id);
 
   const allFiles: Array<{
     id: string;
@@ -51,14 +49,17 @@ const FilesList: React.FC<FilesListProps> = ({
   }> = [];
   validMessages.forEach((message) => {
     const type = String(message.type || "").toLowerCase();
-    if (type !== "file") return;
+    if (type !== "file" && type !== "audio") return;
 
     const contentArray = Array.isArray(message.content)
       ? message.content
       : [message.content];
 
     contentArray.forEach((content, index) => {
-      const key = typeof content === "string" ? content : content?.url;
+      const key =
+        typeof content === "string"
+          ? content
+          : String(content?.url || content?.content || content?.text || "");
       if (key) {
         const contentSize =
           typeof content === "object" ? Number(content?.size || 0) : 0;
@@ -116,13 +117,14 @@ const FilesList: React.FC<FilesListProps> = ({
 
     const fileName = getFileName(key);
     const contentSize = Number((message as any)?.size || 0);
+    const messageType = String(message.type || "").toLowerCase();
 
     try {
       await MessageService.sendMessage(
         targetConversationId,
         senderId,
         key,
-        "file",
+        messageType === "audio" ? "audio" : "file",
         contentSize,
         fileName,
       );
@@ -184,7 +186,7 @@ const FilesList: React.FC<FilesListProps> = ({
           const ext = fileName.split(".").pop() || "";
           const { Icon, bg, color } = getFileTypeData(ext);
           const typeLabel = getFileTypeLabel(ext);
-          const fileUrl = `${URL_S3}${key}`;
+          const fileUrl = getFullUrl(key);
           const fileDate =
             message.created_at || message.createdAt
               ? new Date(

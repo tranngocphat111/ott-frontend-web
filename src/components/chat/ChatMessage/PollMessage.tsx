@@ -145,6 +145,16 @@ export const PollMessage: React.FC<PollMessageProps> = ({
       setIsLocking(true);
       await MessageService.lockPoll(msg.conversation_id, msg.msg_id, currentUserId);
       setLocallyLocked(true);
+      window.dispatchEvent(
+        new CustomEvent("chat:poll-updated", {
+          detail: {
+            ...msg,
+            poll_locked: true,
+            poll_locked_at: msg.poll_locked_at || new Date().toISOString(),
+            poll_locked_by: currentUserId,
+          },
+        }),
+      );
       setIsLockConfirmOpen(false);
     } catch (error) {
       console.error("Error locking poll:", error);
