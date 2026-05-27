@@ -116,8 +116,10 @@ const SuggestedFriendCards: React.FC<Props> = ({ users, currentUserId }) => {
       if (
         payload.type === "REQUEST_REJECTED" ||
         payload.type === "REQUEST_CANCELED" ||
+        payload.type === "REQUEST_CANCELLED" ||
         payload.type === "UNFRIENDED" ||
-        payload.type === "BLOCKED"
+        payload.type === "BLOCKED" ||
+        payload.type === "USER_BLOCKED"
       ) {
         setPendingMap((prev) => {
           if (!prev[effectiveTarget]) return prev;

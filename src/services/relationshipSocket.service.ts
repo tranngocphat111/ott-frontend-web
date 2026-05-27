@@ -7,8 +7,10 @@ export type RelationshipEventType =
   | "REQUEST_ACCEPTED"
   | "REQUEST_REJECTED"
   | "REQUEST_CANCELED"
+  | "REQUEST_CANCELLED"
   | "UNFRIENDED"
-  | "BLOCKED";
+  | "BLOCKED"
+  | "USER_BLOCKED";
 
 export type RelationshipRealtimePayload = {
   type: RelationshipEventType;
