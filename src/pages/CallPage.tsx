@@ -383,6 +383,39 @@ const CallPage: React.FC = () => {
     };
   }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, isGroupUrl, urlCallId]);
 
+  useEffect(() => {
+    const onAnsweredElsewhere = (event: Event) => {
+      const payload = (event as CustomEvent<{
+        conversationId?: string;
+        callId?: string;
+      }>).detail;
+      if (String(payload?.conversationId || "") !== String(conversationId)) return;
+
+      const activeCallId = currentCallId || urlCallId;
+      if (
+        activeCallId &&
+        payload?.callId &&
+        String(payload.callId) !== String(activeCallId)
+      ) {
+        return;
+      }
+
+      isClosingByCancelRef.current = true;
+      void endCall(false).finally(() => {
+        if (window.opener) {
+          window.close();
+          return;
+        }
+        navigate("/chat");
+      });
+    };
+
+    window.addEventListener("riff-call-answered-elsewhere", onAnsweredElsewhere);
+    return () => {
+      window.removeEventListener("riff-call-answered-elsewhere", onAnsweredElsewhere);
+    };
+  }, [conversationId, currentCallId, endCall, navigate, urlCallId]);
+
   const handleExit = async () => {
     await endCall();
     // window.opener chỉ tồn tại khi window được mở bằng window.open — an toàn để close

@@ -31,6 +31,12 @@ type CallOutcomeMessagePayload = {
   } | null;
 };
 
+type CallAnsweredElsewherePayload = {
+  conversationId: string;
+  callId?: string;
+  userId: string;
+};
+
 /* ─── Reusable Modal (style khớp app) ─────────────────────────────── */
 const AppModal: React.FC<{
   title: string;
@@ -333,9 +339,20 @@ const ChatContent: React.FC = () => {
       );
     };
 
+    const onCallAnsweredElsewhere = (payload: CallAnsweredElsewherePayload) => {
+      if (String(payload.userId || "") !== String(normalizedUserId || "")) return;
+      setIncomingCall((prev) =>
+        String(prev?.conversationId) === String(payload.conversationId) &&
+        (!prev?.callId || (payload.callId && String(prev.callId) === String(payload.callId)))
+          ? null
+          : prev,
+      );
+    };
+
     socketService.onIncomingCall(onIncomingCall);
     socketService.onCallEnded(onCallEnded);
     socketService.onCallDeclined(onCallDeclined);
+    socketService.onCallAnsweredElsewhere(onCallAnsweredElsewhere);
     
     // Đăng ký listener tin nhắn để làm fail-safe cho cuộc gọi
     socketService.onNewMessage(onNewMessage);
@@ -344,6 +361,7 @@ const ChatContent: React.FC = () => {
       socketService.offIncomingCall(onIncomingCall);
       socketService.offCallEnded(onCallEnded);
       socketService.offCallDeclined(onCallDeclined);
+      socketService.offCallAnsweredElsewhere(onCallAnsweredElsewhere);
       socketService.offNewMessage(onNewMessage);
     };
   }, [normalizedUserId]);

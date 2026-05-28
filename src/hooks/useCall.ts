@@ -103,6 +103,11 @@ const patchTrackStop = (
 const isLiveTrack = (track?: MediaStreamTrack | null) =>
   Boolean(track && track.readyState === "live");
 
+const CALL_ANSWERED_ELSEWHERE_EVENT = "riff-call-answered-elsewhere";
+
+const isStaleDeviceReason = (reason: unknown) =>
+  /already_joined_elsewhere|stale_device_ignored/i.test(String(reason || ""));
+
 const enableTrack = (track?: MediaStreamTrack | null) => {
   if (track && track.readyState === "live") {
     track.enabled = true;
@@ -912,6 +917,13 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
         }
       } catch (error) {
         console.error("Không thể tham gia cuộc gọi:", error);
+        if (isStaleDeviceReason((error as Error)?.message)) {
+          window.dispatchEvent(
+            new CustomEvent(CALL_ANSWERED_ELSEWHERE_EVENT, {
+              detail: { conversationId, callId },
+            }),
+          );
+        }
         resetCallState();
         stopLocalStream();
       } finally {
@@ -972,11 +984,18 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       }
 
       setIncomingCall(null);
-    } catch (error) {
-      console.error("Không thể chấp nhận cuộc gọi:", error);
-      setIncomingCall(null);
-      resetCallState();
-      stopLocalStream();
+      } catch (error) {
+        console.error("Không thể chấp nhận cuộc gọi:", error);
+        if (isStaleDeviceReason((error as Error)?.message)) {
+          window.dispatchEvent(
+            new CustomEvent(CALL_ANSWERED_ELSEWHERE_EVENT, {
+              detail: incomingCall,
+            }),
+          );
+        }
+        setIncomingCall(null);
+        resetCallState();
+        stopLocalStream();
     } finally {
       setIsConnecting(false);
     }
@@ -1404,6 +1423,21 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       });
     };
 
+    const handleCallAnsweredElsewhere = (payload: {
+      conversationId: string;
+      callId?: string;
+      userId: string;
+      reason?: string;
+    }) => {
+      if (String(payload.userId || "") !== String(userId || "")) return;
+      if (!isPayloadForActiveCall(payload)) return;
+
+      window.dispatchEvent(
+        new CustomEvent(CALL_ANSWERED_ELSEWHERE_EVENT, { detail: payload }),
+      );
+      closeCallLocally();
+    };
+
     const handleCameraStateChanged = (payload: {
       conversationId: string;
       callId?: string;
@@ -1449,6 +1483,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
     socketService.onCallEnded(handleCallEnded);
     socketService.onCallDeclined(handleCallDeclined);
     socketService.onCallBusy(handleCallBusy);
+    socketService.onCallAnsweredElsewhere(handleCallAnsweredElsewhere);
     socketService.onCameraStateChanged(handleCameraStateChanged);
 
     return () => {
@@ -1462,6 +1497,7 @@ export const useCall = ({ conversationId, userId }: UseCallOptions) => {
       socketService.offCallEnded(handleCallEnded);
       socketService.offCallDeclined(handleCallDeclined);
       socketService.offCallBusy(handleCallBusy);
+      socketService.offCallAnsweredElsewhere(handleCallAnsweredElsewhere);
       socketService.offCameraStateChanged(handleCameraStateChanged);
     };
   }, [

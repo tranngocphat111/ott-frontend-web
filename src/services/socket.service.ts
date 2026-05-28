@@ -22,6 +22,15 @@ type CallSessionAck = {
   targetUserId?: string;
 };
 
+type CallAnsweredElsewherePayload = {
+  conversationId: string;
+  callId?: string;
+  userId: string;
+  acceptedSocketId?: string;
+  isGroup?: boolean;
+  reason?: string;
+};
+
 class SocketService {
   private socket: Socket | null = null;
   private userRoomId: string | null = null;
@@ -812,6 +821,18 @@ class SocketService {
       this.socket?.off("nguoi_dung_tu_choi_goi", callback);
     } else {
       this.socket?.removeAllListeners("nguoi_dung_tu_choi_goi");
+    }
+  }
+
+  onCallAnsweredElsewhere(callback: (payload: CallAnsweredElsewherePayload) => void) {
+    this.socket?.on("cuoc_goi_da_nhan_o_thiet_bi_khac", callback);
+  }
+
+  offCallAnsweredElsewhere(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cuoc_goi_da_nhan_o_thiet_bi_khac", callback);
+    } else {
+      this.socket?.removeAllListeners("cuoc_goi_da_nhan_o_thiet_bi_khac");
     }
   }
 
