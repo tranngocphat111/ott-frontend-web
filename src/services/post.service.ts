@@ -43,6 +43,7 @@ export interface ApiPost {
     sharedPost?: ApiPost | null;
     sharedPostRestricted?: boolean;
     sharedPostDeleted?: boolean;
+    status?: string;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -131,6 +132,7 @@ export function mapPost(
         likes: p.totalReactions,
         comments: p.totalComments,
         shares: p.totalShares,
+        status: p.status,
         visibility: p.visibility,
         relationship: p.accountId === currentUserId ? "self" : undefined,
         accessControls: p.accessControls,

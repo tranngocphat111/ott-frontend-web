@@ -52,6 +52,9 @@ interface Props {
   currentUser: PostUser;
 }
 
+const isDeletedPost = (post: Post) =>
+  String(post.status || "").toUpperCase() === "DELETED";
+
 const emptyReactionCounts = (): Record<ReactionKey, number> =>
   Object.fromEntries(REACTIONS.map((reaction) => [reaction.key, 0])) as Record<
     ReactionKey,
@@ -138,6 +141,7 @@ const PostCard: React.FC<Props> = ({
     useState(false);
   const sharedMenuRef = useRef<HTMLDivElement>(null);
   const sharedHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleted = isDeletedPost(post);
 
   useEffect(() => {
     checkIsSaved(post.id).then(setIsSaved);
@@ -473,12 +477,23 @@ const PostCard: React.FC<Props> = ({
           />
         </div>
 
-        <PostBody
-          content={post.content}
-          media={post.media}
-          totalLikes={totalReactionCount}
-          isInView={isInView}
-        />
+        {deleted ?
+          <div className="mx-4 mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
+            <div className="text-sm font-semibold text-gray-800">
+              Bài viết đã bị xóa
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              Nội dung này không còn khả dụng, nhưng vẫn được giữ lại trong lịch
+              sử và danh sách đã lưu.
+            </div>
+          </div>
+        : <PostBody
+            content={post.content}
+            media={post.media}
+            totalLikes={totalReactionCount}
+            isInView={isInView}
+          />
+        }
 
         {(post.sharedPost ||
           post.sharedPostDeleted ||
@@ -543,40 +558,44 @@ const PostCard: React.FC<Props> = ({
           </div>
         )}
 
-        <>
-          <div>
-            <PostReactionsSummary
-              reactionCounts={reactionCounts}
-              commentCount={commentCount}
-              shares={shareCount}
-              onToggleComments={() => openModal(true)}
-              onShowReactionsList={() => setIsReactionsListModalOpen(true)}
-            />
-          </div>
+        {!deleted && (
+          <>
+            <div>
+              <PostReactionsSummary
+                reactionCounts={reactionCounts}
+                commentCount={commentCount}
+                shares={shareCount}
+                onToggleComments={() => openModal(true)}
+                onShowReactionsList={() => setIsReactionsListModalOpen(true)}
+              />
+            </div>
 
-          <div onClick={(e) => e.stopPropagation()}>
-            <PostActions
-              reaction={reaction}
-              reactionLabel={currentReaction ? currentReaction.label : "Thích"}
-              reactionEmoji={currentReaction?.emoji}
-              reactionColor={
-                currentReaction ? currentReaction.color : "text-gray-400"
-              }
-              showComments={false}
-              showPicker={showPicker}
-              isSaved={isSaved}
-              onToggleSave={handleToggleSave}
-              onLikeClick={handleLikeButtonClick}
-              onToggleComments={() => openModal(true)}
-              onSelectReaction={handleReactionClick}
-              onLikeMouseEnter={onMouseEnterLike}
-              onLikeMouseLeave={onMouseLeaveLike}
-              onPickerMouseEnter={onMouseEnterPicker}
-              onPickerMouseLeave={onMouseLeavePicker}
-              onShareClick={() => setIsShareModalOpen(true)}
-            />
-          </div>
-        </>
+            <div onClick={(e) => e.stopPropagation()}>
+              <PostActions
+                reaction={reaction}
+                reactionLabel={
+                  currentReaction ? currentReaction.label : "Thích"
+                }
+                reactionEmoji={currentReaction?.emoji}
+                reactionColor={
+                  currentReaction ? currentReaction.color : "text-gray-400"
+                }
+                showComments={false}
+                showPicker={showPicker}
+                isSaved={isSaved}
+                onToggleSave={handleToggleSave}
+                onLikeClick={handleLikeButtonClick}
+                onToggleComments={() => openModal(true)}
+                onSelectReaction={handleReactionClick}
+                onLikeMouseEnter={onMouseEnterLike}
+                onLikeMouseLeave={onMouseLeaveLike}
+                onPickerMouseEnter={onMouseEnterPicker}
+                onPickerMouseLeave={onMouseLeavePicker}
+                onShareClick={() => setIsShareModalOpen(true)}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <PostDetailModal

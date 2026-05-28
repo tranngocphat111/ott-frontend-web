@@ -25,6 +25,7 @@ export interface Post {
     likes: number;
     comments: number;
     shares: number;
+    status?: string;
     visibility?: string;
     relationship?: "self" | "friend" | "friend-of-friend" | "stranger";
     relationshipLabel?: string;

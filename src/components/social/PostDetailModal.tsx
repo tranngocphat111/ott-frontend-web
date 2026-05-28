@@ -9,6 +9,9 @@ import PostReactionsSummary from "./post/PostReactionsSummary";
 import PostActions from "./post/PostActions";
 import PostCommentsSection from "./post/PostCommentsSection";
 
+const isDeletedPost = (post: Post) =>
+  String(post.status || "").toUpperCase() === "DELETED";
+
 interface Props {
   isOpen: boolean;
   post: Post;
@@ -71,6 +74,7 @@ const PostDetailModal: React.FC<Props> = ({
   onCountChange,
 }) => {
   if (!isOpen) return null;
+  const deleted = isDeletedPost(post);
 
   return (
     <div
@@ -109,13 +113,24 @@ const PostDetailModal: React.FC<Props> = ({
               onProfile={onProfile}
             />
 
-            <PostBody
-              content={post.content}
-              media={post.media}
-              totalLikes={post.likes}
-              isInView
-              variant="carousel"
-            />
+            {deleted ?
+              <div className="mx-4 mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
+                <div className="text-sm font-semibold text-gray-800">
+                  Bài viết đã bị xóa
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Nội dung này không còn khả dụng, nhưng vẫn hiển thị trong lịch
+                  sử và danh sách đã lưu.
+                </div>
+              </div>
+            : <PostBody
+                content={post.content}
+                media={post.media}
+                totalLikes={post.likes}
+                isInView
+                variant="carousel"
+              />
+            }
 
             {(post.sharedPost ||
               post.sharedPostDeleted ||
@@ -182,41 +197,43 @@ const PostDetailModal: React.FC<Props> = ({
               </div>
             )}
 
-            <>
-              <PostReactionsSummary
-                reactionCounts={reactionCounts}
-                commentCount={commentCount}
-                shares={post.shares}
-                onToggleComments={onToggleComments}
-                onShowReactionsList={onShowReactionsList}
-              />
+            {!deleted && (
+              <>
+                <PostReactionsSummary
+                  reactionCounts={reactionCounts}
+                  commentCount={commentCount}
+                  shares={post.shares}
+                  onToggleComments={onToggleComments}
+                  onShowReactionsList={onShowReactionsList}
+                />
 
-              <PostActions
-                reaction={reaction}
-                reactionLabel={currentReactionLabel}
-                reactionEmoji={currentReactionEmoji}
-                reactionColor={currentReactionColor}
-                showComments={showComments}
-                showPicker={showPicker}
-                onLikeClick={onLikeClick}
-                onToggleComments={onToggleComments}
-                onSelectReaction={onSelectReaction}
-                onLikeMouseEnter={onLikeMouseEnter}
-                onLikeMouseLeave={onLikeMouseLeave}
-                onPickerMouseEnter={onPickerMouseEnter}
-                onPickerMouseLeave={onPickerMouseLeave}
-              />
+                <PostActions
+                  reaction={reaction}
+                  reactionLabel={currentReactionLabel}
+                  reactionEmoji={currentReactionEmoji}
+                  reactionColor={currentReactionColor}
+                  showComments={showComments}
+                  showPicker={showPicker}
+                  onLikeClick={onLikeClick}
+                  onToggleComments={onToggleComments}
+                  onSelectReaction={onSelectReaction}
+                  onLikeMouseEnter={onLikeMouseEnter}
+                  onLikeMouseLeave={onLikeMouseLeave}
+                  onPickerMouseEnter={onPickerMouseEnter}
+                  onPickerMouseLeave={onPickerMouseLeave}
+                />
 
-              {showComments && (
-                <div className="px-4 pb-4">
-                  <PostCommentsSection
-                    postId={post.id}
-                    currentUser={currentUser}
-                    onCountChange={onCountChange}
-                  />
-                </div>
-              )}
-            </>
+                {showComments && (
+                  <div className="px-4 pb-4">
+                    <PostCommentsSection
+                      postId={post.id}
+                      currentUser={currentUser}
+                      onCountChange={onCountChange}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
