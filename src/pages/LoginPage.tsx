@@ -2,23 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoginTabs, PhoneLoginForm, EmailOTPLoginForm, QRCodeLogin, GoogleLoginButton } from '../components/LoginPage';
 import { ConfirmModal } from '../components/modal/ConfirmModal';
-import { FORCED_LOGOUT_NOTICE_KEY } from '../utils/authLogoutSignal';
+import { clearForcedLogoutNotice, getForcedLogoutNotice } from '../utils/authLogoutSignal';
 import logo from '../assets/logo_tach_nen.jpg';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'phone' | 'email' | 'qr'>('phone');
   const [forcedLogoutMessage, setForcedLogoutMessage] = useState<string | null>(() =>
-    localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY),
+    getForcedLogoutNotice(),
   );
 
   useEffect(() => {
-    const message = localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY);
+    const message = getForcedLogoutNotice();
     setForcedLogoutMessage(message);
   }, []);
 
   const dismissForcedLogoutNotice = () => {
-    localStorage.removeItem(FORCED_LOGOUT_NOTICE_KEY);
+    clearForcedLogoutNotice();
     setForcedLogoutMessage(null);
   };
 

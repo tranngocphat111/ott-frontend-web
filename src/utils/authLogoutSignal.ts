@@ -6,6 +6,13 @@ export const FORCED_LOGOUT_NOTICE_MESSAGE =
   "Tài khoản của bạn vừa được đăng nhập ở thiết bị khác. Phiên hiện tại đã được đăng xuất để bảo vệ tài khoản.";
 
 const MANUAL_LOGOUT_TTL_MS = 30000;
+const FORCED_LOGOUT_NOTICE_TTL_MS = 30 * 60 * 1000;
+
+type ForcedLogoutNotice = {
+  type: "forced-logout";
+  message: string;
+  at: number;
+};
 
 export const emitAuthLogoutSignal = () => {
   if (typeof window === "undefined") return;
@@ -25,7 +32,39 @@ export const rememberForcedLogoutNotice = (
 ) => {
   if (typeof window === "undefined") return;
   if (isManualLogoutInProgress()) return;
-  localStorage.setItem(FORCED_LOGOUT_NOTICE_KEY, message);
+  localStorage.setItem(
+    FORCED_LOGOUT_NOTICE_KEY,
+    JSON.stringify({
+      type: "forced-logout",
+      message,
+      at: Date.now(),
+    } satisfies ForcedLogoutNotice),
+  );
+};
+
+export const getForcedLogoutNotice = () => {
+  if (typeof window === "undefined") return null;
+
+  const raw = localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY);
+  if (!raw) return null;
+
+  try {
+    const notice = JSON.parse(raw) as Partial<ForcedLogoutNotice>;
+    const isValidNotice =
+      notice.type === "forced-logout" &&
+      typeof notice.message === "string" &&
+      typeof notice.at === "number";
+
+    if (!isValidNotice || Date.now() - notice.at > FORCED_LOGOUT_NOTICE_TTL_MS) {
+      localStorage.removeItem(FORCED_LOGOUT_NOTICE_KEY);
+      return null;
+    }
+
+    return notice.message;
+  } catch {
+    localStorage.removeItem(FORCED_LOGOUT_NOTICE_KEY);
+    return null;
+  }
 };
 
 export const clearForcedLogoutNotice = () => {

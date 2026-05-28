@@ -3,9 +3,9 @@ import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axio
 import { type ApiResponse, type ApiError, DeviceType } from '../../types';
 import { API_CONFIG } from '../../config/api';
 import {
+  clearForcedLogoutNotice,
   emitAuthLogoutSignal,
   isManualLogoutInProgress,
-  rememberForcedLogoutNotice,
 } from '../../utils/authLogoutSignal';
 
 export const apiClient: AxiosInstance = axios.create({
@@ -120,6 +120,7 @@ apiClient.interceptors.response.use(
           throw new Error('Invalid refresh response');
         }
 
+        clearForcedLogoutNotice();
         localStorage.setItem('accessToken', newToken);
         localStorage.setItem('refreshToken', newRefreshToken);
 
@@ -130,7 +131,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         refreshSubscribers = [];
         if (isRefreshSessionInvalidation(refreshError) && !isManualLogoutInProgress()) {
-          rememberForcedLogoutNotice();
+          clearForcedLogoutNotice();
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           emitAuthLogoutSignal();
