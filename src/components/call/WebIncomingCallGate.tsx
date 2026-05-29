@@ -28,6 +28,12 @@ type CallOutcomeMessagePayload = {
   } | null;
 };
 
+type CallAnsweredElsewherePayload = {
+  conversationId: string;
+  callId?: string;
+  userId: string;
+};
+
 const WebIncomingCallGate: React.FC = () => {
   const location = useLocation();
   const { user: currentUser, isAuthenticated } = useAuth();
@@ -168,6 +174,11 @@ const WebIncomingCallGate: React.FC = () => {
       });
     };
 
+    const clearAnsweredElsewhere = (payload: CallAnsweredElsewherePayload) => {
+      if (String(payload.userId || "") !== String(normalizedUserId || "")) return;
+      clearIncoming(payload);
+    };
+
     const onNewMessage = (message: CallOutcomeMessagePayload) => {
       if (
         !["call_end", "call_missed", "call_cancel", "call_no_answer", "call_busy"].includes(
@@ -193,12 +204,14 @@ const WebIncomingCallGate: React.FC = () => {
     socketService.onIncomingCall(onIncomingCall);
     socketService.onCallEnded(clearIncoming);
     socketService.onCallDeclined(clearIncoming);
+    socketService.onCallAnsweredElsewhere(clearAnsweredElsewhere);
     socketService.onNewMessage(onNewMessage);
 
     return () => {
       socketService.offIncomingCall(onIncomingCall);
       socketService.offCallEnded(clearIncoming);
       socketService.offCallDeclined(clearIncoming);
+      socketService.offCallAnsweredElsewhere(clearAnsweredElsewhere);
       socketService.offNewMessage(onNewMessage);
     };
   }, [

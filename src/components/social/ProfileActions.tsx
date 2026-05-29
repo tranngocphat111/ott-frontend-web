@@ -98,10 +98,12 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
             break;
           case "REQUEST_REJECTED":
           case "REQUEST_CANCELED":
+          case "REQUEST_CANCELLED":
           case "UNFRIENDED":
             setCurrentStatus("REMOVED");
             break;
           case "BLOCKED":
+          case "USER_BLOCKED":
             setCurrentStatus("BLOCKED");
             break;
           default:

@@ -226,7 +226,19 @@ const CallPage: React.FC = () => {
       // Gửi tên người nhận về ChatPage để hiện modal
       const opener = window.opener;
       if (opener) {
-        opener.postMessage({ type: "call-target-busy", name: remoteDisplayName }, "*");
+        opener.postMessage(
+          {
+            type: "call-target-busy",
+            conversationId,
+            name: remoteDisplayName,
+            targetUserId: busyUserIds[0],
+            reason:
+              String(busyUserIds[0] || "") === String(normalizedUserId || "")
+                ? "caller_busy"
+                : "target_busy",
+          },
+          "*",
+        );
       }
       // Đóng cửa sổ gọi
       void endCall(false);
@@ -382,6 +394,39 @@ const CallPage: React.FC = () => {
       socketService.offCallEnded(onCallEnded);
     };
   }, [conversationId, currentCallId, endCall, normalizedUserId, isGroup, isGroupUrl, urlCallId]);
+
+  useEffect(() => {
+    const onAnsweredElsewhere = (event: Event) => {
+      const payload = (event as CustomEvent<{
+        conversationId?: string;
+        callId?: string;
+      }>).detail;
+      if (String(payload?.conversationId || "") !== String(conversationId)) return;
+
+      const activeCallId = currentCallId || urlCallId;
+      if (
+        activeCallId &&
+        payload?.callId &&
+        String(payload.callId) !== String(activeCallId)
+      ) {
+        return;
+      }
+
+      isClosingByCancelRef.current = true;
+      void endCall(false).finally(() => {
+        if (window.opener) {
+          window.close();
+          return;
+        }
+        navigate("/chat");
+      });
+    };
+
+    window.addEventListener("riff-call-answered-elsewhere", onAnsweredElsewhere);
+    return () => {
+      window.removeEventListener("riff-call-answered-elsewhere", onAnsweredElsewhere);
+    };
+  }, [conversationId, currentCallId, endCall, navigate, urlCallId]);
 
   const handleExit = async () => {
     await endCall();

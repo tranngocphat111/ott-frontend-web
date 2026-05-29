@@ -293,66 +293,73 @@ const CommentSection: React.FC<Props> = ({
   );
 
   /* ── Submit ───────────────────────────────────────── */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitComment = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed || !currentUser.id) return;
+    if (!trimmed || !currentUser.id || submitting) return;
     setSubmitting(true);
-    const created = await addComment(
-      postId,
-      currentUser.id,
-      trimmed,
-      replyTo?.id,
-    );
-    if (created) {
-      processedCommentIds.current.add(created.id);
-      if (replyTo) {
-        setRepliesMap((prev) => {
-          const existing = prev[replyTo.id];
-          return {
-            ...prev,
-            [replyTo.id]:
-              existing ?
-                { ...existing, comments: [...existing.comments, created] }
-              : {
-                  comments: [created],
-                  page: 0,
-                  hasMore: false,
-                  loading: false,
-                },
-          };
-        });
-        setExpandedReplies((prev) => new Set(prev).add(replyTo.id));
-        // Update totalReplies for parent in roots OR any nested repliesMap level
-        setRoots((prev) =>
-          prev.map((c) =>
-            c.id === replyTo.id ?
-              { ...c, totalReplies: c.totalReplies + 1 }
-            : c,
-          ),
-        );
-        setRepliesMap((prev) => {
-          const updated: Record<string, ReplyState> = {};
-          for (const key of Object.keys(prev)) {
-            updated[key] = {
-              ...prev[key],
-              comments: prev[key].comments.map((r) =>
-                r.id === replyTo.id ?
-                  { ...r, totalReplies: r.totalReplies + 1 }
-                : r,
-              ),
+    try {
+      const created = await addComment(
+        postId,
+        currentUser.id,
+        trimmed,
+        replyTo?.id,
+      );
+      if (created) {
+        processedCommentIds.current.add(created.id);
+        if (replyTo) {
+          setRepliesMap((prev) => {
+            const existing = prev[replyTo.id];
+            return {
+              ...prev,
+              [replyTo.id]:
+                existing ?
+                  { ...existing, comments: [...existing.comments, created] }
+                : {
+                    comments: [created],
+                    page: 0,
+                    hasMore: false,
+                    loading: false,
+                  },
             };
-          }
-          return updated;
-        });
-      } else {
-        setRoots((prev) => [created, ...prev]);
+          });
+          setExpandedReplies((prev) => new Set(prev).add(replyTo.id));
+          // Update totalReplies for parent in roots OR any nested repliesMap level
+          setRoots((prev) =>
+            prev.map((c) =>
+              c.id === replyTo.id ?
+                { ...c, totalReplies: c.totalReplies + 1 }
+              : c,
+            ),
+          );
+          setRepliesMap((prev) => {
+            const updated: Record<string, ReplyState> = {};
+            for (const key of Object.keys(prev)) {
+              updated[key] = {
+                ...prev[key],
+                comments: prev[key].comments.map((r) =>
+                  r.id === replyTo.id ?
+                    { ...r, totalReplies: r.totalReplies + 1 }
+                  : r,
+                ),
+              };
+            }
+            return updated;
+          });
+        } else {
+          setRoots((prev) => [created, ...prev]);
+        }
+        onCountChange?.(1);
+        setText("");
+        setReplyTo(null);
       }
-      onCountChange?.(1);
-      setText("");
-      setReplyTo(null);
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
+  }, [currentUser.id, onCountChange, postId, replyTo, submitting, text]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitComment();
   };
 
   /* ── Delete ───────────────────────────────────────── */
@@ -609,12 +616,20 @@ const CommentSection: React.FC<Props> = ({
       )}
 
       {currentUser.id && (
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}>
           {renderAvatar(currentUser.name, currentUser.avatar, currentUser.id)}
           <div className="flex-1 flex items-center bg-primary-50 rounded-full overflow-hidden px-3 gap-2">
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                void submitComment();
+              }}
               placeholder={
                 replyTo ? `Trả lời ${replyTo.name}...` : "Viết bình luận..."
               }
@@ -623,7 +638,8 @@ const CommentSection: React.FC<Props> = ({
               maxLength={500}
             />
             <button
-              type="submit"
+              type="button"
+              onClick={() => void submitComment()}
               disabled={!text.trim() || submitting}
               className="text-primary-500 hover:text-primary-700 transition disabled:opacity-30 shrink-0">
               {submitting ?

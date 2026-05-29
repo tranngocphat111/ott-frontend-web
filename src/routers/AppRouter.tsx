@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { FORCED_LOGOUT_NOTICE_KEY } from "../utils/authLogoutSignal";
+import { getForcedLogoutNotice } from "../utils/authLogoutSignal";
 
 import LandingPage from "../pages/LandingPage";
 import LoginPage from "../pages/LoginPage";
@@ -52,7 +52,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const hasForcedLogoutNotice =
     typeof window !== "undefined" &&
-    Boolean(localStorage.getItem(FORCED_LOGOUT_NOTICE_KEY));
+    Boolean(getForcedLogoutNotice());
 
   if (isLoading)
     return (

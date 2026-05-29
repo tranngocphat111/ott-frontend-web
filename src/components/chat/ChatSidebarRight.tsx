@@ -250,6 +250,39 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     );
   };
 
+  const loadPinnedMessagesOnly = useCallback(async () => {
+    if (!conversation?._id) return;
+
+    try {
+      const pinnedData = await MessageService.getPinnedMessages(
+        conversation._id,
+        currentUser?.id,
+      );
+      const memberNameById = new Map<string, string>();
+      members.forEach((member) => {
+        const preferredName =
+          (member.nickname || "").trim() ||
+          (member.name || "").trim() ||
+          `User ${String(member.user_id).slice(-4)}`;
+        memberNameById.set(member.user_id, preferredName);
+      });
+
+      setPinnedMessages(
+        filterValidMessages(pinnedData).map((message: Message) => {
+          const senderId = String(message.sender_id || "");
+          const preferredName = memberNameById.get(senderId);
+          if (!preferredName) return message;
+          return {
+            ...message,
+            sender_name: preferredName,
+          };
+        }),
+      );
+    } catch (error) {
+      console.error("Error loading pinned messages:", error);
+    }
+  }, [conversation?._id, currentUser?.id, members]);
+
   const loadSidebarData = useCallback(async () => {
     if (!conversation?._id) return;
 
@@ -390,7 +423,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       const custom = event as CustomEvent<{ conversationId?: string }>;
       if (custom.detail?.conversationId !== conversation?._id) return;
       if (!isOpen) return;
-      void loadSidebarData();
+      void loadPinnedMessagesOnly();
     };
 
     const handleMemberUpdated = (event: Event) => {
@@ -447,7 +480,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         return;
       }
 
-      if (type === "file") {
+      if (type === "file" || type === "audio") {
         setAllFileMessages((prev) => upsertSidebarItem(prev, normalizedMessage));
         setFileMessagesPreview((prev) =>
           upsertSidebarItem(prev, normalizedMessage).slice(0, 5),
@@ -483,6 +516,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           return m;
         })
       );
+    };
+
+    const handleLocalPollUpdated = (event: Event) => {
+      handleSocketMessageUpdated((event as CustomEvent).detail);
     };
 
     const handleSocketMessageRemoved = (payload: any) => {
@@ -636,6 +673,10 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       "chat:message-upserted",
       handleLocalMessageUpserted as EventListener,
     );
+    window.addEventListener(
+      "chat:poll-updated",
+      handleLocalPollUpdated as EventListener,
+    );
     window.addEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
 
     return () => {
@@ -666,9 +707,20 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
         "chat:message-upserted",
         handleLocalMessageUpserted as EventListener,
       );
+      window.removeEventListener(
+        "chat:poll-updated",
+        handleLocalPollUpdated as EventListener,
+      );
       window.removeEventListener("chat:relationship-updated", handleLocalRelationshipUpdate);
     };
-  }, [conversation?._id, currentUser?.id, isOpen, loadSidebarData, members]);
+  }, [
+    conversation?._id,
+    currentUser?.id,
+    isOpen,
+    loadSidebarData,
+    loadPinnedMessagesOnly,
+    members,
+  ]);
 
   // Load available users for create group modal
   useEffect(() => {
@@ -1067,7 +1119,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
 
   if (loading) {
     return (
-      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-[340px] overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[340px] xl:relative xl:inset-auto xl:z-auto xl:w-[340px] xl:max-w-none xl:shrink-0 xl:shadow-none">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
           <h2 className="text-lg font-semibold text-gray-900">
             {isGroupChat ? "Thông tin nhóm" : "Thông tin đoạn chat"}
@@ -1151,7 +1203,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
           <button onClick={() => setError(null)} className="ml-2 font-bold cursor-pointer">×</button>
         </div>
       )}
-      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-sm overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[360px] xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:max-w-none xl:shrink-0 xl:shadow-none">
+      <div className="custom-scrollbar fixed inset-y-0 right-0 z-[70] h-full w-full max-w-[340px] overflow-y-auto border-l border-gray-200 bg-white shadow-2xl sm:w-[340px] xl:relative xl:inset-auto xl:z-auto xl:w-[340px] xl:max-w-none xl:shrink-0 xl:shadow-none">
         {/* MAIN VIEW */}
         {viewMode === "main" && (
           <>

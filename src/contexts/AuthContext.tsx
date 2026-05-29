@@ -111,6 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Invalid refresh response");
     }
 
+    clearForcedLogoutNotice();
     localStorage.setItem("accessToken", nextToken);
     localStorage.setItem("refreshToken", nextRefreshToken);
 
@@ -162,9 +163,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("AuthContext: Found token in localStorage, fetching user...");
       fetchUser().catch((error) => {
         console.log("AuthContext: Initial fetch failed");
-        if (isSessionInvalidationError(error)) {
-          rememberForcedLogoutNoticeIfNeeded();
-        }
+        console.debug("AuthContext: Clearing expired/invalid stored session", error);
+        clearForcedLogoutNotice();
         clearLocalSession();
         emitAuthLogoutSignal();
         if (!window.location.pathname.includes("/login")) {
@@ -203,9 +203,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       lastTokenCheckAt = now;
 
       ensureCurrentTokenActive().catch((error) => {
-        if (isSessionInvalidationError(error)) {
-          rememberForcedLogoutNoticeIfNeeded();
-        }
+        console.debug("AuthContext: Current session check failed, clearing local session", error);
+        clearForcedLogoutNotice();
         clearLocalSession();
         emitAuthLogoutSignal();
         window.location.href = "/login";
@@ -367,6 +366,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         if (response.result.token && response.result.refreshToken) {
+          clearForcedLogoutNotice();
           localStorage.setItem("accessToken", response.result.token);
           localStorage.setItem("refreshToken", response.result.refreshToken);
           await fetchUser();
@@ -391,6 +391,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isBackupCode,
       });
       if (response.result?.token && response.result?.refreshToken) {
+        clearForcedLogoutNotice();
         localStorage.setItem("accessToken", response.result.token);
         localStorage.setItem("refreshToken", response.result.refreshToken);
         await fetchUser();
@@ -418,6 +419,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithToken = async (token: string, refreshToken: string) => {
     try {
+      clearForcedLogoutNotice();
       localStorage.setItem("accessToken", token);
       localStorage.setItem("refreshToken", refreshToken);
       await fetchUser();

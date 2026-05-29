@@ -31,6 +31,12 @@ type CallOutcomeMessagePayload = {
   } | null;
 };
 
+type CallAnsweredElsewherePayload = {
+  conversationId: string;
+  callId?: string;
+  userId: string;
+};
+
 /* ─── Reusable Modal (style khớp app) ─────────────────────────────── */
 const AppModal: React.FC<{
   title: string;
@@ -199,11 +205,27 @@ const ChatContent: React.FC = () => {
       doOpenCallWindow(pending.payload, pending.action, pending.displayName, pending.displayAvatar);
     };
 
-    // nguoi_dung_ban_goi: người nhận đang bận → hiện modal ngay
+    // nguoi_dung_ban_goi: server trả về người gọi hoặc người nhận đang bận.
     const onCallBusy = (payload: { conversationId: string; targetUserId: string; reason?: string }) => {
+      const pending = pendingCallParamsRef.current;
       pendingCallParamsRef.current = null;
 
-      let displayName = pendingCallNameRef.current;
+      if (!pending || pending.payload.conversationId !== payload.conversationId) {
+        return;
+      }
+
+      if (
+        payload.reason === "caller_busy" ||
+        String(payload.targetUserId || "") === String(normalizedUserId || "")
+      ) {
+        setModalInfo({
+          title: "Đang trong cuộc gọi",
+          body: "Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước khi gọi mới.",
+        });
+        return;
+      }
+
+      let displayName = pending.displayName || pendingCallNameRef.current;
 
       // Nếu name vẫn là placeholder ("Người dùng"), thử tìm trong conversations list
       if ((displayName === "Người dùng" || !displayName) && conversations) {
@@ -222,6 +244,25 @@ const ChatContent: React.FC = () => {
     // postMessage từ CallPage: dự phòng nếu window kịp mở trước
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === "call-target-busy") {
+        if (
+          event.data?.conversationId &&
+          selectedConversation?._id &&
+          String(event.data.conversationId) === String(selectedConversation._id)
+        ) {
+          return;
+        }
+
+        if (
+          event.data?.reason === "caller_busy" ||
+          String(event.data?.targetUserId || "") === String(normalizedUserId || "")
+        ) {
+          setModalInfo({
+            title: "Đang trong cuộc gọi",
+            body: "Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước khi gọi mới.",
+          });
+          return;
+        }
+
         const name = event.data.name || pendingCallNameRef.current;
         setModalInfo({
           title: "Không thể kết nối",
@@ -240,7 +281,7 @@ const ChatContent: React.FC = () => {
       window.removeEventListener("message", onMessage);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedConversation?._id, normalizedUserId]);
 
   const handleAcceptIncomingCall = () => {
     if (!incomingCall) return;
@@ -333,9 +374,20 @@ const ChatContent: React.FC = () => {
       );
     };
 
+    const onCallAnsweredElsewhere = (payload: CallAnsweredElsewherePayload) => {
+      if (String(payload.userId || "") !== String(normalizedUserId || "")) return;
+      setIncomingCall((prev) =>
+        String(prev?.conversationId) === String(payload.conversationId) &&
+        (!prev?.callId || (payload.callId && String(prev.callId) === String(payload.callId)))
+          ? null
+          : prev,
+      );
+    };
+
     socketService.onIncomingCall(onIncomingCall);
     socketService.onCallEnded(onCallEnded);
     socketService.onCallDeclined(onCallDeclined);
+    socketService.onCallAnsweredElsewhere(onCallAnsweredElsewhere);
     
     // Đăng ký listener tin nhắn để làm fail-safe cho cuộc gọi
     socketService.onNewMessage(onNewMessage);
@@ -344,6 +396,7 @@ const ChatContent: React.FC = () => {
       socketService.offIncomingCall(onIncomingCall);
       socketService.offCallEnded(onCallEnded);
       socketService.offCallDeclined(onCallDeclined);
+      socketService.offCallAnsweredElsewhere(onCallAnsweredElsewhere);
       socketService.offNewMessage(onNewMessage);
     };
   }, [normalizedUserId]);

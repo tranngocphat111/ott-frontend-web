@@ -7,11 +7,27 @@ import PostActions from "./post/PostActions";
 import PostDetailModal from "./PostDetailModal";
 import PostReactionsListModal from "./post/PostReactionsListModal";
 import { useNavigate } from "react-router-dom";
-import { getReactionByKey, REACTIONS, type ReactionKey } from "./post/reactions";
+import {
+  getReactionByKey,
+  REACTIONS,
+  type ReactionKey,
+} from "./post/reactions";
 import PostHeader from "./post/PostHeader";
-import { mediaSocketService, type PostActivityPayload } from "../../services/mediaSocket.service";
-import { fetchPostById, fetchPostReactionDetails, type ApiReaction } from "../../services/post.service";
-import { checkIsSaved, toggleSaveContent, recordViewHistory } from "../../services/social.service";
+import {
+  mediaSocketService,
+  type PostActivityPayload,
+} from "../../services/mediaSocket.service";
+import {
+  fetchPostById,
+  fetchPostReactionDetails,
+  toggleLike,
+  type ApiReaction,
+} from "../../services/post.service";
+import {
+  checkIsSaved,
+  toggleSaveContent,
+  recordViewHistory,
+} from "../../services/social.service";
 import PostMediaGrid from "./PostMediaGrid";
 import { SharePostModal } from "./post/SharePostModal";
 
@@ -28,9 +44,16 @@ interface Props {
   onToggleLike: (key: ReactionKey | null) => void;
   onDelete?: (id: string) => void;
   onEdit?: (post: Post) => void;
-  onShare?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
+  onShare?: (
+    postId: string,
+    caption?: string,
+    visibility: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   currentUser: PostUser;
 }
+
+const isDeletedPost = (post: Post) =>
+  String(post.status || "").toUpperCase() === "DELETED";
 
 const emptyReactionCounts = (): Record<ReactionKey, number> =>
   Object.fromEntries(REACTIONS.map((reaction) => [reaction.key, 0])) as Record<
@@ -40,8 +63,8 @@ const emptyReactionCounts = (): Record<ReactionKey, number> =>
 
 const toReactionKey = (value?: string | null): ReactionKey | null => {
   const key = String(value || "").toLowerCase();
-  return REACTIONS.some((reaction) => reaction.key === key)
-    ? (key as ReactionKey)
+  return REACTIONS.some((reaction) => reaction.key === key) ?
+      (key as ReactionKey)
     : null;
 };
 
@@ -98,9 +121,27 @@ const PostCard: React.FC<Props> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalShowComments, setModalShowComments] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
-  const [isReactionsListModalOpen, setIsReactionsListModalOpen] = useState(false);
+  const [isReactionsListModalOpen, setIsReactionsListModalOpen] =
+    useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const hasRecordedView = useRef(false);
+  const [sharedModalPost, setSharedModalPost] = useState<Post | null>(null);
+  const [isSharedModalOpen, setIsSharedModalOpen] = useState(false);
+  const [sharedModalCommentCount, setSharedModalCommentCount] = useState(0);
+  const [sharedModalReactionCounts, setSharedModalReactionCounts] = useState<
+    Record<ReactionKey, number>
+  >(emptyReactionCounts());
+  const [sharedModalReaction, setSharedModalReaction] =
+    useState<ReactionKey | null>(null);
+  const [sharedModalShowComments, setSharedModalShowComments] = useState(false);
+  const [sharedModalShowPicker, setSharedModalShowPicker] = useState(false);
+  const [sharedModalShowMenu, setSharedModalShowMenu] = useState(false);
+  const [isSharedLiking, setIsSharedLiking] = useState(false);
+  const [isSharedReactionsListModalOpen, setIsSharedReactionsListModalOpen] =
+    useState(false);
+  const sharedMenuRef = useRef<HTMLDivElement>(null);
+  const sharedHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleted = isDeletedPost(post);
 
   useEffect(() => {
     checkIsSaved(post.id).then(setIsSaved);
@@ -115,7 +156,9 @@ const PostCard: React.FC<Props> = ({
   }, [post.id, initialReaction]);
 
   useEffect(() => {
-    setReactionCounts(buildInitialReactionCounts(initialReactionCounts, post.likes));
+    setReactionCounts(
+      buildInitialReactionCounts(initialReactionCounts, post.likes),
+    );
   }, [post.id, initialReactionCounts]);
 
   useEffect(() => {
@@ -161,7 +204,9 @@ const PostCard: React.FC<Props> = ({
         void fetchPostReactionDetails(post.id).then((reactions) => {
           if (!active) return;
           setReactionCounts(buildReactionCounts(reactions));
-          const ownReaction = reactions.find((item) => item.accountId === currentUser.id);
+          const ownReaction = reactions.find(
+            (item) => item.accountId === currentUser.id,
+          );
           setReaction(toReactionKey(ownReaction?.reactionType));
         });
       } else if (payload.activityType === "COMMENT") {
@@ -274,6 +319,128 @@ const PostCard: React.FC<Props> = ({
     setIsModalOpen(false);
   };
 
+  const openSharedModal = async (target: Post) => {
+    setIsModalOpen(false);
+    setModalShowComments(false);
+    const fresh = await fetchPostById(target.id, currentUser.id);
+    const nextPost = fresh ?? target;
+
+    setSharedModalPost(nextPost);
+    setSharedModalCommentCount(nextPost.comments);
+    setSharedModalReactionCounts(
+      buildInitialReactionCounts(undefined, nextPost.likes),
+    );
+    setSharedModalReaction(null);
+    setSharedModalShowComments(false);
+    setSharedModalShowPicker(false);
+    setSharedModalShowMenu(false);
+    setIsSharedModalOpen(true);
+
+    const reactions = await fetchPostReactionDetails(nextPost.id);
+    setSharedModalReactionCounts(buildReactionCounts(reactions));
+    const ownReaction = reactions.find(
+      (item) => item.accountId === currentUser.id,
+    );
+    setSharedModalReaction(toReactionKey(ownReaction?.reactionType));
+  };
+
+  const closeSharedModal = () => {
+    setIsSharedModalOpen(false);
+    setSharedModalPost(null);
+    setSharedModalShowComments(false);
+    setSharedModalShowMenu(false);
+    setSharedModalShowPicker(false);
+    setIsSharedReactionsListModalOpen(false);
+  };
+
+  const sharedTotalReactionCount = Object.values(
+    sharedModalReactionCounts,
+  ).reduce((sum, count) => sum + count, 0);
+
+  const handleSharedReactionClick = async (key: ReactionKey) => {
+    if (!sharedModalPost || isSharedLiking) return;
+    setIsSharedLiking(true);
+
+    const prev = sharedModalReaction;
+    const wasReacted = prev === key;
+    const newReaction = wasReacted ? null : key;
+    setSharedModalReaction(newReaction);
+    setSharedModalShowPicker(false);
+    if (sharedHoverTimer.current) clearTimeout(sharedHoverTimer.current);
+
+    setSharedModalReactionCounts((c) => {
+      const next = { ...c };
+      if (prev) next[prev] = Math.max(0, next[prev] - 1);
+      if (!wasReacted) next[key] = next[key] + 1;
+      return next;
+    });
+
+    await toggleLike(
+      sharedModalPost.id,
+      currentUser.id,
+      (newReaction ?? "LIKE").toUpperCase(),
+    );
+
+    const reactions = await fetchPostReactionDetails(sharedModalPost.id);
+    setSharedModalReactionCounts(buildReactionCounts(reactions));
+    const ownReaction = reactions.find(
+      (item) => item.accountId === currentUser.id,
+    );
+    setSharedModalReaction(toReactionKey(ownReaction?.reactionType));
+
+    setIsSharedLiking(false);
+  };
+
+  const handleSharedLikeButtonClick = async () => {
+    if (isSharedLiking || !sharedModalPost) return;
+    setIsSharedLiking(true);
+
+    setSharedModalShowPicker(false);
+    if (sharedHoverTimer.current) clearTimeout(sharedHoverTimer.current);
+
+    const nextReaction = sharedModalReaction ? null : "like";
+    if (sharedModalReaction) {
+      setSharedModalReactionCounts((c) => ({
+        ...c,
+        [sharedModalReaction]: Math.max(0, c[sharedModalReaction] - 1),
+      }));
+    } else {
+      setSharedModalReactionCounts((c) => ({ ...c, like: c.like + 1 }));
+    }
+    setSharedModalReaction(nextReaction);
+
+    await toggleLike(
+      sharedModalPost.id,
+      currentUser.id,
+      (nextReaction ?? "LIKE").toUpperCase(),
+    );
+
+    const reactions = await fetchPostReactionDetails(sharedModalPost.id);
+    setSharedModalReactionCounts(buildReactionCounts(reactions));
+    const ownReaction = reactions.find(
+      (item) => item.accountId === currentUser.id,
+    );
+    setSharedModalReaction(toReactionKey(ownReaction?.reactionType));
+
+    setIsSharedLiking(false);
+  };
+
+  const onSharedMouseEnterLike = () => {
+    sharedHoverTimer.current = setTimeout(
+      () => setSharedModalShowPicker(true),
+      400,
+    );
+  };
+  const onSharedMouseLeaveLike = () => {
+    if (sharedHoverTimer.current) clearTimeout(sharedHoverTimer.current);
+  };
+  const onSharedMouseEnterPicker = () => {
+    if (sharedHoverTimer.current) clearTimeout(sharedHoverTimer.current);
+  };
+  const onSharedMouseLeavePicker = () => {
+    setSharedModalShowPicker(false);
+  };
+
   const toggleModalComments = () => {
     setModalShowComments((prev) => !prev);
   };
@@ -310,83 +477,125 @@ const PostCard: React.FC<Props> = ({
           />
         </div>
 
-        <PostBody
-          content={post.content}
-          media={post.media}
-          totalLikes={totalReactionCount}
-          isInView={isInView}
-        />
-
-        {post.sharedPost && (
-          <div 
-            className="mx-4 mb-4 p-4 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-xl transition duration-200 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              goToProfile(post.sharedPost!.author.id);
-            }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ${post.sharedPost.author.avatar ? "" : post.sharedPost.author.color}`}>
-                {post.sharedPost.author.avatar ? (
-                  <img src={post.sharedPost.author.avatar} alt={post.sharedPost.author.displayName} className="size-full object-cover" />
-                ) : (
-                  post.sharedPost.author.displayName.charAt(0)
-                )}
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-gray-800 hover:underline">
-                  {post.sharedPost.author.displayName}
-                </div>
-                <div className="text-[11px] text-gray-400">
-                  {post.sharedPost.time}
-                </div>
-              </div>
+        {deleted ?
+          <div className="mx-4 mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
+            <div className="text-sm font-semibold text-gray-800">
+              Bài viết đã bị xóa
             </div>
-            <p className="text-sm text-gray-700 leading-relaxed mb-2 line-clamp-3">
-              {post.sharedPost.content}
-            </p>
-            {post.sharedPost.media && post.sharedPost.media.length > 0 && (
-              <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60" onClick={(e) => e.stopPropagation()}>
-                <PostMediaGrid
-                  media={post.sharedPost.media}
-                  isInView={isInView}
-                />
+            <div className="mt-1 text-xs text-gray-500">
+              Nội dung này không còn khả dụng, nhưng vẫn được giữ lại trong lịch
+              sử và danh sách đã lưu.
+            </div>
+          </div>
+        : <PostBody
+            content={post.content}
+            media={post.media}
+            totalLikes={totalReactionCount}
+            isInView={isInView}
+          />
+        }
+
+        {(post.sharedPost ||
+          post.sharedPostDeleted ||
+          post.sharedPostRestricted ||
+          post.sharedPostCollapsed) && (
+          <div
+            className={`mx-4 mb-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl transition duration-200 ${post.sharedPost ? "hover:bg-gray-50 cursor-pointer" : ""}`}
+            onClick={(e) => {
+              if (!post.sharedPost) return;
+              e.stopPropagation();
+              openSharedModal(post.sharedPost);
+            }}>
+            {post.sharedPost ?
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className={`size-8 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden ${post.sharedPost.author.avatar ? "" : post.sharedPost.author.color}`}>
+                    {post.sharedPost.author.avatar ?
+                      <img
+                        src={post.sharedPost.author.avatar}
+                        alt={post.sharedPost.author.displayName}
+                        className="size-full object-cover"
+                      />
+                    : post.sharedPost.author.displayName.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800 hover:underline">
+                      {post.sharedPost.author.displayName}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {post.sharedPost.time}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed mb-2 line-clamp-3">
+                  {post.sharedPost.content}
+                </p>
+                {post.sharedPost.media && post.sharedPost.media.length > 0 && (
+                  <div
+                    className="rounded-lg overflow-hidden border border-gray-100 max-h-60"
+                    onClick={(e) => e.stopPropagation()}>
+                    <PostMediaGrid
+                      media={post.sharedPost.media}
+                      isInView={isInView}
+                    />
+                  </div>
+                )}
+              </>
+            : <div className="text-sm text-gray-500">
+                <div className="font-semibold text-gray-700">
+                  {post.sharedPostCollapsed ?
+                    "Nội dung đã được thu gọn"
+                  : "Nội dung không khả dụng"}
+                </div>
+                <div className="text-xs mt-1">
+                  {post.sharedPostCollapsed ?
+                    "Chuỗi chia sẻ quá dài. Mở bài gốc để xem đầy đủ."
+                  : "Bài viết đã bị xóa hoặc bạn không có quyền xem."}
+                </div>
               </div>
-            )}
+            }
           </div>
         )}
 
-        <div>
-          <PostReactionsSummary
-            reactionCounts={reactionCounts}
-            commentCount={commentCount}
-            shares={shareCount}
-            onToggleComments={() => openModal(true)}
-            onShowReactionsList={() => setIsReactionsListModalOpen(true)}
-          />
-        </div>
+        {!deleted && (
+          <>
+            <div>
+              <PostReactionsSummary
+                reactionCounts={reactionCounts}
+                commentCount={commentCount}
+                shares={shareCount}
+                onToggleComments={() => openModal(true)}
+                onShowReactionsList={() => setIsReactionsListModalOpen(true)}
+              />
+            </div>
 
-        <div onClick={(e) => e.stopPropagation()}>
-          <PostActions
-            reaction={reaction}
-            reactionLabel={currentReaction ? currentReaction.label : "Thích"}
-            reactionEmoji={currentReaction?.emoji}
-            reactionColor={
-              currentReaction ? currentReaction.color : "text-gray-400"
-            }
-            showComments={false}
-            showPicker={showPicker}
-            isSaved={isSaved}
-            onToggleSave={handleToggleSave}
-            onLikeClick={handleLikeButtonClick}
-            onToggleComments={() => openModal(true)}
-            onSelectReaction={handleReactionClick}
-            onLikeMouseEnter={onMouseEnterLike}
-            onLikeMouseLeave={onMouseLeaveLike}
-            onPickerMouseEnter={onMouseEnterPicker}
-            onPickerMouseLeave={onMouseLeavePicker}
-            onShareClick={() => setIsShareModalOpen(true)}
-          />
-        </div>
+            <div onClick={(e) => e.stopPropagation()}>
+              <PostActions
+                reaction={reaction}
+                reactionLabel={
+                  currentReaction ? currentReaction.label : "Thích"
+                }
+                reactionEmoji={currentReaction?.emoji}
+                reactionColor={
+                  currentReaction ? currentReaction.color : "text-gray-400"
+                }
+                showComments={false}
+                showPicker={showPicker}
+                isSaved={isSaved}
+                onToggleSave={handleToggleSave}
+                onLikeClick={handleLikeButtonClick}
+                onToggleComments={() => openModal(true)}
+                onSelectReaction={handleReactionClick}
+                onLikeMouseEnter={onMouseEnterLike}
+                onLikeMouseLeave={onMouseLeaveLike}
+                onPickerMouseEnter={onMouseEnterPicker}
+                onPickerMouseLeave={onMouseLeavePicker}
+                onShareClick={() => setIsShareModalOpen(true)}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <PostDetailModal
@@ -407,6 +616,7 @@ const PostCard: React.FC<Props> = ({
           onDelete?.(post.id);
         }}
         onProfile={goToProfile}
+        onOpenSharedPost={openSharedModal}
         commentCount={commentCount}
         reactionCounts={reactionCounts}
         reaction={reaction}
@@ -429,11 +639,68 @@ const PostCard: React.FC<Props> = ({
         onShowReactionsList={() => setIsReactionsListModalOpen(true)}
       />
 
+      {sharedModalPost && (
+        <PostDetailModal
+          isOpen={isSharedModalOpen}
+          post={{ ...sharedModalPost, likes: sharedTotalReactionCount }}
+          currentUser={currentUser}
+          showMenu={sharedModalShowMenu}
+          menuRef={sharedMenuRef}
+          onToggleMenu={() => setSharedModalShowMenu((v) => !v)}
+          onEdit={() => {
+            setSharedModalShowMenu(false);
+            closeSharedModal();
+            onEdit?.(sharedModalPost);
+          }}
+          onDelete={() => {
+            setSharedModalShowMenu(false);
+            closeSharedModal();
+            onDelete?.(sharedModalPost.id);
+          }}
+          onProfile={goToProfile}
+          onOpenSharedPost={openSharedModal}
+          commentCount={sharedModalCommentCount}
+          reactionCounts={sharedModalReactionCounts}
+          reaction={sharedModalReaction}
+          currentReactionLabel={
+            sharedModalReaction ?
+              (getReactionByKey(sharedModalReaction)?.label ?? "Thích")
+            : "Thích"
+          }
+          currentReactionEmoji={getReactionByKey(sharedModalReaction)?.emoji}
+          currentReactionColor={
+            getReactionByKey(sharedModalReaction)?.color ?? "text-gray-400"
+          }
+          showPicker={sharedModalShowPicker}
+          showComments={sharedModalShowComments}
+          onClose={closeSharedModal}
+          onToggleComments={() => setSharedModalShowComments((prev) => !prev)}
+          onLikeClick={handleSharedLikeButtonClick}
+          onSelectReaction={handleSharedReactionClick}
+          onLikeMouseEnter={onSharedMouseEnterLike}
+          onLikeMouseLeave={onSharedMouseLeaveLike}
+          onPickerMouseEnter={onSharedMouseEnterPicker}
+          onPickerMouseLeave={onSharedMouseLeavePicker}
+          onCountChange={(delta) =>
+            setSharedModalCommentCount((prev) => prev + delta)
+          }
+          onShowReactionsList={() => setIsSharedReactionsListModalOpen(true)}
+        />
+      )}
+
       <PostReactionsListModal
         isOpen={isReactionsListModalOpen}
         onClose={() => setIsReactionsListModalOpen(false)}
         postId={post.id}
       />
+
+      {sharedModalPost && (
+        <PostReactionsListModal
+          isOpen={isSharedReactionsListModalOpen}
+          onClose={() => setIsSharedReactionsListModalOpen(false)}
+          postId={sharedModalPost.id}
+        />
+      )}
 
       <SharePostModal
         isOpen={isShareModalOpen}

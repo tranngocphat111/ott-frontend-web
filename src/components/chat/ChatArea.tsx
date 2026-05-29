@@ -356,6 +356,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     action: "start" | "join";
     displayName: string;
     displayAvatar: string;
+    invitedUserIds?: string[];
+    callId?: string;
   } | null>(null);
   const pendingGroupCallTimerRef = useRef<number | null>(null);
 
@@ -1713,12 +1715,22 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     if (!activeConversation?._id) return;
 
     setIsGroupCallModalOpen(false);
-    lockPendingGroupCall(activeConversation._id);
 
     const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
     const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
 
-    doOpenCallWindow("video", "start", displayName, displayAvatar, selectedUserIds);
+    pendingCallParamsRef.current = {
+      type: "video",
+      action: "start",
+      displayName,
+      displayAvatar,
+      invitedUserIds: selectedUserIds,
+    };
+
+    socketService.checkCallAvailability(
+      activeConversation._id,
+      normalizedUserId as string,
+    );
   };
 
   const openCallWindow = (
@@ -1750,13 +1762,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       const displayName = getConversationDisplayName(activeConversation, normalizedUserId);
       const displayAvatar = getConversationDisplayAvatar(activeConversation, normalizedUserId) || "";
-      doOpenCallWindow(
-        "video",
-        "join",
+
+      pendingCallParamsRef.current = {
+        type: "video",
+        action: "join",
         displayName,
         displayAvatar,
-        undefined,
-        activeConversation.active_call_id,
+        callId: activeConversation.active_call_id,
+      };
+      socketService.checkCallAvailability(
+        activeConversation._id,
+        normalizedUserId as string,
       );
       return;
     }
@@ -1830,11 +1846,17 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       if (payload.conversationId !== activeConversation?._id) return;
       const params = pendingCallParamsRef.current;
       if (params) {
+        if (activeConversation?.type === "group" && params.action === "start") {
+          lockPendingGroupCall(activeConversation._id);
+        }
+
         doOpenCallWindow(
           params.type,
           params.action,
           params.displayName,
           params.displayAvatar,
+          params.invitedUserIds,
+          params.callId,
         );
         pendingCallParamsRef.current = null;
       }
@@ -1845,7 +1867,45 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
     return () => {
       socketService.offCallReady(onCallReady);
     };
-  }, [activeConversation?._id, normalizedUserId]);
+  }, [activeConversation, lockPendingGroupCall, normalizedUserId]);
+
+  useEffect(() => {
+    const onCallBusy = (payload: {
+      conversationId: string;
+      targetUserId: string;
+      reason?: string;
+    }) => {
+      if (payload.conversationId !== activeConversation?._id) return;
+
+      const params = pendingCallParamsRef.current;
+      pendingCallParamsRef.current = null;
+      const isCallerBusy =
+        payload.reason === "caller_busy" ||
+        String(payload.targetUserId || "") === String(normalizedUserId || "");
+
+      if (isCallerBusy) {
+        setCallBlockModal({
+          title: "Đang trong cuộc gọi",
+          message:
+            "Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước khi gọi mới.",
+        });
+        return;
+      }
+
+      const fallbackDisplayName = activeConversation
+        ? getConversationDisplayName(activeConversation, normalizedUserId)
+        : "Người dùng";
+      setCallBlockModal({
+        title: "Không thể kết nối",
+        message: `${params?.displayName || fallbackDisplayName} đang trong một cuộc gọi khác.`,
+      });
+    };
+
+    socketService.onCallBusy(onCallBusy);
+    return () => {
+      socketService.offCallBusy(onCallBusy);
+    };
+  }, [activeConversation, normalizedUserId]);
 
   // Logic đánh dấu đã đọc
   useEffect(() => {
@@ -2361,10 +2421,27 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       if (!targetElement) return false;
 
+      const syncJumpScrollButton = () => {
+        const activeContainer = messagesContainerRef.current;
+        if (!activeContainer) return;
+
+        const hasScrollableOverflow =
+          activeContainer.scrollHeight > activeContainer.clientHeight + 8;
+        const distanceToBottom =
+          activeContainer.scrollHeight -
+          activeContainer.scrollTop -
+          activeContainer.clientHeight;
+        const isNearBottom = distanceToBottom < 100;
+
+        wasNearBottomRef.current = isNearBottom;
+        lastScrollTopRef.current = activeContainer.scrollTop;
+        setShowScrollButton(hasScrollableOverflow && distanceToBottom >= 100);
+      };
+
       // Ensure auto-scroll doesn't override our manual scroll.
       suppressAutoScrollUntilRef.current = Date.now() + 1000;
       wasNearBottomRef.current = false;
-      setShowScrollButton(true);
+      setShowScrollButton(false);
 
       centerTargetInContainer(targetElement);
       await waitForNextFrame();
@@ -2372,6 +2449,9 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       if (targetElement.isConnected) {
         centerTargetInContainer(targetElement);
       }
+
+      syncJumpScrollButton();
+      window.requestAnimationFrame(syncJumpScrollButton);
 
       if (!highlight) return true;
 
@@ -3093,7 +3173,6 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
   const shouldShowScrollToBottomButton = useCallback(
     (container: HTMLDivElement | null = messagesContainerRef.current) => {
       if (messages.length === 0) return false;
-      if (hasMoreAfter) return true;
       if (!container) return false;
 
       const hasScrollableOverflow =
@@ -3105,7 +3184,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
 
       return distanceToBottom >= 100;
     },
-    [hasMoreAfter, messages.length],
+    [messages.length],
   );
 
   const captureScrollAnchor = useCallback(
@@ -4519,7 +4598,7 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
         {showScrollButton && !isChatOverlayOpen && (
           <button
             onClick={scrollToBottom}
-            className="absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
+            className="absolute left-1/2 z-[65] -translate-x-1/2 rounded-full bg-primary-500 p-3 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-primary-600"
             style={{ bottom: Math.max(composerHeight + 18, 112) }}
             title="Scroll to bottom"
           >

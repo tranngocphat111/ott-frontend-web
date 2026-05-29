@@ -1,5 +1,4 @@
 import { apiClient } from './api/client';
-import { API_AI_SERVER_URL, API_CHAT_SERVER_URL } from '../config/api.config';
 
 export interface AiSmartReplySuggestion {
   text: string;
@@ -31,6 +30,8 @@ interface AiTranslationResponse {
   translatedText: string;
   detectedLanguage?: string;
   targetLanguage?: string;
+  shouldTranslate?: boolean;
+  reason?: string;
 }
 
 interface AiSmartReplyOptions {
@@ -47,9 +48,7 @@ const unwrapApiPayload = <T>(response: unknown): T => {
   return (payload?.result ?? payload) as T;
 };
 
-const AI_API_BASE_URLS = Array.from(
-  new Set([API_AI_SERVER_URL, `${API_CHAT_SERVER_URL}/ai`]),
-);
+const AI_API_BASE_PATHS = ['/ai', '/chat/ai'];
 
 const isNotFoundError = (error: unknown): boolean => {
   const payload = error as any;
@@ -62,9 +61,9 @@ const requestAiEndpoint = async <T>(
 ): Promise<T> => {
   let lastError: unknown;
 
-  for (const baseUrl of AI_API_BASE_URLS) {
+  for (const basePath of AI_API_BASE_PATHS) {
     try {
-      return (await request(`${baseUrl}${path}`)) as T;
+      return (await request(`${basePath}${path}`)) as T;
     } catch (error) {
       lastError = error;
       if (!isNotFoundError(error)) throw error;
@@ -179,7 +178,7 @@ export const AiService = {
     }
   },
 
-  translateText: async (text: string, targetLang: string = 'Tiếng Việt'): Promise<string> => {
+  translateText: async (text: string, targetLang: string = 'Tiếng Việt'): Promise<string | null> => {
     try {
       const response = await requestAiEndpoint<AiTranslationResponse>('/translate', (url) =>
         apiClient.post<AiTranslationResponse>(url, {
@@ -188,10 +187,14 @@ export const AiService = {
         }),
       );
       const data = unwrapApiPayload<AiTranslationResponse>(response);
-      return data?.translatedText || text;
+      const translatedText = data?.translatedText?.trim() || '';
+      if (!translatedText || data?.shouldTranslate === false || translatedText === text.trim()) {
+        return null;
+      }
+      return translatedText;
     } catch (error) {
       console.error('Translation Error:', error);
-      return text;
+      return null;
     }
   },
 

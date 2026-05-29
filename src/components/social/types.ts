@@ -25,11 +25,15 @@ export interface Post {
     likes: number;
     comments: number;
     shares: number;
+    status?: string;
     visibility?: string;
     relationship?: "self" | "friend" | "friend-of-friend" | "stranger";
     relationshipLabel?: string;
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
     sharedPost?: Post;
+    sharedPostRestricted?: boolean;
+    sharedPostDeleted?: boolean;
+    sharedPostCollapsed?: boolean;
 }
 
 export interface StoryContentItem {

@@ -25,7 +25,7 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   const [friends, setFriends] = useState<FriendOption[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"requests" | "friends">("friends");
 
@@ -73,14 +73,16 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
           break;
         }
         case "REQUEST_REJECTED":
-        case "REQUEST_CANCELED": {
+        case "REQUEST_CANCELED":
+        case "REQUEST_CANCELLED": {
           setRequests((prev) =>
             prev.filter((req) => req.id !== payload.relationshipId),
           );
           break;
         }
         case "UNFRIENDED":
-        case "BLOCKED": {
+        case "BLOCKED":
+        case "USER_BLOCKED": {
           const otherUserId = getOtherUserId(payload);
           if (otherUserId) {
             setFriends((prev) => prev.filter((f) => f.id !== otherUserId));
@@ -173,9 +175,9 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
         }}
       />
 
-      <FriendsPanel 
-        friends={friends} 
-        loading={friendsLoading} 
+      <FriendsPanel
+        friends={friends}
+        loading={friendsLoading}
         onViewAll={() => {
           setModalTab("friends");
           setModalOpen(true);

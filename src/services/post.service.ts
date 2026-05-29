@@ -41,6 +41,9 @@ export interface ApiPost {
     hashTags: string[] | null;
     accessControls?: { accountId: string; ruleType: "INCLUDE" | "EXCLUDE" }[];
     sharedPost?: ApiPost | null;
+    sharedPostRestricted?: boolean;
+    sharedPostDeleted?: boolean;
+    status?: string;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -55,6 +58,16 @@ const AVATAR_COLORS = [
     "bg-sky-500",
 ];
 const colorFor = (idx: number) => AVATAR_COLORS[idx % AVATAR_COLORS.length];
+const MAX_SHARED_DEPTH = 3;
+
+const createApiUrl = (url: string) => {
+    const browserOrigin =
+        typeof window !== "undefined" && window.location?.origin
+            ? window.location.origin
+            : "http://localhost";
+
+    return new URL(url, browserOrigin);
+};
 
 /** Chuyển ISO timestamp sang chuỗi tiếng Việt tương đối */
 export function relativeTime(iso: string | null | undefined): string {
@@ -96,7 +109,12 @@ export function mapMedia(medias: ApiMedia[] | null): PostMediaItem[] {
 }
 
 /** ApiPost → Post (frontend model) */
-export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string): Post {
+export function mapPost(
+    p: ApiPost,
+    colorIndex: number,
+    currentUserId?: string,
+    depth = 0,
+): Post {
     const author: PostUser = {
         id: p.accountId,
         name: p.accountDisplayName || p.accountUsername || "Người dùng",
@@ -104,6 +122,7 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
         avatar: p.accountAvatarUrl ?? undefined,
         color: colorFor(colorIndex),
     };
+    const shouldCollapse = Boolean(p.sharedPost) && depth >= MAX_SHARED_DEPTH;
     return {
         id: p.id,
         author,
@@ -113,10 +132,16 @@ export function mapPost(p: ApiPost, colorIndex: number, currentUserId?: string):
         likes: p.totalReactions,
         comments: p.totalComments,
         shares: p.totalShares,
+        status: p.status,
         visibility: p.visibility,
         relationship: p.accountId === currentUserId ? "self" : undefined,
         accessControls: p.accessControls,
-        sharedPost: p.sharedPost ? mapPost(p.sharedPost, colorIndex + 1, currentUserId) : undefined,
+        sharedPost: !shouldCollapse && p.sharedPost ?
+            mapPost(p.sharedPost, colorIndex + 1, currentUserId, depth + 1)
+            : undefined,
+        sharedPostRestricted: Boolean(p.sharedPostRestricted),
+        sharedPostDeleted: Boolean(p.sharedPostDeleted),
+        sharedPostCollapsed: shouldCollapse,
     };
 }
 
@@ -528,7 +553,7 @@ export async function sharePost(
     visibility: string = "PUBLIC",
 ): Promise<{ post: Post | null; error?: string }> {
     try {
-        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/share`);
+        const url = createApiUrl(`${API_MEDIA_SERVER_URL}/posts/${postId}/share`);
         url.searchParams.set("accountId", accountId);
         if (caption) {
             url.searchParams.set("caption", caption);
@@ -588,7 +613,7 @@ export async function toggleLike(
     reactionType: string = "LIKE",
 ): Promise<ToggleLikeResult | null> {
     try {
-        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/like`);
+        const url = createApiUrl(`${API_MEDIA_SERVER_URL}/posts/${postId}/like`);
         url.searchParams.set("accountId", accountId);
         url.searchParams.set("reactionType", reactionType.toUpperCase());
         const res = await authFetch(url.toString(), {
@@ -890,7 +915,7 @@ export async function addComment(
     parentCommentId?: string,
 ): Promise<Comment | null> {
     try {
-        const url = new URL(`${API_MEDIA_SERVER_URL}/posts/${postId}/comments`);
+        const url = createApiUrl(`${API_MEDIA_SERVER_URL}/posts/${postId}/comments`);
         url.searchParams.set("accountId", accountId);
         url.searchParams.set("text", text);
         if (parentCommentId) url.searchParams.set("parentCommentId", parentCommentId);
@@ -898,12 +923,16 @@ export async function addComment(
             method: "POST",
             signal: AbortSignal.timeout(5_000),
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+            console.error(`[addComment] Backend error ${res.status}:`, await res.text().catch(() => ""));
+            return null;
+        }
         const json = await res.json();
         const c = unwrapApiResult<ApiComment>(json);
         if (!c) return null;
         return mapComment(c);
-    } catch {
+    } catch (err) {
+        console.error("[addComment] Request failed before reaching backend:", err);
         return null;
     }
 }
