@@ -5,6 +5,8 @@ import type {
   DailyPostPoint,
   DailyUserTrendPoint,
   LoginMethodCount,
+  AdminUserStatusRequest,
+  AdminUserStatusResponse,
   MessageTypesResponse,
   ModerationDashboardResponse,
   ModerationRule,
@@ -260,6 +262,35 @@ const normalizeUserSummary = (value: unknown): UserSummary => {
       typeof record.registeredAt === "string" ? record.registeredAt : null,
     profileSynced:
       typeof record.profileSynced === "boolean" ? record.profileSynced : false,
+    isActive:
+      typeof record.isActive === "boolean" ? record.isActive : null,
+    isBlocked:
+      typeof record.isBlocked === "boolean" ? record.isBlocked : null,
+    blockedUntil:
+      typeof record.blockedUntil === "string" ? record.blockedUntil : null,
+    blockedReason:
+      typeof record.blockedReason === "string" ? record.blockedReason : null,
+    deletedAt:
+      typeof record.deletedAt === "string" ? record.deletedAt : null,
+  };
+};
+
+const normalizeAdminUserStatusResponse = (
+  value: unknown,
+): AdminUserStatusResponse => {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    userId: typeof record.userId === "string" ? record.userId : "",
+    accountType: typeof record.accountType === "string" ? record.accountType : "",
+    isActive: typeof record.isActive === "boolean" ? record.isActive : false,
+    isBlocked: typeof record.isBlocked === "boolean" ? record.isBlocked : false,
+    blockedUntil:
+      typeof record.blockedUntil === "string" ? record.blockedUntil : null,
+    blockedReason:
+      typeof record.blockedReason === "string" ? record.blockedReason : null,
+    deletedAt: typeof record.deletedAt === "string" ? record.deletedAt : null,
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : null,
   };
 };
 
@@ -309,6 +340,18 @@ export const adminService = {
         ...response,
         items: response.items.map(normalizeUserSummary),
       })),
+
+  updateUserStatus: async (
+    userId: string,
+    payload: AdminUserStatusRequest,
+  ) => {
+    const response = await sendJson<unknown>(
+      "patch",
+      `/users/admin/users/${encodeURIComponent(userId)}/status`,
+      payload,
+    );
+    return normalizeAdminUserStatusResponse(response);
+  },
 
   getUserDailyTrend: async (timeRange: TimeRange = "allTime") => {
     const response = await getArrayJson<unknown>(

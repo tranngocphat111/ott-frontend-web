@@ -19,6 +19,11 @@ export interface UserSummary {
   fullName: string | null;
   registeredAt?: string | null;
   profileSynced?: boolean;
+  isActive?: boolean | null;
+  isBlocked?: boolean | null;
+  blockedUntil?: string | null;
+  blockedReason?: string | null;
+  deletedAt?: string | null;
 }
 
 export interface PaginatedRecentUsersResponse {
@@ -71,7 +76,33 @@ export interface AuditLog {
   targetUserId: string | null;
   reason: string | null;
   durationMinutes: number | null;
+  oldValue?: string | null;
+  newValue?: string | null;
   createdAt: string;
+}
+
+export type AdminUserStatusAction =
+  | "BLOCK"
+  | "UNBLOCK"
+  | "DEACTIVATE"
+  | "RESTORE";
+
+export interface AdminUserStatusRequest {
+  actionType: AdminUserStatusAction;
+  reason?: string | null;
+  durationMinutes?: number | null;
+  isPermanent?: boolean | null;
+}
+
+export interface AdminUserStatusResponse {
+  userId: string;
+  accountType: string;
+  isActive: boolean;
+  isBlocked: boolean;
+  blockedUntil: string | null;
+  blockedReason: string | null;
+  deletedAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface PaginatedAuditLogsResponse {

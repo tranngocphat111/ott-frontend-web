@@ -10,6 +10,15 @@ import type {
 
 const PAGE_SIZE = 10;
 
+const formatJsonPreview = (value?: string | null) => {
+  if (!value) return "-";
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+};
+
 const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +53,7 @@ const AuditLogs: React.FC = () => {
         });
       } catch (err) {
         console.error("Failed to load audit logs", err);
-        setError("Không thể tải nhật ký quản trị.");
+        setError("Khong the tai nhat ky quan tri.");
       } finally {
         setLoading(false);
       }
@@ -69,7 +78,7 @@ const AuditLogs: React.FC = () => {
   if (error) {
     return (
       <ErrorState
-        title="Không thể hiển thị nhật ký"
+        title="Khong the hien thi nhat ky"
         description={error}
         onRetry={() => setRetryNonce((current) => current + 1)}
       />
@@ -79,7 +88,7 @@ const AuditLogs: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-80 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm">
-        Đang tải nhật ký...
+        Dang tai nhat ky...
       </div>
     );
   }
@@ -94,13 +103,13 @@ const AuditLogs: React.FC = () => {
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
-            Nhật ký
+            Nhat ky
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Nhật ký quản trị
+            Nhat ky quan tri
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            {pagination.totalElements} bản ghi - trang {pagination.page + 1}/
+            {pagination.totalElements} ban ghi - trang {pagination.page + 1}/
             {Math.max(pagination.totalPages, 1)}
           </p>
         </div>
@@ -108,11 +117,34 @@ const AuditLogs: React.FC = () => {
 
       <AdminTable
         columns={[
-          { key: "id", label: "Mã log", className: "font-medium text-slate-900" },
-          { key: "adminId", label: "Người thực hiện" },
-          { key: "actionType", label: "Hành động" },
-          { key: "targetUserId", label: "Người dùng bị tác động" },
-          { key: "createdAt", label: "Thời gian" },
+          { key: "id", label: "Ma log", className: "font-medium text-slate-900" },
+          { key: "adminId", label: "Nguoi thuc hien" },
+          { key: "actionType", label: "Hanh dong" },
+          { key: "targetUserId", label: "Nguoi dung bi tac dong" },
+          {
+            key: "reason",
+            label: "Ly do",
+            render: (log) => log.reason || "-",
+          },
+          {
+            key: "oldValue",
+            label: "Truoc",
+            render: (log) => (
+              <pre className="max-w-xs whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+                {formatJsonPreview(log.oldValue)}
+              </pre>
+            ),
+          },
+          {
+            key: "newValue",
+            label: "Sau",
+            render: (log) => (
+              <pre className="max-w-xs whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+                {formatJsonPreview(log.newValue)}
+              </pre>
+            ),
+          },
+          { key: "createdAt", label: "Thoi gian" },
         ]}
         rows={rows}
       />
@@ -124,11 +156,11 @@ const AuditLogs: React.FC = () => {
           disabled={page <= 0}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trước
+          Truoc
         </button>
 
         <span className="text-sm text-slate-500">
-          Hiển thị {rows.length}/{pagination.totalElements} bản ghi
+          Hien thi {rows.length}/{pagination.totalElements} ban ghi
         </span>
 
         <button

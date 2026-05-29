@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const userRole: AdminRole | null = inferredRole
     ? (inferredRole as AdminRole)
     : isAdminAccountType(user?.accountType)
-      ? "ANALYST"
+      ? "ADMIN"
       : null;
   const isAdmin = userRole !== null;
 
