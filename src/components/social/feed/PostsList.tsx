@@ -44,7 +44,7 @@ const PostsList: React.FC<Props> = ({
   onShare,
   currentUser,
   loading = false,
-) => {
+}) => {
   const visiblePosts = posts.filter(
     (post) => String(post.status || "").toUpperCase() !== "DELETED",
   );
@@ -61,7 +61,9 @@ const PostsList: React.FC<Props> = ({
           <PostCard
             key={post.id}
             post={post}
-            initialReaction={userReactionMap[post.id] as ReactionKey | undefined}
+            initialReaction={
+              userReactionMap[post.id] as ReactionKey | undefined
+            }
             initialReactionCounts={
               postReactionCountsMap[post.id] as
                 | Partial<Record<ReactionKey, number>>

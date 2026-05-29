@@ -135,7 +135,7 @@ const SocialProfile: React.FC = () => {
           displayName={displayName}
           username={profileUser?.username}
           bio={profile.bio}
-          postCount={posts.length}
+          postCount={posts.filter((p) => p.status === "ACTIVE").length}
           isOwner={isOwner}
           onEditCover={openCoverModal}
           onEditAvatar={openAvatarModal}
@@ -160,7 +160,7 @@ const SocialProfile: React.FC = () => {
               loading={loading}
               onToggleLike={handleToggleLike}
               onDeletePost={handleDeletePost}
-              onEditPost={() => { }}
+              onEditPost={() => {}}
               onSharePost={handleSharePost}
             />
           )}
