@@ -177,9 +177,7 @@ const PostDetailModal: React.FC<Props> = ({
                     </p>
                     {post.sharedPost.media &&
                       post.sharedPost.media.length > 0 && (
-                        <div
-                          className="rounded-lg overflow-hidden border border-gray-100 max-h-60"
-                          onClick={(e) => e.stopPropagation()}>
+                        <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60">
                           <PostBody media={post.sharedPost.media} isInView />
                         </div>
                       )}

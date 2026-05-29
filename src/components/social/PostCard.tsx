@@ -531,9 +531,7 @@ const PostCard: React.FC<Props> = ({
                   {post.sharedPost.content}
                 </p>
                 {post.sharedPost.media && post.sharedPost.media.length > 0 && (
-                  <div
-                    className="rounded-lg overflow-hidden border border-gray-100 max-h-60"
-                    onClick={(e) => e.stopPropagation()}>
+                  <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60">
                     <PostMediaGrid
                       media={post.sharedPost.media}
                       isInView={isInView}
