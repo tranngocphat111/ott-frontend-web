@@ -154,7 +154,7 @@ export const SharePostModal: React.FC<Props> = ({
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Hãy viết gì đó về bài viết này..."
-              className="w-full resize-none outline-none text-gray-800 placeholder-gray-400 text-base leading-relaxed min-h-[80px]"
+              className="w-full resize-none outline-none text-gray-800 placeholder-gray-400 text-base leading-relaxed min-h-20"
               disabled={isSubmitting}
               rows={3}
             />
@@ -240,7 +240,7 @@ export const SharePostModal: React.FC<Props> = ({
             </button>
             <button
               onClick={handleShareClick}
-              className="px-4 py-2 text-sm font-semibold text-white bg-primary-500 rounded-xl hover:bg-primary-600 transition flex items-center gap-1.5 min-w-[100px] justify-center"
+              className="px-4 py-2 text-sm font-semibold text-white bg-primary-500 rounded-xl hover:bg-primary-600 transition flex items-center gap-1.5 min-w-25 justify-center"
               disabled={isSubmitting}>
               {isSubmitting ?
                 <>
