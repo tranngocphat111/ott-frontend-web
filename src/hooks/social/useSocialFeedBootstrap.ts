@@ -23,6 +23,7 @@ type Params = {
     >;
     setHasMore: React.Dispatch<React.SetStateAction<boolean>>;
     setLoadingDB: React.Dispatch<React.SetStateAction<boolean>>;
+    setLoadError: React.Dispatch<React.SetStateAction<string | null>>;
     pageRef: React.MutableRefObject<number>;
     currentUserRef: React.MutableRefObject<User>;
 };
@@ -34,6 +35,7 @@ export const useSocialFeedBootstrap = ({
     setPostReactionCountsMap,
     setHasMore,
     setLoadingDB,
+    setLoadError,
     pageRef,
     currentUserRef,
 }: Params) => {
@@ -42,6 +44,7 @@ export const useSocialFeedBootstrap = ({
     useEffect(() => {
         (async () => {
             try {
+                setLoadError(null);
                 const authUserId = user?.id?.trim();
                 if (!isAuthenticated || !authUserId) {
                     setHasMore(false);
@@ -102,8 +105,13 @@ export const useSocialFeedBootstrap = ({
                     }
                     setUserReactionMap(map);
                 }
-            } catch {
-                // backend not available
+            } catch (error) {
+                setLoadError(
+                    error instanceof Error && error.message
+                        ? error.message
+                        : "Không tải được bảng tin. Vui lòng thử lại sau.",
+                );
+                setHasMore(false);
             } finally {
                 setLoadingDB(false);
             }
@@ -116,6 +124,7 @@ export const useSocialFeedBootstrap = ({
         setCurrentUser,
         setHasMore,
         setLoadingDB,
+        setLoadError,
         setPostReactionCountsMap,
         setPosts,
         setUserReactionMap,

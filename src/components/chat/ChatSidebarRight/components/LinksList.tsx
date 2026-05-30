@@ -1,6 +1,7 @@
 import React from "react";
 import { Link as LinkIcon } from "lucide-react";
 import type { LinkData } from "../../../../interfaces";
+import { parseBackendDate } from "../../../../utils";
 
 interface LinksListProps {
   messages: LinkData[];
@@ -65,7 +66,7 @@ const LinksList: React.FC<LinksListProps> = ({ messages, onViewAll }) => {
                 </div>
                 <div className="text-xs text-gray-400 shrink-0">
                   {message.createdAt
-                    ? new Date(message.createdAt).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })
+                    ? parseBackendDate(message.createdAt)?.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' }) || "11/01"
                     : "11/01"
                   }
                 </div>

@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { fetchViewHistory, clearViewHistory } from "../../services/social.service";
 import { History, Trash2 } from "lucide-react";
 import { mapPost } from "../../services/post.service";
+import { parseBackendDate } from "../../utils/timeUtils";
 
 const HistoryFeed: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
@@ -125,7 +126,9 @@ const HistoryFeed: React.FC = () => {
                     </div>
                     <div>
                       <div className="font-semibold text-gray-900">Story của {item.account?.fullName || 'User'}</div>
-                      <div className="text-sm text-gray-500">{new Date(item.createdAt).toLocaleString()}</div>
+                      <div className="text-sm text-gray-500">
+                        {(parseBackendDate(item.createdAt) ?? new Date(item.createdAt)).toLocaleString()}
+                      </div>
                     </div>
                   </div>
                 );

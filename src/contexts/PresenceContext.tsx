@@ -18,6 +18,7 @@ import React, {
 } from "react";
 import { socketService } from "../services";
 import { useAuth } from "./AuthContext";
+import { parseBackendDate } from "../utils/timeUtils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PresenceEntry {
@@ -78,7 +79,7 @@ export const PresenceProvider: React.FC<PresenceProviderProps> = ({ children }) 
           next.set(userId, { 
             ...existing, 
             isOnline,
-            lastSeenAt: lastSeenAt ? new Date(lastSeenAt) : existing.lastSeenAt 
+            lastSeenAt: parseBackendDate(lastSeenAt) ?? existing.lastSeenAt
           });
         });
         return next;
@@ -93,7 +94,7 @@ export const PresenceProvider: React.FC<PresenceProviderProps> = ({ children }) 
     }) => {
       updateEntry(payload.userId, {
         isOnline: payload.isOnline,
-        lastSeenAt: payload.lastSeenAt ? new Date(payload.lastSeenAt) : null,
+        lastSeenAt: parseBackendDate(payload.lastSeenAt),
       });
     };
 
@@ -178,7 +179,7 @@ export const PresenceProvider: React.FC<PresenceProviderProps> = ({ children }) 
       if (!userId) return;
       updateEntry(userId, {
         isOnline,
-        lastSeenAt: lastSeenAt ? new Date(lastSeenAt) : null,
+        lastSeenAt: parseBackendDate(lastSeenAt),
       });
     },
     [updateEntry]

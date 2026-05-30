@@ -10,9 +10,14 @@ interface Props {
   onToggleLike: (id: string, key: ReactionKey | null) => void;
   onDelete: (id: string) => void;
   onEdit: (post: Post) => void;
-  onShare?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
   currentUser: PostUser;
+  onShare?: (
+    postId: string,
+    caption: string | undefined,
+    visibility: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   loading?: boolean;
+  loadError?: string | null;
 }
 
 const PostSkeleton: React.FC = () => (
@@ -30,6 +35,19 @@ const PostSkeleton: React.FC = () => (
   </div>
 );
 
+const FeedStateCard: React.FC<{
+  title: string;
+  description: string;
+}> = ({ title, description }) => (
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+    <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary-50 text-lg font-black text-primary-600">
+      !
+    </div>
+    <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+    <p className="mt-2 text-sm text-gray-500">{description}</p>
+  </div>
+);
+
 const PostsList: React.FC<Props> = ({
   posts,
   userReactionMap,
@@ -40,33 +58,52 @@ const PostsList: React.FC<Props> = ({
   onShare,
   currentUser,
   loading = false,
-}) => (
-  <>
-    {loading ?
-      <>
-        <PostSkeleton />
-        <PostSkeleton />
-        <PostSkeleton />
-      </>
-    : posts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          initialReaction={userReactionMap[post.id] as ReactionKey | undefined}
-          initialReactionCounts={
-            postReactionCountsMap[post.id] as
-              | Partial<Record<ReactionKey, number>>
-              | undefined
-          }
-          onToggleLike={(key) => onToggleLike(post.id, key)}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          onShare={onShare}
-          currentUser={currentUser}
+  loadError = null,
+}) => {
+  const visiblePosts = posts.filter(
+    (post) => String(post.status || "").toUpperCase() !== "DELETED",
+  );
+
+  return (
+    <>
+      {loading ?
+        <>
+          <PostSkeleton />
+          <PostSkeleton />
+          <PostSkeleton />
+        </>
+      : loadError ?
+        <FeedStateCard
+          title="Không tải được bài viết"
+          description={loadError}
         />
-      ))
-    }
-  </>
-);
+      : visiblePosts.length === 0 ?
+        <FeedStateCard
+          title="Chưa có bài viết"
+          description="Khi có bài viết mới, chúng sẽ xuất hiện ở đây."
+        />
+      : visiblePosts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            initialReaction={
+              userReactionMap[post.id] as ReactionKey | undefined
+            }
+            initialReactionCounts={
+              postReactionCountsMap[post.id] as
+                | Partial<Record<ReactionKey, number>>
+                | undefined
+            }
+            onToggleLike={(key) => onToggleLike(post.id, key)}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onShare={onShare}
+            currentUser={currentUser}
+          />
+        ))
+      }
+    </>
+  );
+};
 
 export default PostsList;

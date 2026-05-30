@@ -6,6 +6,7 @@ import CreateGroupModal from "../../modal/group/CreateGroupModal";
 import AddFriendModal from "../../modal/friend/AddFriendModal";
 import { ConversationService } from "../../../services/conversation.service";
 import { CategoryService, socketService, fetchFriends, MessageService } from "../../../services";
+import { parseBackendDate } from "../../../utils/timeUtils";
 import { useConversations } from "../../../contexts/ConversationsContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import type {
@@ -156,12 +157,10 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
       const isPinnedB = b.participant.settings.is_pinned;
 
       if (isPinnedA === isPinnedB) {
-        const timeA = new Date(
-          a.conversation.updatedAt || a.conversation.createdAt,
-        ).getTime();
-        const timeB = new Date(
-          b.conversation.updatedAt || b.conversation.createdAt,
-        ).getTime();
+        const timeA =
+          parseBackendDate(a.conversation.updatedAt || a.conversation.createdAt)?.getTime() || 0;
+        const timeB =
+          parseBackendDate(b.conversation.updatedAt || b.conversation.createdAt)?.getTime() || 0;
         return timeB - timeA;
       }
       return isPinnedA ? -1 : 1;

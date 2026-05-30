@@ -1,5 +1,23 @@
+const DATE_TIME_WITH_ZONE_PATTERN = /(?:z|[+-]\d{2}:?\d{2})$/i;
+const ISO_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T|\s)/;
+
+export function parseBackendDate(dateString: unknown): Date | null {
+  if (!dateString) return null;
+
+  const value = String(dateString).trim();
+  if (!value) return null;
+
+  const normalized =
+    ISO_LOCAL_DATE_TIME_PATTERN.test(value) && !DATE_TIME_WITH_ZONE_PATTERN.test(value)
+      ? `${value}Z`
+      : value;
+  const date = new Date(normalized);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseBackendDate(dateString) ?? new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -44,7 +62,7 @@ export function formatTimeAgo(dateString: string): string {
 }
 
 export function formatMessageTime(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseBackendDate(dateString) ?? new Date(dateString);
   return date.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -53,7 +71,7 @@ export function formatMessageTime(dateString: string): string {
 }
 
 export function formatFullDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseBackendDate(dateString) ?? new Date(dateString);
   return date.toLocaleDateString("vi-VN", {
     weekday: "long",
     year: "numeric",
@@ -75,8 +93,8 @@ export const shouldShowTimestamp = (
 ): boolean => {
   if (!prevDateString) return true;
 
-  const current = new Date(currentDateString).getTime();
-  const prev = new Date(prevDateString).getTime();
+  const current = (parseBackendDate(currentDateString) ?? new Date(currentDateString)).getTime();
+  const prev = (parseBackendDate(prevDateString) ?? new Date(prevDateString)).getTime();
 
   const THRESHOLD = 60 * 60 * 1000;
 
@@ -91,7 +109,7 @@ export const shouldShowTimestamp = (
  * - Xa hơn: "05/02/2026, 14:30" (Luôn hiện năm)
  */
 export const formatChatTimestamp = (dateString: string): string => {
-  const date = new Date(dateString);
+  const date = parseBackendDate(dateString) ?? new Date(dateString);
   const now = new Date();
 
   // 1. Reset giờ phút giây về 0 để so sánh khoảng cách ngày chính xác

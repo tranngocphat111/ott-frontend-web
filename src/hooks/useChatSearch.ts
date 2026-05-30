@@ -5,6 +5,11 @@ import {
   getConversationDisplayAvatar,
   getConversationDisplayName,
 } from "../utils";
+import {
+  VIRTUAL_CONV_PREFIX,
+  buildVirtualPrivateConversationItem,
+  cacheVirtualConversation,
+} from "../utils/chatConversation";
 import type {
   ConversationWithParticipant,
   SearchEverythingResponse,
@@ -31,7 +36,7 @@ interface UseChatSearchParams {
   onConversationSelect?: (conversation: ConversationWithParticipant) => void;
 }
 
-export const VIRTUAL_CONV_PREFIX = "VIRTUAL_CONV_";
+export { VIRTUAL_CONV_PREFIX };
 
 const EMPTY_SEARCH: SearchEverythingResponse = {
   contacts: [],
@@ -330,53 +335,20 @@ const useChatSearch = ({
             // Instead, create a virtual conversation object
             const targetUser = await UserService.getUserById(contactId);
             if (targetUser) {
-              const virtualId = `${VIRTUAL_CONV_PREFIX}${contactId}`;
-              targetConvId = virtualId;
-              targetConv = {
-                conversation: {
-                  _id: virtualId,
-                  type: "private",
-                  name: targetUser.display_name || targetUser.name || "Người dùng",
-                  avatar: targetUser.avatar || "",
-                  created_by: normalizedUserId,
-                  member_count: 2,
-                  is_deleted: false,
-                  participants: [
-                    {
-                      _id: normalizedUserId,
-                      user_id: normalizedUserId,
-                      display_name: "Bạn",
-                    },
-                    {
-                      _id: contactId,
-                      user_id: contactId,
-                      display_name: targetUser.display_name || targetUser.name || "Người dùng",
-                      avatar: targetUser.avatar || "",
-                    }
-                  ]
-                } as any,
-                participant: {
-                  user_id: normalizedUserId,
-                  conversation_id: virtualId,
-                  roles: "user",
-                  settings: { is_pinned: false, notification_status: "on" }
-                } as any
-              };
+              targetConv = buildVirtualPrivateConversationItem({
+                currentUserId: normalizedUserId,
+                targetUserId: contactId,
+                targetName: targetUser.display_name || targetUser.name,
+                targetAvatar: targetUser.avatar || "",
+              });
+              targetConvId = targetConv.conversation._id;
               
               // Cache it
               setVirtualConversationsCache(prev => ({
                 ...prev,
-                [virtualId]: targetConv!
+                [targetConvId]: targetConv!
               }));
-              
-              // Persist cache to localStorage
-              const cacheKey = `virtual_conv_cache_${normalizedUserId}`;
-              const existingCacheRaw = localStorage.getItem(cacheKey);
-              const existingCache = existingCacheRaw ? JSON.parse(existingCacheRaw) : {};
-              localStorage.setItem(cacheKey, JSON.stringify({
-                ...existingCache,
-                [virtualId]: targetConv
-              }));
+              cacheVirtualConversation(normalizedUserId, targetConv);
             }
           }
         } catch (error) {

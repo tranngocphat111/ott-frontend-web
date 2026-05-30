@@ -1,7 +1,7 @@
 import { Phone, PhoneMissed, PhoneOff, Video } from "lucide-react";
 import type { Conversation, Message } from "../../../types";
 import { MessageLayout } from "./MessageLayout";
-import { getConversationDisplayAvatar, getConversationDisplayName } from "../../../utils";
+import { getConversationDisplayAvatar, getConversationDisplayName, parseBackendDate } from "../../../utils";
 import { useConversations } from "../../../contexts/ConversationsContext";
 
 const formatCallDuration = (seconds: number) => {
@@ -110,10 +110,10 @@ export const CallMessage = ({
     normalizedType === "call_cancel" ||
     normalizedType === "call_no_answer";
   const durationLabel = getCallDurationLabel(msg, rawText);
-  const messageTime = new Date(
+  const messageTime = parseBackendDate(
     String(msg.createdAt || (msg as { created_at?: string }).created_at || ""),
   );
-  const callTimeLabel = Number.isNaN(messageTime.getTime())
+  const callTimeLabel = !messageTime
     ? ""
     : messageTime.toLocaleTimeString("vi-VN", {
       hour: "2-digit",

@@ -13,7 +13,7 @@ import {
 import Avatar from "../../common/Avatar";
 import { ConfirmModal } from "../../modal/ConfirmModal";
 import type { MembersFullViewProps } from "../../../interfaces";
-import { getFullUrl } from "../../../utils";
+import { getFullUrl, parseBackendDate } from "../../../utils";
 import { useToast } from "../../../contexts/ToastContext";
 import { ConversationService } from "../../../services/conversation.service";
 
@@ -129,8 +129,8 @@ const MembersFullView: React.FC<MembersFullViewProps> = ({
   const formatJoinedDate = (joinedAt?: string) => {
     if (!joinedAt) return "";
 
-    const date = new Date(joinedAt);
-    if (Number.isNaN(date.getTime())) return "";
+    const date = parseBackendDate(joinedAt);
+    if (!date) return "";
 
     return date.toLocaleDateString("vi-VN");
   };

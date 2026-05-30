@@ -121,6 +121,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               isOwner={isOwner}
               currentUserId={currentUser.id}
               profileUserId={userId}
+              profileDisplayName={displayName}
+              profileAvatarUrl={avatarUrl}
               onEditProfile={() => {
                 setActiveTab("about");
                 startEditAbout();

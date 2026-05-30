@@ -11,6 +11,7 @@
 import { API_MEDIA_SERVER_URL, URL_S3 } from "../config/api.config";
 import type { Post, PostUser, PostMediaItem } from "../components/social/types";
 import { authFetch } from "./api/fetchClient";
+import { parseBackendDate } from "../utils/timeUtils";
 
 /* ═══════════════════════════════════════════════════════
    Raw shapes trả về từ backend
@@ -69,14 +70,17 @@ const createApiUrl = (url: string) => {
     return new URL(url, browserOrigin);
 };
 
+const getBackendDateTime = (value: string | null | undefined) =>
+    parseBackendDate(value)?.getTime() ?? 0;
+
 /** Chuyển ISO timestamp sang chuỗi tiếng Việt tương đối */
 export function relativeTime(iso: string | null | undefined): string {
     if (!iso) return "Vừa xong";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "Vừa xong";
+    const d = parseBackendDate(iso);
+    if (!d) return "Vừa xong";
     const diff = Date.now() - d.getTime();
+    if (diff < 60_000) return "Vừa xong";
     const mins = Math.floor(diff / 60_000);
-    if (mins < 1) return "Vừa xong";
     if (mins < 60) return `${mins} phút trước`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs} giờ trước`;
@@ -200,7 +204,7 @@ export async function fetchPosts(currentUserId?: string): Promise<Post[] | null>
         let colorIdx = 0;
 
         return raw
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .sort((a, b) => getBackendDateTime(b.createdAt) - getBackendDateTime(a.createdAt))
             .map((p) => {
                 if (!colorMap.has(p.accountId)) colorMap.set(p.accountId, colorIdx++);
                 return mapPost(p, colorMap.get(p.accountId)!, currentUserId);
@@ -317,7 +321,7 @@ export async function fetchPostsByUser(userId: string, currentUserId?: string): 
 
         const raw = unwrapList<ApiPost>(await res.json());
         return raw
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .sort((a, b) => getBackendDateTime(b.createdAt) - getBackendDateTime(a.createdAt))
             .map((p, i) => mapPost(p, i, currentUserId));
     } catch {
         return [];

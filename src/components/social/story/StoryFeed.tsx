@@ -41,6 +41,7 @@ export const StoryFeed: React.FC<Props> = ({
     [],
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [editingStory, setEditingStory] = useState<StoryItem | null>(null);
   const lastLocalUpdateRef = useRef<number>(0);
@@ -61,6 +62,7 @@ export const StoryFeed: React.FC<Props> = ({
 
   const loadStories = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const groups = await fetchStoryGroups(currentUserId);
       setStoryGroups((prev) => {
@@ -107,6 +109,14 @@ export const StoryFeed: React.FC<Props> = ({
       } else {
         setSuggestedUsers([]);
       }
+    } catch (error) {
+      setLoadError(
+        error instanceof Error && error.message ?
+          error.message
+        : "Không tải được story. Vui lòng thử lại sau.",
+      );
+      setStoryGroups([]);
+      setSuggestedUsers([]);
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
@@ -444,7 +454,7 @@ export const StoryFeed: React.FC<Props> = ({
   const ViewersModal = () => {
     if (!isViewersModalOpen) return null;
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">
@@ -495,6 +505,7 @@ export const StoryFeed: React.FC<Props> = ({
         currentUserAvatar={currentUserAvatar}
         currentUserId={currentUserId}
         isLoading={isLoading}
+        loadError={loadError}
         onCreateStory={() => setIsStoryModalOpen(true)}
         onOpenUserStories={openUserStories}
       />

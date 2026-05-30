@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, Phone, PhoneOff, Video, PhoneCall, X } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "../components/chat/ChatSidebarLeft";
 import { useConversations } from "../contexts/ConversationsContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,6 +14,11 @@ import {
   getConversationDisplayName,
   getFullUrl,
 } from "../utils";
+import {
+  clearPendingChatOpenTarget,
+  readPendingChatOpenTarget,
+  type ChatOpenTarget,
+} from "../utils/chatConversation";
 
 type IncomingCallPayload = {
   conversationId: string;
@@ -91,6 +97,7 @@ const AppModal: React.FC<{
 );
 
 const ChatContent: React.FC = () => {
+  const location = useLocation();
   const { user: currentUser } = useAuth();
   const { conversations } = useConversations();
   const rawUser = currentUser as { id?: string; user_id?: string; _id?: string } | null;
@@ -107,6 +114,7 @@ const ChatContent: React.FC = () => {
   const [incomingCall, setIncomingCall] = useState<IncomingCallPayload | null>(null);
   const [modalInfo, setModalInfo] = useState<{ title: string; body: string } | null>(null);
   const [avatarBroken, setAvatarBroken] = useState(false);
+  const consumedOpenTargetRef = useRef("");
   const pendingCallNameRef = useRef<string>("Người dùng");
   const pendingCallParamsRef = useRef<{
     payload: IncomingCallPayload;
@@ -128,6 +136,32 @@ const ChatContent: React.FC = () => {
   const handleBackToConversationList = () => {
     setSelectedConversation(null);
   };
+
+  useEffect(() => {
+    const routeState = location.state as
+      | { openConversation?: ChatOpenTarget }
+      | null
+      | undefined;
+    const target =
+      routeState?.openConversation || readPendingChatOpenTarget();
+
+    if (!target?.conversationId) return;
+
+    const targetKey = `${target.conversationId}:${target.at || ""}`;
+    if (consumedOpenTargetRef.current === targetKey) return;
+
+    const targetConversation =
+      target.conversation ||
+      conversations.find(
+        (item) => item.conversation._id === target.conversationId,
+      )?.conversation;
+
+    if (!targetConversation) return;
+
+    consumedOpenTargetRef.current = targetKey;
+    setSelectedConversation(targetConversation);
+    clearPendingChatOpenTarget();
+  }, [conversations, location.state]);
 
   // Helper thực sự mở cửa sổ gọi (sau khi đã xác nhận sẵn sàng)
   const doOpenCallWindow = (payload: IncomingCallPayload, action: "join" | "start", displayName: string, displayAvatar: string) => {

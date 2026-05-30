@@ -22,6 +22,7 @@ export const useSocialFeed = () => {
     const [loadingDB, setLoadingDB] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const pageRef = useRef(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,7 @@ export const useSocialFeed = () => {
         setPostReactionCountsMap,
         setHasMore,
         setLoadingDB,
+        setLoadError,
         pageRef,
         currentUserRef,
     });
@@ -103,6 +105,7 @@ export const useSocialFeed = () => {
         loadingDB,
         loadingMore,
         hasMore,
+        loadError,
         containerRef,
         openModal,
         closeModal,

@@ -5,3 +5,4 @@ export * from "./fileTypeUtils";
 export * from "./conversationDisplayUtils";
 export * from "./callWindowLock";
 export * from "./imageCompression";
+export * from "./chatConversation";

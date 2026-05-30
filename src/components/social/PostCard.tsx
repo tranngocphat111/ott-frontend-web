@@ -142,6 +142,15 @@ const PostCard: React.FC<Props> = ({
   const sharedMenuRef = useRef<HTMLDivElement>(null);
   const sharedHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deleted = isDeletedPost(post);
+  const hasVisibleSharedPost = Boolean(
+    post.sharedPost && !isDeletedPost(post.sharedPost),
+  );
+  const shouldShowSharedFallback = Boolean(
+    post.sharedPostDeleted ||
+    post.sharedPostRestricted ||
+    post.sharedPostCollapsed ||
+    (post.sharedPost && isDeletedPost(post.sharedPost)),
+  );
 
   useEffect(() => {
     checkIsSaved(post.id).then(setIsSaved);
@@ -445,6 +454,10 @@ const PostCard: React.FC<Props> = ({
     setModalShowComments((prev) => !prev);
   };
 
+  if (deleted) {
+    return null;
+  }
+
   return (
     <>
       <div
@@ -477,36 +490,22 @@ const PostCard: React.FC<Props> = ({
           />
         </div>
 
-        {deleted ?
-          <div className="mx-4 mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
-            <div className="text-sm font-semibold text-gray-800">
-              Bài viết đã bị xóa
-            </div>
-            <div className="mt-1 text-xs text-gray-500">
-              Nội dung này không còn khả dụng, nhưng vẫn được giữ lại trong lịch
-              sử và danh sách đã lưu.
-            </div>
-          </div>
-        : <PostBody
-            content={post.content}
-            media={post.media}
-            totalLikes={totalReactionCount}
-            isInView={isInView}
-          />
-        }
+        <PostBody
+          content={post.content}
+          media={post.media}
+          totalLikes={totalReactionCount}
+          isInView={isInView}
+        />
 
-        {(post.sharedPost ||
-          post.sharedPostDeleted ||
-          post.sharedPostRestricted ||
-          post.sharedPostCollapsed) && (
+        {(hasVisibleSharedPost || shouldShowSharedFallback) && (
           <div
-            className={`mx-4 mb-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl transition duration-200 ${post.sharedPost ? "hover:bg-gray-50 cursor-pointer" : ""}`}
+            className={`mx-4 mb-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl transition duration-200 ${hasVisibleSharedPost ? "hover:bg-gray-50 cursor-pointer" : ""}`}
             onClick={(e) => {
-              if (!post.sharedPost) return;
+              if (!hasVisibleSharedPost || !post.sharedPost) return;
               e.stopPropagation();
               openSharedModal(post.sharedPost);
             }}>
-            {post.sharedPost ?
+            {hasVisibleSharedPost && post.sharedPost ?
               <>
                 <div className="flex items-center gap-2 mb-2">
                   <div
@@ -532,9 +531,7 @@ const PostCard: React.FC<Props> = ({
                   {post.sharedPost.content}
                 </p>
                 {post.sharedPost.media && post.sharedPost.media.length > 0 && (
-                  <div
-                    className="rounded-lg overflow-hidden border border-gray-100 max-h-60"
-                    onClick={(e) => e.stopPropagation()}>
+                  <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60">
                     <PostMediaGrid
                       media={post.sharedPost.media}
                       isInView={isInView}
@@ -637,6 +634,9 @@ const PostCard: React.FC<Props> = ({
         onPickerMouseLeave={onMouseLeavePicker}
         onCountChange={(delta) => setCommentCount((prev) => prev + delta)}
         onShowReactionsList={() => setIsReactionsListModalOpen(true)}
+        isSaved={isSaved}
+        onToggleSave={handleToggleSave}
+        onShareClick={() => setIsShareModalOpen(true)}
       />
 
       {sharedModalPost && (

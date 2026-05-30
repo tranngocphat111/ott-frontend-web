@@ -15,7 +15,7 @@ import {
 import { URL_S3 } from "../../../config/api.config";
 import type { StorageViewProps, StorageTab } from "../../../interfaces";
 import Avatar from "../../common/Avatar";
-import { getFullUrl } from "../../../utils";
+import { getFullUrl, parseBackendDate } from "../../../utils";
 import { getFileTypeData, getFileTypeLabel } from "../../../utils/fileTypeUtils";
 
 type DatePreset = "all" | "7d" | "30d" | "90d" | "custom";
@@ -46,8 +46,7 @@ interface LinkItem extends BaseItem {
 
 const toDate = (dateInput: string | undefined) => {
   if (!dateInput) return null;
-  const parsed = new Date(dateInput);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return parseBackendDate(dateInput);
 };
 
 const dateLabel = (dateInput: string) => {

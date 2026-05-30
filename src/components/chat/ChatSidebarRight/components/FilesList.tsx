@@ -5,7 +5,7 @@ import {
   getFileTypeData,
   getFileTypeLabel,
 } from "../../../../utils/fileTypeUtils";
-import { getFullUrl } from "../../../../utils";
+import { getFullUrl, parseBackendDate } from "../../../../utils";
 import { MessageService } from "../../../../services";
 
 interface FilesListProps {
@@ -189,9 +189,9 @@ const FilesList: React.FC<FilesListProps> = ({
           const fileUrl = getFullUrl(key);
           const fileDate =
             message.created_at || message.createdAt
-              ? new Date(
+              ? parseBackendDate(
                   message.created_at || message.createdAt || "",
-                ).toLocaleDateString("vi-VN")
+                )?.toLocaleDateString("vi-VN") || "Không rõ ngày"
               : "Không rõ ngày";
           const isMenuOpen = openMenuFileId === id;
 

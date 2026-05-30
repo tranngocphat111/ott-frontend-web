@@ -35,6 +35,9 @@ interface Props {
   onToggleComments: () => void;
   onShowReactionsList: () => void;
   onLikeClick: () => void;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
+  onShareClick?: () => void;
   onSelectReaction: (key: ReactionKey) => void;
   onLikeMouseEnter: () => void;
   onLikeMouseLeave: () => void;
@@ -66,6 +69,9 @@ const PostDetailModal: React.FC<Props> = ({
   onToggleComments,
   onShowReactionsList,
   onLikeClick,
+  isSaved,
+  onToggleSave,
+  onShareClick,
   onSelectReaction,
   onLikeMouseEnter,
   onLikeMouseLeave,
@@ -75,6 +81,17 @@ const PostDetailModal: React.FC<Props> = ({
 }) => {
   if (!isOpen) return null;
   const deleted = isDeletedPost(post);
+  const hasVisibleSharedPost = Boolean(
+    post.sharedPost && !isDeletedPost(post.sharedPost),
+  );
+  const shouldShowSharedFallback = Boolean(
+    post.sharedPostDeleted ||
+    post.sharedPostRestricted ||
+    post.sharedPostCollapsed ||
+    (post.sharedPost && isDeletedPost(post.sharedPost)),
+  );
+
+  if (deleted) return null;
 
   return (
     <div
@@ -113,33 +130,19 @@ const PostDetailModal: React.FC<Props> = ({
               onProfile={onProfile}
             />
 
-            {deleted ?
-              <div className="mx-4 mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center">
-                <div className="text-sm font-semibold text-gray-800">
-                  Bài viết đã bị xóa
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Nội dung này không còn khả dụng, nhưng vẫn hiển thị trong lịch
-                  sử và danh sách đã lưu.
-                </div>
-              </div>
-            : <PostBody
-                content={post.content}
-                media={post.media}
-                totalLikes={post.likes}
-                isInView
-                variant="carousel"
-              />
-            }
+            <PostBody
+              content={post.content}
+              media={post.media}
+              totalLikes={post.likes}
+              isInView
+              variant="carousel"
+            />
 
-            {(post.sharedPost ||
-              post.sharedPostDeleted ||
-              post.sharedPostRestricted ||
-              post.sharedPostCollapsed) && (
+            {(hasVisibleSharedPost || shouldShowSharedFallback) && (
               <div
-                className={`mx-4 mb-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl transition duration-200 ${post.sharedPost ? "hover:bg-gray-50 cursor-pointer" : ""}`}
+                className={`mx-4 mb-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl transition duration-200 ${hasVisibleSharedPost ? "hover:bg-gray-50 cursor-pointer" : ""}`}
                 onClick={(e) => {
-                  if (!post.sharedPost) return;
+                  if (!hasVisibleSharedPost || !post.sharedPost) return;
                   e.stopPropagation();
                   if (onOpenSharedPost) {
                     onOpenSharedPost(post.sharedPost);
@@ -147,7 +150,7 @@ const PostDetailModal: React.FC<Props> = ({
                   }
                   onProfile(post.sharedPost.author.id);
                 }}>
-                {post.sharedPost ?
+                {hasVisibleSharedPost && post.sharedPost ?
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <div
@@ -174,9 +177,7 @@ const PostDetailModal: React.FC<Props> = ({
                     </p>
                     {post.sharedPost.media &&
                       post.sharedPost.media.length > 0 && (
-                        <div
-                          className="rounded-lg overflow-hidden border border-gray-100 max-h-60"
-                          onClick={(e) => e.stopPropagation()}>
+                        <div className="rounded-lg overflow-hidden border border-gray-100 max-h-60">
                           <PostBody media={post.sharedPost.media} isInView />
                         </div>
                       )}
@@ -214,8 +215,11 @@ const PostDetailModal: React.FC<Props> = ({
                   reactionColor={currentReactionColor}
                   showComments={showComments}
                   showPicker={showPicker}
+                  isSaved={isSaved}
                   onLikeClick={onLikeClick}
                   onToggleComments={onToggleComments}
+                  onToggleSave={onToggleSave}
+                  onShareClick={onShareClick}
                   onSelectReaction={onSelectReaction}
                   onLikeMouseEnter={onLikeMouseEnter}
                   onLikeMouseLeave={onLikeMouseLeave}

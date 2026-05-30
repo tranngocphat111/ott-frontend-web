@@ -22,6 +22,7 @@ import {
   getMessageBorderRadius,
   getFullUrl,
   getFileNameFromUrl,
+  parseBackendDate,
 } from "../../../utils";
 import {
   convertDisplayShortcodeToEmoji,
@@ -324,8 +325,8 @@ const getMessageTimeLabel = (msg: any) => {
   const rawTime = msg?.created_at || msg?.createdAt || msg?.timestamp;
   if (!rawTime) return "";
 
-  const date = new Date(rawTime);
-  if (Number.isNaN(date.getTime())) return "";
+  const date = parseBackendDate(rawTime);
+  if (!date) return "";
 
   return date.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
@@ -796,9 +797,10 @@ export const MessageLayout = ({
         .join(", ")}`
       : deliverySummary.label;
   const messagePreviewText = getMessageContentPreview(msg);
+  const messageCreatedDate = parseBackendDate(msg.created_at || msg.createdAt);
   const messageCreatedLabel =
-    msg.created_at || msg.createdAt
-      ? new Date(msg.created_at || msg.createdAt).toLocaleString("vi-VN", {
+    messageCreatedDate
+      ? messageCreatedDate.toLocaleString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
         hour: "2-digit",

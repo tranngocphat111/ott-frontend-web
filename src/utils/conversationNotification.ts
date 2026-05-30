@@ -1,3 +1,5 @@
+import { parseBackendDate } from "./timeUtils";
+
 type ParticipantLike = {
   unread_count?: number | string | null;
   settings?: {
@@ -16,8 +18,10 @@ export const isConversationMuted = (participant: ParticipantLike): boolean => {
   const muteUntil = settings?.mute_until;
   if (!muteUntil) return true;
 
-  const muteUntilTime = new Date(muteUntil).getTime();
-  if (Number.isNaN(muteUntilTime)) return true;
+  const muteUntilDate =
+    muteUntil instanceof Date ? muteUntil : parseBackendDate(muteUntil);
+  const muteUntilTime = muteUntilDate?.getTime();
+  if (!muteUntilTime) return true;
 
   return muteUntilTime > Date.now();
 };

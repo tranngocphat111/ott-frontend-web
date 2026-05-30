@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Users } from "lucide-react";
 import avatar from "../../../assets/avatar.png";
 import type { FriendRequestOption } from "../../../services/social.service";
+import { parseBackendDate } from "../../../utils/timeUtils";
 
 const getInitials = (name: string) => {
   if (!name) return "?";
@@ -25,9 +26,11 @@ const stringToColor = (str: string) => {
 const formatRelativeTime = (dateStr?: string) => {
   if (!dateStr) return "Vừa gửi lời mời";
   try {
-    const date = new Date(dateStr);
+    const date = parseBackendDate(dateStr);
+    if (!date) return "Vừa gửi lời mời";
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 60000) return "Vừa gửi lời mời";
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);

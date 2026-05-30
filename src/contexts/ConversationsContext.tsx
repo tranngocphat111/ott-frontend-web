@@ -22,6 +22,7 @@ import {
   getParticipantUnreadCount,
   isConversationMuted,
 } from "../utils/conversationNotification";
+import { parseBackendDate } from "../utils/timeUtils";
 
 const APP_TITLE = "Riff - Chat";
 const TAB_MESSAGE_PREVIEW_MS = 6000;
@@ -463,8 +464,10 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       const mergedConversations = [...baseFiltered, ...preservedReopened];
       const sortedConversations = [...mergedConversations].sort((a, b) => {
         // Re-sort by updatedAt to ensure new items are at top
-        const timeA = new Date(a.conversation.updatedAt || a.conversation.createdAt).getTime();
-        const timeB = new Date(b.conversation.updatedAt || b.conversation.createdAt).getTime();
+        const timeA =
+          parseBackendDate(a.conversation.updatedAt || a.conversation.createdAt)?.getTime() || 0;
+        const timeB =
+          parseBackendDate(b.conversation.updatedAt || b.conversation.createdAt)?.getTime() || 0;
         return timeB - timeA;
       });
 

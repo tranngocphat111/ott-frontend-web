@@ -1,6 +1,7 @@
 import { API_CHAT_SERVER_URL } from "../config/api.config";
 import type { SearchEverythingResponse } from "../types";
 import { authFetch } from "./api/fetchClient";
+import { parseBackendDate } from "../utils/timeUtils";
 
 const S3_MEDIA_VIOLATION_MESSAGE =
   "Ảnh hoặc video này có thể vi phạm chính sách lưu trữ, vui lòng chọn tệp khác.";
@@ -26,6 +27,9 @@ const resolveUploadContentDisposition = (contentType: string, fileName: string) 
     : "attachment";
   return `${disposition}; filename="${sanitizeS3FileName(fileName)}"`;
 };
+
+const getBackendDateTime = (value: string | null | undefined) =>
+  parseBackendDate(value)?.getTime() ?? 0;
 
 const extractXmlTagValue = (xml: string, tagName: string) => {
   const match = xml.match(
@@ -695,12 +699,12 @@ export class MessageService {
 
       return Array.from(byId.values())
         .sort((left: any, right: any) => {
-          const leftTime = new Date(
-            left?.createdAt || left?.created_at || 0,
-          ).getTime();
-          const rightTime = new Date(
-            right?.createdAt || right?.created_at || 0,
-          ).getTime();
+          const leftTime = getBackendDateTime(
+            left?.createdAt || left?.created_at,
+          );
+          const rightTime = getBackendDateTime(
+            right?.createdAt || right?.created_at,
+          );
           return rightTime - leftTime;
         })
         .slice(0, limit);

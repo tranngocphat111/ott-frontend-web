@@ -237,6 +237,40 @@ export class ConversationService {
     }
   }
 
+  static async findPrivateConversation(
+    userId: string,
+    targetUserId: string,
+  ): Promise<Conversation | null> {
+    try {
+      const params = new URLSearchParams({
+        userId,
+        targetUserId,
+      });
+
+      const response = await authFetch(
+        `${API_CHAT_SERVER_URL}/conversations/private?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.status === 404) return null;
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data || null;
+    } catch (error) {
+      console.error("Error finding private conversation:", error);
+      throw error;
+    }
+  }
+
   // Get single conversation detail
   static async getConversationById(conversationId: string): Promise<Conversation> {
     try {

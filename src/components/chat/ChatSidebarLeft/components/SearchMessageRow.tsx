@@ -1,6 +1,6 @@
 import React from "react";
 import Avatar from "../../../common/Avatar";
-import { getFullUrl } from "../../../../utils";
+import { getFullUrl, parseBackendDate } from "../../../../utils";
 import type { SearchMessageRowProps } from "../../../../types";
 
 const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
@@ -37,7 +37,7 @@ const SearchMessageRow: React.FC<SearchMessageRowProps> = ({
             </span>
             <span>
               {msg.createdAt
-                ? new Date(msg.createdAt).toLocaleDateString("vi-VN")
+                ? parseBackendDate(msg.createdAt)?.toLocaleDateString("vi-VN") || ""
                 : ""}
             </span>
           </div>

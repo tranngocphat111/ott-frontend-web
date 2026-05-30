@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { MessageCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   cancelRelationship,
   acceptFriendRequest,
@@ -13,11 +15,20 @@ import {
   relationshipSocketService,
   type RelationshipRealtimePayload,
 } from "../../services/relationshipSocket.service";
+import { ConversationService } from "../../services/conversation.service";
+import { useConversations } from "../../contexts/ConversationsContext";
+import {
+  buildVirtualPrivateConversationItem,
+  cacheVirtualConversation,
+  persistPendingChatOpenTarget,
+} from "../../utils/chatConversation";
 
 interface ProfileActionsProps {
   isOwner: boolean;
   currentUserId: string;
   profileUserId?: string;
+  profileDisplayName?: string;
+  profileAvatarUrl?: string;
   onEditProfile: () => void;
 }
 interface ProfileActionProps {
@@ -29,8 +40,12 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   isOwner,
   currentUserId,
   profileUserId,
+  profileDisplayName,
+  profileAvatarUrl,
   onEditProfile,
 }) => {
+  const navigate = useNavigate();
+  const { conversations, addConversation } = useConversations();
   const [relationship, setRelationship] = useState<RelationshipResponse | null>(
     null,
   );
@@ -41,6 +56,78 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   });
 
   const [isPopUpShown, setIsPopUpShown] = useState<boolean>(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
+
+  const handleOpenChat = useCallback(async () => {
+    if (!currentUserId || !profileUserId || currentUserId === profileUserId) {
+      return;
+    }
+
+    try {
+      setIsOpeningChat(true);
+
+      const existingLocal = conversations.find((item) => {
+        if (item.conversation.type !== "private") return false;
+        return item.conversation.participants?.some(
+          (participant) =>
+            String(participant.user_id || participant._id || "") ===
+            String(profileUserId),
+        );
+      });
+
+      let targetConversation = existingLocal?.conversation;
+
+      if (!targetConversation) {
+        try {
+          const existingRemote =
+            await ConversationService.findPrivateConversation(
+              currentUserId,
+              profileUserId,
+            );
+          if (existingRemote?._id) {
+            targetConversation = existingRemote;
+            addConversation(existingRemote);
+          }
+        } catch (error) {
+          console.warn("Không thể kiểm tra hội thoại riêng hiện có:", error);
+        }
+      }
+
+      if (!targetConversation) {
+        const virtualItem = buildVirtualPrivateConversationItem({
+          currentUserId,
+          targetUserId: profileUserId,
+          targetName: profileDisplayName,
+          targetAvatar: profileAvatarUrl,
+        });
+        targetConversation = virtualItem.conversation;
+        cacheVirtualConversation(currentUserId, virtualItem);
+      }
+
+      const openTarget = {
+        conversationId: targetConversation._id,
+        conversation: targetConversation,
+        at: Date.now(),
+      };
+
+      persistPendingChatOpenTarget(openTarget);
+      navigate("/chat", {
+        state: {
+          openConversation: openTarget,
+        },
+      });
+    } finally {
+      setIsOpeningChat(false);
+    }
+  }, [
+    addConversation,
+    conversations,
+    currentUserId,
+    navigate,
+    profileAvatarUrl,
+    profileDisplayName,
+    profileUserId,
+  ]);
 
   const updateFromPayload = useCallback(
     (payload: RelationshipRealtimePayload) => {
@@ -249,11 +336,11 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   }, [currentUserId, profileUserId, refreshRelationship]);
 
   return (
-    <div className="flex gap-2 mb-4">
+    <div className="mb-4 flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-center md:justify-end">
       {isOwner ?
         <button
           onClick={onEditProfile}
-          className="bg-primary-100 text-primary-800 px-6 py-2 rounded-lg hover:bg-primary-200 transition font-medium text-sm">
+          className="w-full rounded-lg bg-primary-100 px-6 py-2 text-sm font-medium text-primary-800 transition hover:bg-primary-200 sm:w-auto">
           Chỉnh sửa trang cá nhân
         </button>
       : <>
@@ -261,7 +348,7 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
             <button
               onClick={profileAction.actionFn}
               disabled={currentStatus === "BLOCKED" || undefined}
-              className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 disabled:bg-primary-200 disabled:text-primary-500 disabled:cursor-not-allowed transition font-medium text-sm shadow-sm">
+              className="w-full rounded-lg bg-primary-600 px-6 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-200 disabled:text-primary-500 sm:w-auto">
               {profileAction.currentAction}
             </button>
 
@@ -299,8 +386,13 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
             )}
           </div>
 
-          <button className="bg-primary-50 text-primary-900 px-6 py-2 rounded-lg border border-primary-100 hover:bg-primary-100 transition font-medium text-sm">
-            Nhắn tin
+          <button
+            onClick={handleOpenChat}
+            disabled={isOpeningChat || currentStatus === "BLOCKED"}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-6 py-2 text-sm font-medium text-primary-900 transition hover:bg-primary-100 disabled:cursor-not-allowed disabled:bg-primary-50 disabled:text-primary-300 sm:w-auto"
+          >
+            <MessageCircle className="size-4" />
+            {isOpeningChat ? "Đang mở..." : "Nhắn tin"}
           </button>
         </>
       }

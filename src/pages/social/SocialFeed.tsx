@@ -26,6 +26,7 @@ const SocialFeed: React.FC = () => {
     loadingDB,
     loadingMore,
     hasMore,
+    loadError,
     containerRef,
     openModal,
     closeModal,
@@ -130,6 +131,7 @@ const SocialFeed: React.FC = () => {
               onShare={handleSharePost}
               currentUser={currentUser}
               loading={loadingDB}
+              loadError={loadError}
             />
           </>
         }

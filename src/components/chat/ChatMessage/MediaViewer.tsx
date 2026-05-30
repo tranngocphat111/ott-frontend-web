@@ -11,7 +11,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { Message } from "../../../types";
-import { getFullUrl } from "../../../utils";
+import { getFullUrl, parseBackendDate } from "../../../utils";
 import { MessageService } from "../../../services";
 import { downloadChatMedia } from "./downloadMedia";
 import { isMessageMediaFlagged } from "../../../utils/mediaModeration";
@@ -68,7 +68,8 @@ export const MediaViewer = ({
             url: getFullUrl(key),
             type: "image",
             imageIndex: idx,
-            createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+            createdAtMs:
+              parseBackendDate(m.createdAt || m.created_at)?.getTime() || 0,
             isFlagged: isMessageMediaFlagged(m, idx),
           });
         });
@@ -82,7 +83,8 @@ export const MediaViewer = ({
           url: getFullUrl(key),
           type: "video",
           imageIndex: 0,
-          createdAtMs: new Date(m.createdAt || m.created_at || 0).getTime(),
+          createdAtMs:
+            parseBackendDate(m.createdAt || m.created_at)?.getTime() || 0,
           isFlagged: isMessageMediaFlagged(m, 0),
         });
       }

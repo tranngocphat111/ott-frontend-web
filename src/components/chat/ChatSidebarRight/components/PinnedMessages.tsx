@@ -2,7 +2,7 @@ import React from "react";
 import { FileText, ImageIcon, Mic, Video, X } from "lucide-react";
 import type { PinnedMessagesProps } from "../../../../interfaces";
 import type { Message } from "../../../../types";
-import { getFileNameFromUrl, getFullUrl } from "../../../../utils";
+import { getFileNameFromUrl, getFullUrl, parseBackendDate } from "../../../../utils";
 
 const PinnedMessages: React.FC<PinnedMessagesProps> = ({
   messages,
@@ -150,15 +150,15 @@ const PinnedMessages: React.FC<PinnedMessagesProps> = ({
 
           <div className="text-[12px] text-slate-500 mt-2">
             {message.created_at || message.createdAt
-              ? new Date(
+              ? parseBackendDate(
                   message.created_at || message.createdAt || "",
-                ).toLocaleString("vi-VN", {
+                )?.toLocaleString("vi-VN", {
                   hour: "2-digit",
                   minute: "2-digit",
                   day: "2-digit",
                   month: "2-digit",
                   year: "numeric",
-                })
+                }) || "Không rõ thời gian"
               : "Không rõ thời gian"}
           </div>
         </div>

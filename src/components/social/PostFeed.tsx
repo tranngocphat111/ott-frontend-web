@@ -12,9 +12,14 @@ interface Props {
   onToggleLike: (id: string, key: ReactionKey | null) => void;
   onDelete: (id: string) => void;
   onEdit: (post: Post) => void;
-  onShare?: (postId: string, caption?: string, visibility: string) => Promise<{ ok: boolean; error?: string }>;
+  onShare?: (
+    postId: string,
+    caption?: string,
+    visibility: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   currentUser: PostUser;
   loading?: boolean;
+  loadError?: string | null;
 }
 
 const PostFeed: React.FC<Props> = ({
@@ -27,6 +32,7 @@ const PostFeed: React.FC<Props> = ({
   onShare,
   currentUser,
   loading = false,
+  loadError = null,
 }) => (
   <main className="w-full">
     <PostsList
@@ -39,6 +45,7 @@ const PostFeed: React.FC<Props> = ({
       onShare={onShare}
       currentUser={currentUser}
       loading={loading}
+      loadError={loadError}
     />
   </main>
 );

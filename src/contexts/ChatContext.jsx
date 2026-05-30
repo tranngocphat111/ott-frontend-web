@@ -8,6 +8,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import io from 'socket.io-client';
+import { parseBackendDate } from '../utils/timeUtils';
 
 const ChatContext = createContext();
 
@@ -109,7 +110,7 @@ export const ChatProvider = ({ children }) => {
 
       // Get the oldest message timestamp
       const oldestMessage = currentMessages[0];
-      const beforeTimestamp = new Date(oldestMessage.createdAt).getTime();
+      const beforeTimestamp = parseBackendDate(oldestMessage.createdAt)?.getTime() || 0;
 
       console.log(
         `📥 Loading older messages before ${new Date(beforeTimestamp).toISOString()}`

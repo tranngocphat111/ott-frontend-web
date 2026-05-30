@@ -61,6 +61,7 @@ import {
   getConversationDisplayAvatar,
   getFullUrl,
   getFileNameFromUrl,
+  parseBackendDate,
 } from "../../utils";
 import {
   convertDisplayShortcodeToEmoji,
@@ -175,8 +176,8 @@ const isRevokeWindowExpired = (msg: Message) => {
   const rawTime = msg.created_at || msg.createdAt;
   if (!rawTime) return false;
 
-  const createdTime = new Date(rawTime).getTime();
-  if (Number.isNaN(createdTime)) return false;
+  const createdTime = parseBackendDate(rawTime)?.getTime();
+  if (!createdTime) return false;
 
   return Date.now() - createdTime > REVOKE_WINDOW_MS;
 };
@@ -1103,8 +1104,8 @@ const ChatArea: React.FC<ExtendedChatAreaProps> = ({
       const normalized = Array.from(mergedById.values())
         .sort(
           (a, b) =>
-            new Date(b.pinned_at || b.createdAt || 0).getTime() -
-            new Date(a.pinned_at || a.createdAt || 0).getTime(),
+            (parseBackendDate(b.pinned_at || b.createdAt)?.getTime() || 0) -
+            (parseBackendDate(a.pinned_at || a.createdAt)?.getTime() || 0),
         )
         .slice(0, 3);
 

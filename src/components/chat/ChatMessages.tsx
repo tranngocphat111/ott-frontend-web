@@ -11,6 +11,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useChat } from '../../contexts/ChatContext';
+import { parseBackendDate } from '../../utils/timeUtils';
 import './ChatMessages.css';
 
 interface ChatMessagesProps {
@@ -179,7 +180,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                 {/* Edit indicator */}
                 {message.isEdited && (
                   <p className="text-xs opacity-70 mt-1">
-                    (chỉnh sửa {new Date(message.editedAt).toLocaleTimeString()})
+                    (chỉnh sửa {parseBackendDate(message.editedAt)?.toLocaleTimeString() || ""})
                   </p>
                 )}
 
@@ -189,10 +190,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                     isOwnMessage ? 'opacity-70' : 'opacity-60'
                   }`}
                 >
-                  {new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+                  {parseBackendDate(message.createdAt)?.toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
                     minute: '2-digit',
-                  })}
+                  }) || ""}
                 </p>
               </div>
 
