@@ -4,6 +4,8 @@ import {
   fetchFriends,
   fetchPendingRequests,
   rejectFriendRequest,
+  fetchBlockedUsers,
+  unblockRelationship,
   type FriendOption,
   type FriendRequestOption,
 } from "../../../services/social.service";
@@ -13,6 +15,7 @@ import {
 } from "../../../services/relationshipSocket.service";
 import FriendRequestsPanel from "../rightSidebar/FriendRequestsPanel";
 import FriendsPanel from "../rightSidebar/FriendsPanel";
+import BlockedUsersPanel from "../rightSidebar/BlockedUsersPanel";
 import { RelationshipListModal } from "../rightSidebar/RelationshipListModal";
 
 interface Props {
@@ -24,6 +27,8 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [friends, setFriends] = useState<FriendOption[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
+  const [blockedLoading, setBlockedLoading] = useState(false);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,6 +48,14 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
     const data = await fetchFriends(currentUserId);
     setFriends(data);
     setFriendsLoading(false);
+  }, [currentUserId]);
+
+  const loadBlocked = useCallback(async () => {
+    if (!currentUserId) return;
+    setBlockedLoading(true);
+    const data = await fetchBlockedUsers(currentUserId);
+    setBlockedUsers(data);
+    setBlockedLoading(false);
   }, [currentUserId]);
 
   const getOtherUserId = useCallback(
@@ -105,7 +118,8 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
 
     loadRequests();
     loadFriends();
-  }, [currentUserId, updateFromPayload, loadFriends, loadRequests]);
+    loadBlocked();
+  }, [currentUserId, updateFromPayload, loadFriends, loadRequests, loadBlocked]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -161,6 +175,15 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
     setBusyRequestId(null);
   };
 
+  const handleUnblock = async (relationshipId: string) => {
+    setBusyRequestId(relationshipId);
+    const ok = await unblockRelationship(relationshipId);
+    if (ok) {
+      setBlockedUsers((prev) => prev.filter((user) => user.id !== relationshipId));
+    }
+    setBusyRequestId(null);
+  };
+
   return (
     <div className="space-y-5">
       <FriendRequestsPanel
@@ -182,6 +205,13 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
           setModalTab("friends");
           setModalOpen(true);
         }}
+      />
+
+      <BlockedUsersPanel
+        blockedUsers={blockedUsers}
+        loading={blockedLoading}
+        busyId={busyRequestId}
+        onUnblock={handleUnblock}
       />
 
       <RelationshipListModal

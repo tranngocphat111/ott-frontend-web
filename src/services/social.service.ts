@@ -487,6 +487,21 @@ export async function blockRelationship(
     }
 }
 
+export async function blockUserDirectly(
+    requesterId: string,
+    receiverId: string,
+): Promise<boolean> {
+    try {
+        const res = await authFetch(
+            `${API_MEDIA_SERVER_URL}/relationships/block?requesterId=${requesterId}&receiverId=${receiverId}`,
+            { method: "POST", signal: AbortSignal.timeout(5_000) },
+        );
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 export async function unfriendRelationship(
     relationshipId: string,
 ): Promise<boolean> {
@@ -863,6 +878,219 @@ export async function fetchViewHistory(page = 0, size = 10): Promise<any[]> {
 export async function clearViewHistory(): Promise<boolean> {
     try {
         const res = await authFetch(`${API_MEDIA_SERVER_URL}/history`, { method: "DELETE" });
+        return res.ok;
+    } catch {
+export interface UserProfileUpdateResult {
+    bio: string | null;
+    work: string | null;
+    location: string | null;
+    relationshipStatus: string | null;
+}
+
+const requestPresignedUrl = async (
+    filename: string,
+    type: "AVATAR" | "COVER",
+): Promise<PresignedUrlResponse | null> => {
+    const res = await authFetch(
+        `${API_BASE_URL}/users/photos/presigned-url?filename=${encodeURIComponent(filename)}&type=${type}`,
+        { signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return unwrapApiResult<PresignedUrlResponse>(json);
+};
+
+const uploadToS3 = async (uploadUrl: string, file: File, contentType?: string | null) => {
+    const resolvedType = contentType || file.type || "application/octet-stream";
+    const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": resolvedType },
+        body: file,
+    });
+    if (!putRes.ok) {
+        throw new Error(`Upload failed (${putRes.status})`);
+    }
+};
+
+const updateUserPhoto = async (
+    type: "AVATAR" | "COVER",
+    file: File,
+): Promise<UserServiceProfile | null> => {
+    const presigned = await requestPresignedUrl(file.name, type);
+    if (!presigned) return null;
+
+    await uploadToS3(presigned.uploadUrl, file, presigned.contentType);
+
+    const endpoint = type === "AVATAR" ? "avatar" : "cover";
+    const res = await authFetch(`${API_BASE_URL}/users/photos/${endpoint}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            fileUrl: presigned.fileUrl,
+            s3Key: presigned.s3Key,
+            photoType: type,
+        }),
+        signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!res.ok) return null;
+    const json = await res.json();
+    return unwrapApiResult<UserServiceProfile>(json);
+};
+
+/**
+ * Upload avatar via multipart PATCH /users/{id}/avatar.
+ * Falls back silently if the backend endpoint is not yet available.
+ * Returns the new avatarUrl or null.
+ */
+export async function uploadUserAvatar(
+    userId: string,
+    file: File,
+): Promise<string | null> {
+    if (!userId) return null;
+    try {
+        const profile = await updateUserPhoto("AVATAR", file);
+        return profile?.avatarUrl ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Upload ảnh bìa via multipart PATCH /users/{id}/cover.
+ * Falls back silently if the backend endpoint is not yet available.
+ * Returns the new coverUrl or null.
+ */
+export async function uploadUserCover(
+    userId: string,
+    file: File,
+): Promise<string | null> {
+    if (!userId) return null;
+    try {
+        const profile = await updateUserPhoto("COVER", file);
+        return profile?.coverUrl ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Update user profile fields via PATCH /users/{id}.
+ * Maps frontend { relationship } → backend { relationshipStatus }.
+ * Returns updated ApiUser on success, throws Error with message on failure.
+ */
+export async function updateUserProfile(
+    userId: string,
+    fields: UserProfile,
+): Promise<UserProfileUpdateResult> {
+    if (!userId) {
+        throw new Error("Thiếu userId");
+    }
+
+    const body = {
+        bio: fields.bio,
+        work: fields.work,
+        location: fields.location,
+        relationshipStatus: fields.relationship,
+        phoneNumber: fields.phone,
+    };
+
+    const res = await authFetch(`${API_BASE_URL}/users/profile/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        throw new Error(`Lưu thất bại (${res.status}): ${text}`);
+    }
+
+    const json = await res.json();
+    const result = unwrapApiResult<UserServiceProfile>(json);
+
+    return {
+        bio: result?.bio ?? null,
+        work: result?.work ?? null,
+        location: result?.location ?? null,
+        relationshipStatus: result?.relationshipStatus ?? null,
+    };
+}
+
+// --- VIEW HISTORY & SAVED CONTENTS ---
+
+export async function toggleSaveContent(contentId: string, isSaved: boolean): Promise<boolean> {
+    try {
+        const method = isSaved ? "POST" : "DELETE";
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?contentId=${contentId}`, { method });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function checkIsSaved(contentId: string): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved/check?contentId=${contentId}`);
+        if (!res.ok) return false;
+        return await res.json();
+    } catch {
+        return false;
+    }
+}
+
+export async function fetchSavedContents(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/saved?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function recordViewHistory(contentId: string): Promise<void> {
+    try {
+        await authFetch(`${API_MEDIA_SERVER_URL}/history?contentId=${contentId}`, { method: "POST" });
+    } catch (e) {
+        // fail silently
+    }
+}
+
+export async function fetchViewHistory(page = 0, size = 10): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history?page=${page}&size=${size}`);
+        if (!res.ok) return [];
+        const json = await res.json();
+        return json.content || [];
+    } catch {
+        return [];
+    }
+}
+
+export async function clearViewHistory(): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/history`, { method: "DELETE" });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+export async function fetchBlockedUsers(userId: string): Promise<any[]> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/blocked/${userId}`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch {
+        return [];
+    }
+}
+
+export async function unblockRelationship(relationshipId: string): Promise<boolean> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/unblock`, { method: "DELETE" });
         return res.ok;
     } catch {
         return false;

@@ -3,6 +3,7 @@ import {
   cancelRelationship,
   acceptFriendRequest,
   blockRelationship,
+  blockUserDirectly,
   fetchRelationshipOf,
   rejectFriendRequest,
   sendFriendRequest,
@@ -133,8 +134,13 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   };
 
   const handleBlock = async () => {
-    if (!relationship?.id) return;
-    const ok = await blockRelationship(relationship.id, currentUserId);
+    let ok = false;
+    if (relationship?.id) {
+      ok = await blockRelationship(relationship.id, currentUserId);
+    } else {
+      ok = await blockUserDirectly(currentUserId, profileUserId);
+    }
+    
     if (ok) {
       setCurrentStatus("BLOCKED");
     }

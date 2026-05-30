@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import type { TabKey } from "../../components/social/ProfileTabs";
 import ProfileHeader from "../../components/social/ProfileHeader";
 import PostsTab from "../../components/social/PostsTab";
@@ -17,6 +17,7 @@ import { getFullUrl } from "../../utils/fileUtils";
 
 const SocialProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
 
   /* ── Tabs ─────────────────────────────────────────── */
   const [activeTab, setActiveTab] = useState<TabKey>("posts");
@@ -125,6 +126,21 @@ const SocialProfile: React.FC = () => {
 
   const shownAvatar = getFullUrl(localAvatar || profileUser?.avatarUrl);
   const shownCover = getFullUrl(localCover || profileUser?.coverUrl);
+
+  if (!loading && profile.relationship === "BLOCKED") {
+    return (
+      <div className="bg-primary-50 w-full h-full flex flex-col items-center justify-center">
+        <i className="fi fi-rr-ban text-6xl text-slate-400 mb-4"></i>
+        <h2 className="text-xl font-bold text-slate-700">Trang cá nhân không khả dụng</h2>
+        <button 
+          onClick={() => navigate('/social')}
+          className="mt-6 bg-primary-600 text-white px-6 py-2 rounded-lg font-medium shadow-sm hover:bg-primary-700 transition"
+        >
+          Trở về Bảng tin
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-primary-50 w-full h-full overflow-y-auto">

@@ -5,10 +5,12 @@ import SocialProfile from "./social/SocialProfile";
 import SavedFeed from "./social/SavedFeed";
 import HistoryFeed from "./social/HistoryFeed";
 import SocialSearch from "./social/SocialSearch";
+import StandalonePostView from "./social/StandalonePostView";
+import StandaloneStoryView from "./social/StandaloneStoryView";
 
 /**
  * SocialPage - Component chính cho trang xã hội
- * Quản lý routing cho các sub-routes: feed, profile, saved, history
+ * Quản lý routing cho các sub-routes: feed, profile, saved, history, post, story
  */
 const SocialPage: React.FC = () => {
   return (
@@ -21,6 +23,12 @@ const SocialPage: React.FC = () => {
 
       {/* Trang cá nhân - Profile */}
       <Route path="profile/:userId" element={<SocialProfile />} />
+
+      {/* Chi tiết bài viết - Post */}
+      <Route path="post/:postId" element={<StandalonePostView />} />
+
+      {/* Chi tiết story - Story */}
+      <Route path="story/:storyId" element={<StandaloneStoryView />} />
 
       {/* Trang đã lưu - Saved */}
       <Route path="saved" element={<SavedFeed />} />

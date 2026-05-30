@@ -101,7 +101,7 @@ export class UserService {
 
   static async searchUsers(query: string): Promise<User[]> {
     try {
-      const response = await authFetch(`${API_BASE_URL}/users/search?q=${encodeURIComponent(query)}`, {
+      const response = await authFetch(`${API_BASE_URL}/media/users/search?q=${encodeURIComponent(query)}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -114,19 +114,20 @@ export class UserService {
 
       const data = await response.json();
       
-      // Map API Response format ({ message, result: [...] }) to User[]
-      const usersList = data.result || [];
+      // media-service returns an array directly, but just in case it's wrapped
+      const usersList = Array.isArray(data) ? data : data.content || data.result || [];
       return usersList.map((user: any) => ({
         _id: user.id || user._id,
         user_id: user.id || user.user_id || '',
-        name: user.fullName || user.name || '',
-        display_name: user.fullName || user.name || '',
+        name: user.displayName || user.fullName || user.name || user.username || '',
+        display_name: user.displayName || user.fullName || user.name || user.username || '',
         avatar: user.avatarUrl || user.avatar || '',
         is_online: user.is_online || false,
         status: user.is_online ? "online" : "offline",
         avatar_url: user.avatarUrl || user.avatar || undefined,
-        phone: user.phone,
+        phone: user.phoneNumber || user.phone,
         email: user.email,
+        relationshipStatus: user.relationshipStatus,
       }));
     } catch (error) {
       console.error("Error searching users:", error);

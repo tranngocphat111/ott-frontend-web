@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, BellRing, CheckCircle2, Trash2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -27,6 +28,7 @@ type RichNotification = InAppNotification & {
   actorAvatarUrl?: string;
   metadata?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  referenceId?: string;
 };
 
 const getString = (value: unknown) =>
@@ -90,6 +92,7 @@ const formatTime = (isoString: string) => {
 };
 
 const NotificationMenu: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [senderProfiles, setSenderProfiles] = useState<
@@ -210,6 +213,26 @@ const NotificationMenu: React.FC = () => {
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true })),
       );
+    }
+  };
+
+  const handleNotificationClick = (notification: RichNotification) => {
+    if (!notification.isRead) {
+      handleMarkAsRead(notification.id);
+    }
+
+    setShowMenu(false);
+
+    // Look for referenceId in the top level or data/metadata
+    const refId = notification.referenceId || notification.data?.referenceId || notification.metadata?.referenceId;
+    const type = notification.type;
+
+    if (!refId) return;
+
+    if (type === "NEW_POST" || type === "UPDATE_POST" || type === "POST") {
+      navigate(`/social/post/${refId}`);
+    } else if (type === "NEW_STORY" || type === "UPDATE_STORY" || type === "STORY") {
+      navigate(`/social/story/${refId}`);
     }
   };
 
@@ -338,10 +361,7 @@ const NotificationMenu: React.FC = () => {
                           ? "bg-primary-50"
                           : "hover:bg-[#fbf6f1]"
                       }`}
-                      onClick={() =>
-                        !notification.isRead &&
-                        handleMarkAsRead(notification.id)
-                      }
+                      onClick={() => handleNotificationClick(richNotification)}
                     >
                       <Avatar
                         src={senderAvatar}

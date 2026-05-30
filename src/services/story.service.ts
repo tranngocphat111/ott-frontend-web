@@ -324,6 +324,19 @@ export async function fetchStories(accountId: string): Promise<StoryReelData> {
     return { storyGroups, suggestedUsers: [] };
 }
 
+export async function fetchStoryById(storyId: string): Promise<StoryItem | null> {
+    try {
+        const res = await authFetch(`${API_MEDIA_SERVER_URL}/stories/${storyId}`);
+        if (!res.ok) return null;
+        const json = await res.json();
+        const apiStory = unwrapApiResult<ApiStory>(json);
+        if (!apiStory) return null;
+        return mapStory(apiStory);
+    } catch {
+        return null;
+    }
+}
+
 export async function createStory(request: StoryCreateRequest): Promise<ApiStory | null> {
     try {
         const res = await authFetch(`${API_MEDIA_SERVER_URL}/stories`, {

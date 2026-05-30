@@ -129,6 +129,10 @@ export const ROUTE_PATHS = {
   CALL: "/call",
   SOCIAL_PROFILE: (userId?: string) =>
     userId ? `/social/profile/${userId}` : "/social/profile/:userId",
+  SOCIAL_POST: (postId?: string) =>
+    postId ? `/social/post/${postId}` : "/social/post/:postId",
+  SOCIAL_STORY: (storyId?: string) =>
+    storyId ? `/social/story/${storyId}` : "/social/story/:storyId",
 } as const;
 
 export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];
