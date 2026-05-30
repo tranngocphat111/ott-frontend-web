@@ -1,5 +1,5 @@
 import type { User } from "../types";
-import { API_CHAT_SERVER_URL } from "../config/api.config";
+import { API_CHAT_SERVER_URL, API_BASE_URL } from "../config/api.config";
 import { authFetch } from "./api/fetchClient";
 
 export class UserService {
@@ -96,6 +96,41 @@ export class UserService {
     } catch (error) {
       console.error(`Error fetching user by phone ${phone}:`, error);
       return null;
+    }
+  }
+
+  static async searchUsers(query: string): Promise<User[]> {
+    try {
+      const response = await authFetch(`${API_BASE_URL}/users/search?q=${encodeURIComponent(query)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Map API Response format ({ message, result: [...] }) to User[]
+      const usersList = data.result || [];
+      return usersList.map((user: any) => ({
+        _id: user.id || user._id,
+        user_id: user.id || user.user_id || '',
+        name: user.fullName || user.name || '',
+        display_name: user.fullName || user.name || '',
+        avatar: user.avatarUrl || user.avatar || '',
+        is_online: user.is_online || false,
+        status: user.is_online ? "online" : "offline",
+        avatar_url: user.avatarUrl || user.avatar || undefined,
+        phone: user.phone,
+        email: user.email,
+      }));
+    } catch (error) {
+      console.error("Error searching users:", error);
+      return [];
     }
   }
 }

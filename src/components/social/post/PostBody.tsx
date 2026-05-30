@@ -2,6 +2,7 @@ import React from "react";
 import type { PostMediaItem } from "../types";
 import PostMediaCarousel from "../PostMediaCarousel";
 import PostMediaGrid from "../PostMediaGrid";
+import TextTagRenderer from "../../../utils/TextTagRenderer";
 
 interface Props {
   content?: string;
@@ -24,7 +25,9 @@ const PostBody: React.FC<Props> = ({
   return (
     <>
       {content && (
-        <p className="px-4 pb-3 text-gray-800 leading-relaxed">{content}</p>
+        <div className="px-4 pb-3 text-gray-800 leading-relaxed">
+          <TextTagRenderer content={content} />
+        </div>
       )}
       <MediaComponent
         media={media}
