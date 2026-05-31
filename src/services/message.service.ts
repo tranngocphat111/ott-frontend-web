@@ -485,7 +485,18 @@ export class MessageService {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage =
+            errorData?.message ||
+            errorData?.error ||
+            errorData?.details ||
+            errorMessage;
+        } catch {
+          // Keep fallback status message when body is not JSON.
+        }
+        throw new Error(String(errorMessage));
       }
 
       return await response.json();
