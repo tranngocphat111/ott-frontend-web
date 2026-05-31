@@ -100,13 +100,14 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
           if (otherUserId) {
             setFriends((prev) => prev.filter((f) => f.id !== otherUserId));
           }
+          loadBlocked();
           break;
         }
         default:
           break;
       }
     },
-    [currentUserId, getOtherUserId, loadFriends, loadRequests],
+    [currentUserId, getOtherUserId, loadFriends, loadRequests, loadBlocked],
   );
 
   useEffect(() => {

@@ -119,6 +119,7 @@ export class UserService {
       return usersList.map((user: any) => ({
         _id: user.id || user._id,
         user_id: user.id || user.user_id || '',
+        username: user.username || '',
         name: user.displayName || user.fullName || user.name || user.username || '',
         display_name: user.displayName || user.fullName || user.name || user.username || '',
         avatar: user.avatarUrl || user.avatar || '',

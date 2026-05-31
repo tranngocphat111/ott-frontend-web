@@ -16,7 +16,6 @@ interface UserProfile {
   work: string;
   location: string;
   relationship: string;
-  phone: string;
 }
 
 interface AboutTabProps {
@@ -132,13 +131,6 @@ const AboutTab: React.FC<AboutTabProps> = ({
           }
           editing={editingAbout}
           onChange={(v) => onUpdateDraft("relationship", v)}
-        />
-        <EditField
-          icon={<Phone className="size-4" />}
-          placeholder="Số điện thoại..."
-          value={editingAbout ? draftProfile.phone : profile.phone}
-          editing={editingAbout}
-          onChange={(v) => onUpdateDraft("phone", v)}
         />
       </div>
     </div>

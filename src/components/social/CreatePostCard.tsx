@@ -1,5 +1,5 @@
 import React from "react";
-import { Image, Smile, Video } from "lucide-react";
+import { Image, Smile } from "lucide-react";
 import type { PostUser } from "./types";
 import UserAvatar from "./UserAvatar";
 
@@ -26,12 +26,12 @@ const CreatePostCard: React.FC<Props> = ({
       </button>
     </div>
     <div className="border-t border-primary-100 pt-2 flex">
-      <button
+      {/* <button
         onClick={onOpenModal}
         className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition text-primary-700">
         <Video className="size-5 text-primary-500" />
         <span className="text-sm font-medium">Live</span>
-      </button>
+      </button> */}
       <button
         onClick={onOpenModal}
         className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition text-primary-700">

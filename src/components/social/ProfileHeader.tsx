@@ -76,7 +76,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             {/* Avatar */}
             <div className="relative -mt-20">
               <div className="size-32 md:size-40 rounded-full overflow-hidden border-4 border-white shadow-xl bg-gray-100 flex items-center justify-center">
-                {avatarUrl ? (
+                {avatarUrl ?
                   <img
                     src={avatarUrl}
                     alt={displayName}
@@ -85,13 +85,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                       (e.target as HTMLImageElement).src = avatar;
                     }}
                   />
-                ) : (
-                  <img
+                : <img
                     src={avatar}
                     alt="Profile"
                     className="size-full object-cover"
                   />
-                )}
+                }
               </div>
               {isOwner && (
                 <button
@@ -107,9 +106,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <h1 className="text-3xl font-bold text-gray-800">
                 {displayName}
               </h1>
-              {username && username !== displayName && (
-                <p className="text-gray-400 text-sm mt-0.5">@{username}</p>
-              )}
               {bio && (
                 <p className="text-gray-500 mt-1 text-sm max-w-sm">{bio}</p>
               )}
