@@ -6,7 +6,7 @@ interface Props {
   className?: string;
 }
 
-const MENTION_RE = /@([A-Za-z0-9_.-]+)/g;
+const MENTION_RE = /@\[(.*?)\]\(([A-Za-z0-9_-]+)\)|@([A-Za-z0-9_.-]+)/g;
 const HASHTAG_RE = /#([A-Za-z0-9_.-]+)/g;
 
 function escapeHtml(s: string) {
@@ -40,20 +40,39 @@ export default function TextTagRenderer({ content, className }: Props) {
     }
     const full = match[0];
     if (full.startsWith("@")) {
-      const username = match[1];
+      const displayName = match[1] || match[3];
+      const linkTarget = match[2] || match[3];
+      const isBracketFormat = !!match[1];
+      
       parts.push(
-        <Link
+        <span
           key={`m-${start}`}
-          to={`/social/search?q=@${encodeURIComponent(username)}`}
-          className="text-primary-600 hover:underline"
-          onClick={(e) => {
-            // allow link normal behavior
-          }}>
-          @{username}
-        </Link>,
+          className="cursor-pointer text-primary-600 hover:underline"
+          onClick={async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isBracketFormat) {
+              navigate(`/social/profile/${linkTarget}`);
+            } else {
+              try {
+                const socialService = await import("../services/social.service");
+                const user = await socialService.fetchUserByUsername(linkTarget);
+                if (user) {
+                  navigate(`/social/profile/${user.id}`);
+                } else {
+                  navigate(`/social/search?q=${encodeURIComponent("@" + linkTarget)}`);
+                }
+              } catch {
+                navigate(`/social/search?q=${encodeURIComponent("@" + linkTarget)}`);
+              }
+            }
+          }}
+        >
+          {isBracketFormat ? `@${displayName}` : full}
+        </span>
       );
     } else if (full.startsWith("#")) {
-      const tag = match[2];
+      const tag = match[4];
       parts.push(
         <Link
           key={`h-${start}`}

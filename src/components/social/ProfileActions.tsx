@@ -250,6 +250,10 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   }, [currentUserId, profileUserId]);
 
   useEffect(() => {
+    refreshRelationship();
+  }, [refreshRelationship]);
+
+  useEffect(() => {
     const getProfileAction = (status: string | null) => {
       if (status === "REMOVED" || status === "BLOCKED") {
         setProfileAction({
@@ -257,13 +261,13 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
           actionFn: async () => {
             await sendFriendRequest(currentUserId, profileUserId);
             setCurrentStatus("PENDING");
+            setRelationship((prev) => prev ? { ...prev, requesterId: currentUserId } : { requesterId: currentUserId, receiverId: profileUserId, id: "", status: "PENDING", type: "FRIEND", createAt: new Date(), acceptedAt: new Date(), requesterUsername: "", requesterAvatarUrl: "", receiverUsername: "", receiverAvatarUrl: "" });
           },
         });
         return;
       }
 
       if (status === "PENDING") {
-        console.log(relationship?.requesterId);
         if (relationship?.requesterId === currentUserId) {
           setProfileAction({
             currentAction: "Đã gửi lời mời kết bạn",
@@ -292,8 +296,6 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
       }
     };
 
-    refreshRelationship();
-
     getProfileAction(currentStatus);
   }, [
     currentUserId,
@@ -301,7 +303,6 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
     currentStatus,
     relationship?.id,
     relationship?.requesterId,
-    refreshRelationship,
   ]);
 
   useEffect(() => {

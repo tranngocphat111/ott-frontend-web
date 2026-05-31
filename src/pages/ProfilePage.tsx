@@ -138,7 +138,6 @@ const ProfilePage: React.FC = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   <InfoRow label="Họ và tên" value={user.fullName} />
-                  <InfoRow label="Số điện thoại" value={user.phone} />
                   <InfoRow label="Email" value={user.email} />
                   <InfoRow label="Giới thiệu" value={user.bio || undefined} />
                   <InfoRow label="Công việc" value={user.work || undefined} />

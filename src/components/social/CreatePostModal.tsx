@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Globe, Lock, Users } from "lucide-react";
+import MentionInput from "../common/MentionInput";
 import { fetchFriends, type FriendOption } from "../../services/social.service";
 import {
   AddToPostToolbar,
@@ -334,11 +335,16 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
           )}
 
           {/* Text area */}
-          <div className="px-4 pb-2">
-            <textarea
+          <div className="px-4 pb-2 relative z-50">
+            <MentionInput
               value={content}
+              dropdownPosition="bottom"
               onChange={(e) => {
                 setContent(e.target.value);
+                setSubmitError(null);
+              }}
+              onValueChange={(val) => {
+                setContent(val);
                 setSubmitError(null);
               }}
               placeholder={`${currentUser.displayName.split(" ").pop()} ơi, bạn đang nghĩ gì vậy?`}
