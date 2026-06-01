@@ -14,6 +14,7 @@ import { useCoverUpload } from "../../hooks/social/useCoverUpload";
 import { useAboutEdit } from "../../hooks/social/useAboutEdit";
 import { usePostActions } from "../../hooks/social/usePostActions";
 import { getFullUrl } from "../../utils/fileUtils";
+import UserNotAvailable from "../../components/social/UserNotAvailable";
 
 const SocialProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -36,6 +37,7 @@ const SocialProfile: React.FC = () => {
     setUserReactionMap,
     postReactionCountsMap,
     loading,
+    isBlocked,
   } = useProfileData(userId, feedCurrentUser);
 
   const {
@@ -127,19 +129,8 @@ const SocialProfile: React.FC = () => {
   const shownAvatar = getFullUrl(localAvatar || profileUser?.avatarUrl);
   const shownCover = getFullUrl(localCover || profileUser?.coverUrl);
 
-  if (!loading && profile.relationship === "BLOCKED") {
-    return (
-      <div className="bg-primary-50 w-full h-full flex flex-col items-center justify-center">
-        <i className="fi fi-rr-ban text-6xl text-slate-400 mb-4"></i>
-        <h2 className="text-xl font-bold text-slate-700">Trang cá nhân không khả dụng</h2>
-        <button 
-          onClick={() => navigate('/social')}
-          className="mt-6 bg-primary-600 text-white px-6 py-2 rounded-lg font-medium shadow-sm hover:bg-primary-700 transition"
-        >
-          Trở về Bảng tin
-        </button>
-      </div>
-    );
+  if (!loading && isBlocked) {
+    return <UserNotAvailable />;
   }
 
   return (

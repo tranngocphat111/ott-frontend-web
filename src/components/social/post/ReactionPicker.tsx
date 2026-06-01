@@ -6,6 +6,7 @@ interface Props {
   onSelect: (key: ReactionKey) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  alignRight?: boolean;
 }
 
 const ReactionPicker: React.FC<Props> = ({
@@ -13,11 +14,12 @@ const ReactionPicker: React.FC<Props> = ({
   onSelect,
   onMouseEnter,
   onMouseLeave,
+  alignRight,
 }) => (
   <div
     onMouseEnter={onMouseEnter}
     onMouseLeave={onMouseLeave}
-    className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl px-2 py-1.5 flex items-center gap-1 z-20"
+    className={`absolute bottom-full mb-2 bg-white border border-gray-200 rounded-2xl shadow-xl px-2 py-1.5 flex items-center gap-1 z-20 ${alignRight ? "right-0" : "left-0"}`}
     style={{ minWidth: "max-content" }}>
     {REACTIONS.map((r) => (
       <button

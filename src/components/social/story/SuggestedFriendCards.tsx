@@ -65,6 +65,7 @@ const SuggestedFriendCards: React.FC<Props> = ({ users, currentUserId }) => {
     setPendingMap({});
     pendingMapRef.current = {};
     relationshipSocketService.connect();
+    relationshipSocketService.joinUserRoom(currentUserId);
 
     const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
       if (!payload) return;

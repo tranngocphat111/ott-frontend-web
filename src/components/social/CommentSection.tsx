@@ -20,7 +20,6 @@ import {
 } from "../../services/mediaSocket.service";
 import type { PostUser } from "./types";
 import TextTagRenderer from "../../utils/TextTagRenderer";
-import MentionInput from "../common/MentionInput";
 
 const ROOT_PAGE_SIZE = 20;
 const REPLY_PAGE_SIZE = 10;
@@ -633,11 +632,10 @@ const CommentSection: React.FC<Props> = ({
           onClick={(e) => e.stopPropagation()}>
           {renderAvatar(currentUser.name, currentUser.avatar, currentUser.id)}
           <div className="flex-1 flex items-center bg-primary-50 rounded-full px-3 gap-2">
-            <MentionInput
-              multiline={false}
+            <input
+              type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onValueChange={(val) => setText(val)}
               onKeyDown={(e) => {
                 if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
                 e.preventDefault();

@@ -308,6 +308,9 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   useEffect(() => {
     if (!currentUserId || !profileUserId) return;
 
+    relationshipSocketService.connect();
+    relationshipSocketService.joinUserRoom(currentUserId);
+
     const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
       if (!payload) return;
 

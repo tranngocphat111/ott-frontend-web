@@ -18,13 +18,21 @@ import {
 } from "lucide-react";
 import avatar from "../../../assets/avatar.png";
 import { useAuth } from "../../../contexts/AuthContext";
-import CommentSection from "../CommentSection";
 import ReactionPicker from "../post/ReactionPicker";
 import PostReactionsListModal from "../post/PostReactionsListModal";
 import { REACTIONS } from "../post/reactions";
 import type { ReactionKey } from "../post/reactions";
 import { toggleLike, fetchPostReactions } from "../../../services/post.service";
 import TextTagRenderer from "../../../utils/TextTagRenderer";
+import { API_CONFIG } from "../../../config/api";
+
+const resolveMediaUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("blob:") || url.startsWith("data:")) return url;
+  const base = API_CONFIG.BASE_URL.replace(/\/$/, "");
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${base}${path}`;
+};
 import {
   checkIsSaved,
   toggleSaveContent,
@@ -88,10 +96,6 @@ const StoryViewer: React.FC<Props> = ({
   const [hasVideoAudio, setHasVideoAudio] = useState(true);
 
   const { user } = useAuth();
-  const [sidebarTab, setSidebarTab] = useState<"stories" | "comments">(
-    "stories",
-  );
-  const [showMobileComments, setShowMobileComments] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showReactionsList, setShowReactionsList] = useState(false);
 
@@ -113,7 +117,6 @@ const StoryViewer: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (!activeStory) return;
-    setShowMobileComments(false);
 
     // Ghi nhận lượt xem
     recordViewHistory(activeStory.id);
@@ -173,7 +176,7 @@ const StoryViewer: React.FC<Props> = ({
     } else {
       setUserReaction(
         res.liked && res.reactionType ?
-          (res.reactionType as ReactionKey)
+          (res.reactionType.toLowerCase() as ReactionKey)
         : null,
       );
     }
@@ -214,18 +217,11 @@ const StoryViewer: React.FC<Props> = ({
         <aside className="hidden lg:flex w-[320px] border-r border-white/10 bg-[#0c0d0f] flex-col">
           <div className="flex border-b border-white/10 shrink-0">
             <button
-              onClick={() => setSidebarTab("stories")}
-              className={`flex-1 py-5 text-sm font-semibold transition text-center ${sidebarTab === "stories" ? "text-white border-b-2 border-white" : "text-white/40 hover:text-white/60"}`}>
+              className="flex-1 py-5 text-sm font-semibold transition text-center text-white border-b-2 border-white">
               Danh sách Story
-            </button>
-            <button
-              onClick={() => setSidebarTab("comments")}
-              className={`flex-1 py-5 text-sm font-semibold transition text-center ${sidebarTab === "comments" ? "text-white border-b-2 border-white" : "text-white/40 hover:text-white/60"}`}>
-              Bình luận
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {sidebarTab === "stories" ?
               <div className="p-4 space-y-2">
                 {storyGroups.map((group) => (
                   <button
@@ -247,25 +243,12 @@ const StoryViewer: React.FC<Props> = ({
                   </button>
                 ))}
               </div>
-            : <div className="h-full bg-white text-slate-900">
-                <CommentSection
-                  postId={activeStory.id}
-                  currentUser={{
-                    id: user?.id || "",
-                    name: user?.fullName || "Khách",
-                    displayName: user?.fullName || "Khách",
-                    avatar: user?.avatarUrl,
-                    color: "#3b82f6",
-                  }}
-                />
-              </div>
-            }
           </div>
         </aside>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center px-6">
-          <div className="relative w-[360px] sm:w-[390px] h-[640px] sm:h-[680px] rounded-[32px] bg-[#a7b4bb] shadow-[0_40px_90px_-45px_rgba(15,23,42,0.9)] overflow-hidden">
+        <div className="flex-1 flex items-center justify-center sm:py-5">
+          <div className="relative w-full sm:w-[400px] h-full sm:h-full rounded-none sm:rounded-[24px] bg-[#a7b4bb] shadow-[0_40px_90px_-45px_rgba(15,23,42,0.9)] overflow-hidden">
             {/* Progress Bars */}
             <div className="absolute top-3 left-4 right-4 z-20">
               <div className="h-1.5 rounded-full bg-white/40 overflow-hidden">
@@ -388,13 +371,13 @@ const StoryViewer: React.FC<Props> = ({
                         }}>
                         {item.type === "IMAGE" && item.url ?
                           <img
-                            src={item.url}
+                            src={resolveMediaUrl(item.url)}
                             alt=""
                             className="w-full h-full object-contain"
                           />
                         : item.type === "VIDEO" && item.url ?
                           <video
-                            src={item.url}
+                            src={resolveMediaUrl(item.url)}
                             className="w-full h-full object-contain"
                             autoPlay
                             muted
@@ -420,14 +403,14 @@ const StoryViewer: React.FC<Props> = ({
                     ))
                 : activeStory.contentType === "IMAGE" && activeStory.imageUrl ?
                   <img
-                    src={activeStory.imageUrl}
+                    src={resolveMediaUrl(activeStory.imageUrl)}
                     alt={activeStory.name}
                     className="w-full h-full object-contain"
                   />
                 : activeStory.contentType === "VIDEO" && activeStory.videoUrl ?
                   <video
                     ref={videoRef}
-                    src={activeStory.videoUrl}
+                    src={resolveMediaUrl(activeStory.videoUrl)}
                     className="w-full h-full object-contain"
                     autoPlay
                     playsInline
@@ -488,19 +471,7 @@ const StoryViewer: React.FC<Props> = ({
             />
 
             {/* Bottom Interaction Bar */}
-            <div className="absolute bottom-5 left-5 right-5 z-30 flex items-center gap-3 pointer-events-auto">
-              <button
-                onClick={() => {
-                  if (!isPaused) onTogglePause();
-                  if (window.innerWidth < 1024) {
-                    setShowMobileComments(true);
-                  } else {
-                    setSidebarTab("comments");
-                  }
-                }}
-                className="flex-1 h-11 rounded-full border border-white/30 bg-black/30 backdrop-blur-md px-4 flex items-center text-white/90 hover:bg-white/20 transition text-[13px] font-medium">
-                Gửi bình luận...
-              </button>
+            <div className="absolute bottom-5 left-5 right-5 z-30 flex items-center justify-end pointer-events-auto gap-3">
 
               <div
                 className="flex items-center gap-1.5 relative"
@@ -513,13 +484,14 @@ const StoryViewer: React.FC<Props> = ({
                       onSelect={(key) => handleLike(key)}
                       onMouseEnter={() => setShowPicker(true)}
                       onMouseLeave={() => setShowPicker(false)}
+                      alignRight
                     />
                   </div>
                 )}
 
                 <button
-                  onClick={() => handleLike(userReaction || "LIKE")}
-                  className="size-10 rounded-full flex items-center justify-center hover:bg-white/10 transition">
+                  onClick={() => handleLike(userReaction || "love")}
+                  className="size-10 rounded-full border border-white/30 bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-white/20 transition">
                   {userReaction ?
                     <span className="text-2xl">
                       {REACTIONS.find((r) => r.key === userReaction)?.emoji}
@@ -552,38 +524,6 @@ const StoryViewer: React.FC<Props> = ({
           )}
         </div>
       </div>
-
-      {/* Mobile Comments Bottom Sheet */}
-      {showMobileComments && (
-        <div className="fixed inset-0 z-[70] lg:hidden flex flex-col justify-end pointer-events-none">
-          <div
-            className="absolute inset-0 bg-transparent pointer-events-auto"
-            onClick={() => setShowMobileComments(false)}
-          />
-          <div className="bg-white w-full rounded-t-[2rem] overflow-hidden pointer-events-auto flex flex-col max-h-[75vh] animate-in slide-in-from-bottom-full duration-300">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900 text-base">Bình luận</h3>
-              <button
-                onClick={() => setShowMobileComments(false)}
-                className="size-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition">
-                <X className="size-4 text-gray-600" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto bg-white">
-              <CommentSection
-                postId={activeStory.id}
-                currentUser={{
-                  id: user?.id || "",
-                  name: user?.fullName || "Khách",
-                  displayName: user?.fullName || "Khách",
-                  avatar: user?.avatarUrl,
-                  color: "#3b82f6",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Reactions Modal */}
       {showReactionsList && (

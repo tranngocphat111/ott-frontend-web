@@ -9,6 +9,8 @@ import {
   fetchUserReactions,
   fetchPostReactions,
 } from "../../services/post.service";
+import { fetchRelationshipOf } from "../../services/social.service";
+import { relationshipSocketService, type RelationshipRealtimePayload } from "../../services/relationshipSocket.service";
 
 interface ProfileUser {
   displayName: string;
@@ -41,6 +43,7 @@ export const useProfileData = (
     Record<string, Record<string, number>>
   >({});
   const [loading, setLoading] = useState(true);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -51,7 +54,7 @@ export const useProfileData = (
       const currentUserId: string | undefined = initialCurrentUser?.id;
 
       // Load full profile fields and set profile user
-      const full = await fetchUserById(userId);
+      const full = await fetchUserById(userId).catch(() => null);
       let chatUser = null;
       
       try {
@@ -59,6 +62,16 @@ export const useProfileData = (
         chatUser = await UserService.getUserById(userId);
       } catch (e) {
         console.error("Failed to fetch user from chat service", e);
+      }
+
+      // Check block status if we have a current user
+      let blocked = false;
+      if (currentUserId && currentUserId !== userId) {
+        const rel = await fetchRelationshipOf(currentUserId, userId).catch(() => null);
+        if (rel?.status === "BLOCKED") {
+          blocked = true;
+          setIsBlocked(true);
+        }
       }
 
       if (full || chatUser) {
@@ -77,23 +90,26 @@ export const useProfileData = (
         });
       }
 
-      // Load posts
-      const userPosts = await fetchPostsByUser(userId, currentUserId);
-      setPosts(userPosts);
+      // If blocked, we can skip fetching posts and reactions
+      if (!blocked) {
+        // Load posts
+        const userPosts = await fetchPostsByUser(userId, currentUserId).catch(() => []);
+        setPosts(userPosts);
 
-      // Load post reactions
-      if (userPosts.length > 0) {
-        const reactionResults = await Promise.all(
-          userPosts.map((p) => fetchPostReactions(p.id)),
-        );
-        const countsMap: Record<string, Record<string, number>> = {};
-        userPosts.forEach((p, i) => {
-          countsMap[p.id] = reactionResults[i];
-        });
-        setPostReactionCountsMap(countsMap);
+        // Load post reactions
+        if (userPosts.length > 0) {
+          const reactionResults = await Promise.all(
+            userPosts.map((p) => fetchPostReactions(p.id).catch(() => ({}))),
+          );
+          const countsMap: Record<string, Record<string, number>> = {};
+          userPosts.forEach((p, i) => {
+            countsMap[p.id] = reactionResults[i];
+          });
+          setPostReactionCountsMap(countsMap);
+        }
       }
 
-      // Load user reactions
+      // Load user reactions (for current user, safe to fetch)
       if (currentUserId) {
         const reactions = await fetchUserReactions(currentUserId);
         const map: Record<string, string> = {};
@@ -109,6 +125,33 @@ export const useProfileData = (
     })();
   }, [userId, initialCurrentUser]);
 
+  // Realtime relationship listener to detect blocks
+  useEffect(() => {
+    if (!userId || !initialCurrentUser?.id) return;
+    
+    relationshipSocketService.connect();
+    relationshipSocketService.joinUserRoom(initialCurrentUser.id);
+    const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
+      const status = String(payload.status || payload.type).toUpperCase();
+      
+      // If the block event involves this profile user
+      if (status === "BLOCKED" || status === "USER_BLOCKED") {
+        const involvesProfileUser = 
+          payload.targetUserIds?.includes(userId) || 
+          payload.requesterId === userId || 
+          payload.receiverId === userId ||
+          payload.actorId === userId;
+          
+        if (involvesProfileUser) {
+          setIsBlocked(true);
+        }
+      }
+    };
+    
+    relationshipSocketService.onRelationshipUpdate(handleRelationshipUpdate);
+    return () => relationshipSocketService.offRelationshipUpdate(handleRelationshipUpdate);
+  }, [userId, initialCurrentUser?.id]);
+
   return {
     profileUser,
     currentUser,
@@ -120,5 +163,6 @@ export const useProfileData = (
     setUserReactionMap,
     postReactionCountsMap,
     loading,
+    isBlocked,
   };
 };

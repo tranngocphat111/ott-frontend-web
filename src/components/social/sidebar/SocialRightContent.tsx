@@ -125,6 +125,9 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   useEffect(() => {
     if (!currentUserId) return;
 
+    relationshipSocketService.connect();
+    relationshipSocketService.joinUserRoom(currentUserId);
+
     const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
       if (!payload) return;
 

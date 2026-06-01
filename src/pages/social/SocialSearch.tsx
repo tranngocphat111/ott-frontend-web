@@ -100,6 +100,9 @@ const SocialSearch: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    relationshipSocketService.connect();
+    relationshipSocketService.joinUserRoom(currentUser.id);
+
     const handleRelationshipUpdate = (payload: RelationshipRealtimePayload) => {
       if (!payload) return;
 
