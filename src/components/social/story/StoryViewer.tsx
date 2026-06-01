@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Maximize,
   MoreHorizontal,
@@ -203,7 +204,7 @@ const StoryViewer: React.FC<Props> = ({
     (activeStory.contentType === "VIDEO" && hasVideoAudio) ||
     (activeStory.musics && activeStory.musics.length > 0);
 
-  return (
+  const content = (
     <div className="fixed inset-0 z-[60] bg-[#0c0d0f]">
       <button
         type="button"
@@ -248,7 +249,7 @@ const StoryViewer: React.FC<Props> = ({
 
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center sm:py-5">
-          <div className="relative w-full sm:w-[400px] h-full sm:h-full rounded-none sm:rounded-[24px] bg-[#a7b4bb] shadow-[0_40px_90px_-45px_rgba(15,23,42,0.9)] overflow-hidden">
+          <div className="relative w-full sm:w-[400px] h-full sm:h-[90vh] sm:max-h-[820px] rounded-none sm:rounded-[24px] bg-[#a7b4bb] shadow-[0_40px_90px_-45px_rgba(15,23,42,0.9)] overflow-hidden">
             {/* Progress Bars */}
             <div className="absolute top-3 left-4 right-4 z-20">
               <div className="h-1.5 rounded-full bg-white/40 overflow-hidden">
@@ -535,6 +536,9 @@ const StoryViewer: React.FC<Props> = ({
       )}
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(content, document.body);
 };
 
 export default StoryViewer;
