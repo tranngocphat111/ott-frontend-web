@@ -70,10 +70,92 @@ const isDisplayableNotification = (notification: InAppNotification) => {
   return !normalized.includes("message") && !normalized.includes("chat");
 };
 
+const HAS_TIMEZONE_PATTERN = /(?:z|[+-]\d{2}:?\d{2})$/i;
+const UUID_PATTERN =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+
+const parseNotificationDate = (value?: string) => {
+  const raw = String(value || "").trim();
+  if (!raw) return new Date(0);
+
+  const normalizedFraction = raw.replace(/(\.\d{3})\d+/, "$1");
+  const normalized = HAS_TIMEZONE_PATTERN.test(normalizedFraction)
+    ? normalizedFraction
+    : `${normalizedFraction}Z`;
+  const date = new Date(normalized);
+
+  return Number.isNaN(date.getTime()) ? new Date(raw) : date;
+};
+
+const normalizeNotificationType = (type?: string) => {
+  const normalized = String(type || "").trim().toUpperCase();
+  if (["FRIEND_ACCEPTED", "FRIEND_REQUEST_ACCEPTED"].includes(normalized)) {
+    return "FRIEND_REQUEST_ACCEPTED";
+  }
+  return normalized;
+};
+
+const getNotificationDedupeKey = (notification: InAppNotification) => {
+  const referenceId = String(notification.referenceId || "").trim();
+  const senderId = String(notification.senderId || "").trim();
+  const recipientId = String(notification.recipientId || "").trim();
+  const type = normalizeNotificationType(notification.type);
+
+  if (referenceId && senderId && recipientId && type) {
+    return `${recipientId}|${senderId}|${type}|${referenceId}`;
+  }
+
+  return `id:${notification.id}`;
+};
+
+const getNotificationQuality = (notification: InAppNotification) => {
+  const content = String(notification.content || "");
+  if (UUID_PATTERN.test(content)) return 0;
+  if (/^đã chấp nhận/i.test(content.trim())) return 1;
+  return 2;
+};
+
+const compareNotificationDateDesc = (
+  a: InAppNotification,
+  b: InAppNotification,
+) => parseNotificationDate(b.createdAt).getTime() -
+  parseNotificationDate(a.createdAt).getTime();
+
+const dedupeNotifications = (items: InAppNotification[]) => {
+  const byKey = new Map<string, InAppNotification>();
+
+  items.forEach((item) => {
+    const key = getNotificationDedupeKey(item);
+    const current = byKey.get(key);
+
+    if (!current) {
+      byKey.set(key, item);
+      return;
+    }
+
+    const itemQuality = getNotificationQuality(item);
+    const currentQuality = getNotificationQuality(current);
+    const itemTime = parseNotificationDate(item.createdAt).getTime();
+    const currentTime = parseNotificationDate(current.createdAt).getTime();
+
+    const shouldUseItem =
+      itemQuality > currentQuality ||
+      (itemQuality === currentQuality && itemTime > currentTime);
+    const selected = shouldUseItem ? item : current;
+
+    byKey.set(key, {
+      ...selected,
+      isRead: item.isRead && current.isRead,
+    });
+  });
+
+  return Array.from(byKey.values()).sort(compareNotificationDateDesc);
+};
+
 const formatTime = (isoString: string) => {
   if (!isoString) return "";
-  const date = new Date(isoString);
-  const diffMs = Date.now() - date.getTime();
+  const date = parseNotificationDate(isoString);
+  const diffMs = Math.max(0, Date.now() - date.getTime());
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
@@ -110,11 +192,7 @@ const NotificationMenu: React.FC = () => {
   const loadNotifications = async () => {
     if (!user?.id) return;
     const data = await notificationService.getNotifications(user.id);
-    const sorted = data.filter(isDisplayableNotification).sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    setNotifications(sorted);
+    setNotifications(dedupeNotifications(data.filter(isDisplayableNotification)));
   };
 
   useEffect(() => {
@@ -124,7 +202,7 @@ const NotificationMenu: React.FC = () => {
 
     const handleNewNotification = (notification: InAppNotification) => {
       if (!isDisplayableNotification(notification)) return;
-      setNotifications((prev) => [notification, ...prev]);
+      setNotifications((prev) => dedupeNotifications([notification, ...prev]));
     };
 
     socketService.onNewNotification(handleNewNotification);
