@@ -12,16 +12,13 @@ import {
   Trash2,
   Eye,
   MessageCircle,
-  ThumbsUp,
   Heart,
   Bookmark,
   BookmarkCheck,
 } from "lucide-react";
 import avatar from "../../../assets/avatar.png";
 import { useAuth } from "../../../contexts/AuthContext";
-import ReactionPicker from "../post/ReactionPicker";
 import PostReactionsListModal from "../post/PostReactionsListModal";
-import { REACTIONS } from "../post/reactions";
 import type { ReactionKey } from "../post/reactions";
 import { toggleLike, fetchPostReactions } from "../../../services/post.service";
 import TextTagRenderer from "../../../utils/TextTagRenderer";
@@ -29,7 +26,12 @@ import { API_CONFIG } from "../../../config/api";
 
 const resolveMediaUrl = (url?: string) => {
   if (!url) return "";
-  if (url.startsWith("http") || url.startsWith("blob:") || url.startsWith("data:")) return url;
+  if (
+    url.startsWith("http") ||
+    url.startsWith("blob:") ||
+    url.startsWith("data:")
+  )
+    return url;
   const base = API_CONFIG.BASE_URL.replace(/\/$/, "");
   const path = url.startsWith("/") ? url : `/${url}`;
   return `${base}${path}`;
@@ -97,7 +99,6 @@ const StoryViewer: React.FC<Props> = ({
   const [hasVideoAudio, setHasVideoAudio] = useState(true);
 
   const { user } = useAuth();
-  const [showPicker, setShowPicker] = useState(false);
   const [showReactionsList, setShowReactionsList] = useState(false);
 
   const [reactionMap, setReactionMap] = useState<Record<string, number>>({});
@@ -182,7 +183,6 @@ const StoryViewer: React.FC<Props> = ({
       );
     }
     setSubmittingReaction(false);
-    setShowPicker(false);
   };
 
   const handleToggleSave = async () => {
@@ -217,33 +217,32 @@ const StoryViewer: React.FC<Props> = ({
         {/* Sidebar */}
         <aside className="hidden lg:flex w-[320px] border-r border-white/10 bg-[#0c0d0f] flex-col">
           <div className="flex border-b border-white/10 shrink-0">
-            <button
-              className="flex-1 py-5 text-sm font-semibold transition text-center text-white border-b-2 border-white">
+            <button className="flex-1 py-5 text-sm font-semibold transition text-center text-white border-b-2 border-white">
               Danh sách Story
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-              <div className="p-4 space-y-2">
-                {storyGroups.map((group) => (
-                  <button
-                    key={group.userId}
-                    type="button"
-                    onClick={() => onOpenUserStories(group.stories)}
-                    className="w-full flex items-center gap-3 rounded-2xl px-3 py-2 text-left hover:bg-white/10 transition">
-                    <img
-                      src={group.avatarUrl ?? avatar}
-                      alt={group.name}
-                      className="size-12 rounded-full object-cover"
-                    />
-                    <div>
-                      <div className="text-white text-sm font-semibold">
-                        {group.name}
-                      </div>
-                      <div className="text-white/50 text-xs">Story</div>
+            <div className="p-4 space-y-2">
+              {storyGroups.map((group) => (
+                <button
+                  key={group.userId}
+                  type="button"
+                  onClick={() => onOpenUserStories(group.stories)}
+                  className="w-full flex items-center gap-3 rounded-2xl px-3 py-2 text-left hover:bg-white/10 transition">
+                  <img
+                    src={group.avatarUrl ?? avatar}
+                    alt={group.name}
+                    className="size-12 rounded-full object-cover"
+                  />
+                  <div>
+                    <div className="text-white text-sm font-semibold">
+                      {group.name}
                     </div>
-                  </button>
-                ))}
-              </div>
+                    <div className="text-white/50 text-xs">Story</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </aside>
 
@@ -473,32 +472,13 @@ const StoryViewer: React.FC<Props> = ({
 
             {/* Bottom Interaction Bar */}
             <div className="absolute bottom-5 left-5 right-5 z-30 flex items-center justify-end pointer-events-auto gap-3">
-
-              <div
-                className="flex items-center gap-1.5 relative"
-                onMouseEnter={() => setShowPicker(true)}
-                onMouseLeave={() => setShowPicker(false)}>
-                {showPicker && (
-                  <div className="absolute bottom-full right-0 mb-3 z-40">
-                    <ReactionPicker
-                      reaction={userReaction}
-                      onSelect={(key) => handleLike(key)}
-                      onMouseEnter={() => setShowPicker(true)}
-                      onMouseLeave={() => setShowPicker(false)}
-                      alignRight
-                    />
-                  </div>
-                )}
-
+              <div className="flex items-center gap-1.5 relative">
                 <button
-                  onClick={() => handleLike(userReaction || "love")}
+                  onClick={() => handleLike("love")}
                   className="size-10 rounded-full border border-white/30 bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-white/20 transition">
-                  {userReaction ?
-                    <span className="text-2xl">
-                      {REACTIONS.find((r) => r.key === userReaction)?.emoji}
-                    </span>
-                  : <Heart className="size-6 text-white hover:text-red-500 transition-colors drop-shadow-md" />
-                  }
+                  <Heart
+                    className={`size-6 drop-shadow-md transition-colors ${userReaction ? "text-red-500 fill-red-500" : "text-white"}`}
+                  />
                 </button>
 
                 {totalReactions > 0 && (

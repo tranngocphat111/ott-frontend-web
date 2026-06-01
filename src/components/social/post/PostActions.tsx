@@ -1,5 +1,11 @@
 import React from "react";
-import { MessageCircle, Share2, ThumbsUp, Bookmark, BookmarkCheck } from "lucide-react";
+import {
+  MessageCircle,
+  Share2,
+  ThumbsUp,
+  Bookmark,
+  BookmarkCheck,
+} from "lucide-react";
 import ReactionPicker from "./ReactionPicker";
 import type { ReactionKey } from "./reactions";
 
@@ -39,9 +45,8 @@ const PostActions: React.FC<Props> = ({
   onPickerMouseLeave,
   onToggleSave,
   onShareClick,
-
 }) => {
-  const shouldShowReactionEmoji = Boolean(reaction && reaction !== "like" && reactionEmoji);
+  const shouldShowReactionEmoji = Boolean(reactionEmoji);
 
   return (
     <div className="px-4 py-1 border-t border-primary-100 flex">
@@ -60,11 +65,15 @@ const PostActions: React.FC<Props> = ({
 
         <button
           onClick={onLikeClick}
-          className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${reactionColor
-            }`}>
+          className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${
+            reactionColor
+          }`}>
           {shouldShowReactionEmoji ?
             <span className="text-lg leading-none">{reactionEmoji}</span>
-            : <ThumbsUp className={`size-5 ${reaction === "like" ? "fill-current" : ""}`} />}
+          : <ThumbsUp
+              className={`size-5 ${reaction === "like" ? "fill-current" : ""}`}
+            />
+          }
           <span className="hidden sm:inline">{reactionLabel}</span>
         </button>
       </div>
@@ -73,14 +82,15 @@ const PostActions: React.FC<Props> = ({
           e.stopPropagation();
           onToggleComments();
         }}
-        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${showComments ? "text-primary-500" : "text-primary-700"
-          }`}>
+        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${
+          showComments ? "text-primary-500" : "text-primary-700"
+        }`}>
         <MessageCircle
           className={`size-5 ${showComments ? "fill-primary-100" : ""}`}
         />
         <span className="hidden sm:inline">Bình luận</span>
       </button>
-      <button 
+      <button
         onClick={(e) => {
           e.stopPropagation();
           onShareClick?.();
@@ -89,14 +99,16 @@ const PostActions: React.FC<Props> = ({
         <Share2 className="size-5" />
         <span className="hidden sm:inline">Chia sẻ</span>
       </button>
-      <button 
+      <button
         onClick={(e) => {
           e.stopPropagation();
           onToggleSave?.();
         }}
-        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${isSaved ? 'text-primary-600' : 'text-primary-700'}`}>
-        {isSaved ? <BookmarkCheck className="size-5 fill-primary-600" /> : <Bookmark className="size-5" />}
-        <span className="hidden sm:inline">{isSaved ? 'Đã lưu' : 'Lưu'}</span>
+        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-primary-50 transition font-medium text-sm ${isSaved ? "text-primary-600" : "text-primary-700"}`}>
+        {isSaved ?
+          <BookmarkCheck className="size-5 fill-primary-600" />
+        : <Bookmark className="size-5" />}
+        <span className="hidden sm:inline">{isSaved ? "Đã lưu" : "Lưu"}</span>
       </button>
     </div>
   );
