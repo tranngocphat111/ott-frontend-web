@@ -22,13 +22,7 @@ export const RevokedMessage = ({
   participants?: ConversationParticipant[];
   conversationType?: string;
 }) => {
-  const isModerationRejected =
-    msg.system_meta?.moderation_status === "rejected";
-  const placeholder = isModerationRejected
-    ? "Tin nhắn đã bị ẩn do vi phạm tiêu chuẩn cộng đồng"
-    : isMe
-      ? "Bạn đã thu hồi một tin nhắn"
-      : "Tin nhắn đã được thu hồi";
+  const placeholder = "Tin nhắn đã được thu hồi";
 
   const placeholderMessage = {
     ...msg,
@@ -55,9 +49,7 @@ export const RevokedMessage = ({
       {(borderRadius, renderMessageMeta) => (
         <div
           className={`min-h-10 px-3 py-2 text-[13px] leading-relaxed shadow-sm overflow-hidden ${borderRadius} ${
-            isModerationRejected
-              ? "bg-red-50 border-red-200 text-red-700"
-              : isMe
+            isMe
                 ? "bg-[#e8e8e8] border-[#d7c7af] text-[#7b6648]"
                 : "bg-gray-200 border-slate-300 text-slate-500"
           }`}
