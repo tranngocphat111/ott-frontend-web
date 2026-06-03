@@ -8,7 +8,7 @@ import PostCard from "../../components/social/PostCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { searchPosts, fetchUserReactions } from "../../services/post.service";
 import { UserService } from "../../services/user.service";
-import { sendFriendRequest, fetchRelationshipOf, acceptFriendRequest, rejectFriendRequest } from "../../services/social.service";
+import { sendFriendRequest, fetchRelationshipOf, acceptFriendRequest, rejectFriendRequest, cancelRelationship } from "../../services/social.service";
 import { relationshipSocketService, type RelationshipRealtimePayload } from "../../services/relationshipSocket.service";
 import { useSocialFeedActions } from "../../hooks/social/useSocialFeedActions";
 import type { Post } from "../../components/social/types";
@@ -84,7 +84,35 @@ const SocialSearch: React.FC = () => {
           setUserReactionMap(map);
         } else {
           const foundUsers = await UserService.searchUsers(query.trim());
-          const filteredUsers = foundUsers.filter((u: any) => u.relationshipStatus !== 'BLOCKED' && u.relationshipStatus !== 'USER_BLOCKED');
+          
+          let usersWithRel = [...foundUsers];
+          if (currentUser?.id) {
+            usersWithRel = await Promise.all(
+              foundUsers.map(async (u: any) => {
+                const targetId = u._id || u.user_id;
+                if (!targetId || targetId === currentUser.id) {
+                  return { ...u, relationshipStatus: "NONE" };
+                }
+                try {
+                  const rel = await fetchRelationshipOf(currentUser.id, targetId);
+                  if (rel && rel.id) {
+                    if (rel.status === "ACCEPTED") {
+                      return { ...u, relationshipStatus: "FRIEND" };
+                    } else if (rel.status === "PENDING") {
+                      return { ...u, relationshipStatus: rel.requesterId === currentUser.id ? "PENDING_REQUEST_SENT" : "PENDING_REQUEST_RECEIVED" };
+                    } else if (rel.status === "BLOCKED") {
+                      return { ...u, relationshipStatus: rel.requesterId === currentUser.id ? "BLOCKED" : "USER_BLOCKED" };
+                    }
+                  }
+                } catch (err) {
+                  // Ignore
+                }
+                return { ...u, relationshipStatus: "NONE" };
+              })
+            );
+          }
+          
+          const filteredUsers = usersWithRel.filter((u: any) => u.relationshipStatus !== 'BLOCKED' && u.relationshipStatus !== 'USER_BLOCKED' && (u._id || u.user_id) !== currentUser?.id);
           setUsers(filteredUsers);
         }
       } catch (err) {
@@ -164,6 +192,19 @@ const SocialSearch: React.FC = () => {
       const rel = await fetchRelationshipOf(currentUser.id, targetId);
       if (rel?.id) {
         await rejectFriendRequest(rel.id);
+        setUsers(users.map(u => (u._id || u.user_id) === targetId ? { ...u, relationshipStatus: "NONE" } as User : u));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleRevokeFriendRequest = async (targetId: string) => {
+    if (!currentUser?.id) return;
+    try {
+      const rel = await fetchRelationshipOf(currentUser.id, targetId);
+      if (rel?.id) {
+        await cancelRelationship(rel.id);
         setUsers(users.map(u => (u._id || u.user_id) === targetId ? { ...u, relationshipStatus: "NONE" } as User : u));
       }
     } catch (error) {
@@ -332,12 +373,13 @@ const SocialSearch: React.FC = () => {
                       {currentUser?.id !== targetId && (
                         <div className="flex gap-2 mt-2">
                           {relationshipStatus === "FRIEND" ? (
-                            <button disabled className="w-full bg-gray-100 text-gray-600 py-1.5 rounded-lg text-sm font-medium">
-                              Bạn bè
-                            </button>
+                            null
                           ) : relationshipStatus === "PENDING_REQUEST_SENT" ? (
-                            <button disabled className="w-full bg-gray-100 text-gray-600 py-1.5 rounded-lg text-sm font-medium">
-                              Đã gửi lời mời
+                            <button
+                              onClick={() => handleRevokeFriendRequest(targetId)}
+                              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 rounded-lg text-sm font-medium transition"
+                            >
+                              Đã gửi lời mời kết bạn
                             </button>
                           ) : relationshipStatus === "PENDING_REQUEST_RECEIVED" ? (
                             <>
