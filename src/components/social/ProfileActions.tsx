@@ -223,7 +223,7 @@ const ProfileActions: React.FC<ProfileActionsProps> = ({
   const handleBlock = async () => {
     let ok = false;
     if (relationship?.id) {
-      ok = await blockRelationship(relationship.id, currentUserId);
+      ok = await blockRelationship(relationship.id, currentUserId, profileUserId);
     } else {
       ok = await blockUserDirectly(currentUserId, profileUserId);
     }
