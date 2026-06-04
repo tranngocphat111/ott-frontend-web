@@ -91,6 +91,7 @@ const CreateStoryModal: React.FC<Props> = ({
   const [textStyle, setTextStyle] = useState("Clean");
   const [selectedBg, setSelectedBg] = useState(0);
   const [visibility, setVisibility] = useState("FRIENDS");
+  const [showVisibility, setShowVisibility] = useState(false);
 
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
   const [uploadedImageKey, setUploadedImageKey] = useState<string>("");
@@ -859,7 +860,7 @@ const CreateStoryModal: React.FC<Props> = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-6 relative z-50">
               <img
                 src={currentUserAvatar}
                 alt={currentUserName}
@@ -870,9 +871,65 @@ const CreateStoryModal: React.FC<Props> = ({
                 <div className="text-base font-bold text-slate-900 leading-tight">
                   {currentUserName}
                 </div>
-
+                <div className="relative mt-1">
+                  <button
+                    onClick={() => setShowVisibility(!showVisibility)}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded-md text-xs font-medium text-slate-700 transition"
+                  >
+                    {visibility === 'PUBLIC' ? <Globe className="size-3" /> : visibility === 'PRIVATE' ? <Lock className="size-3" /> : <Users className="size-3" />}
+                    <span>{visibility === 'PUBLIC' ? 'Công khai' : visibility === 'PRIVATE' ? 'Chỉ mình tôi' : visibility === 'CUSTOM' ? 'Tùy chỉnh' : 'Bạn bè'}</span>
+                    <ChevronDown className="size-3" />
+                  </button>
+                  {showVisibility && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 min-w-36 overflow-hidden">
+                      {[
+                        { value: 'PUBLIC', label: 'Công khai', icon: Globe },
+                        { value: 'FRIENDS', label: 'Bạn bè', icon: Users },
+                        { value: 'PRIVATE', label: 'Chỉ mình tôi', icon: Lock },
+                        { value: 'CUSTOM', label: 'Tùy chỉnh', icon: Users }
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            setVisibility(opt.value);
+                            setShowVisibility(false);
+                            if (opt.value !== 'CUSTOM') {
+                              setSelectedFriendIds([]);
+                              setCustomError(null);
+                            }
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 transition ${visibility === opt.value ? "text-blue-600 font-semibold" : "text-slate-700"}`}
+                        >
+                          <opt.icon className="size-4" />
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {visibility === "CUSTOM" && (
+              <div className="mb-6">
+                <CustomVisibilityPanel
+                  customRuleType={customRuleType}
+                  onRuleTypeChange={setCustomRuleType}
+                  friendSearch={friendSearch}
+                  onFriendSearchChange={setFriendSearch}
+                  friendsLoading={friendsLoading}
+                  friends={filteredFriends}
+                  selectedFriendIds={selectedFriendIds}
+                  onToggleFriend={(friendId) => {
+                    setCustomError(null);
+                    setSelectedFriendIds((prev) =>
+                      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
+                    );
+                  }}
+                  customError={customError}
+                />
+              </div>
+            )}
 
 
 
