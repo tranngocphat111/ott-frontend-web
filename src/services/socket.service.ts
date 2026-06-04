@@ -385,6 +385,30 @@ class SocketService {
     }
   }
 
+  onPinUpdated(callback: (payload: any) => void) {
+    this.ensureSocket().on("cap_nhat_ghim", callback);
+  }
+
+  offPinUpdated(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("cap_nhat_ghim", callback);
+    } else {
+      this.socket?.removeAllListeners("cap_nhat_ghim");
+    }
+  }
+
+  onOwnershipTransferred(callback: (payload: any) => void) {
+    this.ensureSocket().on("chuyen_quyen_truong_nhom", callback);
+  }
+
+  offOwnershipTransferred(callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.socket?.off("chuyen_quyen_truong_nhom", callback);
+    } else {
+      this.socket?.removeAllListeners("chuyen_quyen_truong_nhom");
+    }
+  }
+
   startTyping(conversationId: string, userId: string) {
     this.emitWhenConnected("nguoi_dung_dang_soan_tin_nhan", {
       conversationId,

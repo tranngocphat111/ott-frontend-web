@@ -260,7 +260,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
         const convId = newItem.conversation._id;
         const isCurrentlyDissolved = dissolvedIds.has(convId) ||
           newItem.conversation.status === "dissolved" ||
-          newItem.conversation.is_dissolved;
+          Boolean(newItem.conversation.is_dissolved);
 
         if (isCurrentlyDissolved) {
           return {
@@ -455,7 +455,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
         .filter((item): item is ConversationWithParticipant => {
           const convId = String(item?.conversation._id || "");
           return (
-            convId &&
+            Boolean(convId) &&
             reopenedConversationIdsRef.current.has(convId) &&
             !loadedIds.has(convId) &&
             !dissolvedSessionIdsRef.current.has(convId)
@@ -912,6 +912,111 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     );
   }, []);
 
+  const handlePinUpdated = useCallback((payload: any) => {
+    const conversationId = String(
+      payload?.conversationId ||
+        payload?.conversation_id ||
+        payload?.participant?.conversation_id ||
+        "",
+    ).trim();
+    if (!conversationId) return;
+
+    const participantPayload = payload?.participant || {};
+    const settingsPayload = participantPayload?.settings || {};
+    const hasPinnedValue =
+      payload?.isPinned !== undefined ||
+      payload?.is_pinned !== undefined ||
+      settingsPayload?.is_pinned !== undefined;
+    const nextPinned = Boolean(
+      payload?.isPinned ?? payload?.is_pinned ?? settingsPayload?.is_pinned,
+    );
+    const nextPinnedAt =
+      payload?.pinnedAt ?? payload?.pinned_at ?? settingsPayload?.pinned_at ?? null;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (String(item.conversation._id) !== conversationId) return item;
+
+        return {
+          ...item,
+          participant: {
+            ...item.participant,
+            ...participantPayload,
+            settings: {
+              ...item.participant.settings,
+              ...settingsPayload,
+              ...(hasPinnedValue ? { is_pinned: nextPinned } : {}),
+              pinned_at: nextPinnedAt,
+            },
+          },
+        };
+      }),
+    );
+  }, []);
+
+  const handleOwnershipTransferred = useCallback((payload: any) => {
+    const conversationId = String(
+      payload?.conversationId ||
+        payload?.conversation_id ||
+        payload?.conversation?._id ||
+        "",
+    ).trim();
+    const oldOwnerId = String(payload?.oldOwnerId || payload?.old_owner_id || "").trim();
+    const newOwnerId = String(
+      payload?.newOwnerId ||
+        payload?.new_owner_id ||
+        payload?.createdBy ||
+        payload?.conversation?.created_by ||
+        "",
+    ).trim();
+
+    if (!conversationId || !newOwnerId) return;
+
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (String(item.conversation._id) !== conversationId) return item;
+
+        const nextParticipants = (item.conversation.participants || []).map(
+          (participant) => {
+            const participantUserId = String(
+              participant.user_id || participant._id || "",
+            );
+            if (participantUserId === newOwnerId) {
+              return { ...participant, role: "admin" as const };
+            }
+            if (oldOwnerId && participantUserId === oldOwnerId) {
+              return { ...participant, role: "member" as const };
+            }
+            return participant;
+          },
+        );
+
+        const selfUserId = String(
+          item.participant?.user_id || item.participant?._id || "",
+        );
+        const nextSelfRole: Participant["roles"] =
+          selfUserId === newOwnerId
+            ? "admin"
+            : oldOwnerId && selfUserId === oldOwnerId
+              ? "user"
+              : item.participant.roles;
+
+        return {
+          ...item,
+          conversation: {
+            ...item.conversation,
+            created_by: newOwnerId,
+            participants: nextParticipants,
+          },
+          participant: {
+            ...item.participant,
+            roles: nextSelfRole,
+          },
+        };
+      }),
+    );
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       socketService.disconnect();
@@ -933,6 +1038,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     socketService.onParticipantCursorChanged(applyParticipantCursorPayload);
     socketService.onConversationReadSynced(applyParticipantCursorPayload);
     socketService.onMemberNicknameUpdated(handleMemberNicknameUpdated);
+    socketService.onPinUpdated(handlePinUpdated);
+    socketService.onOwnershipTransferred(handleOwnershipTransferred);
 
     return () => {
       socketService.offNewMessage(handleIncomingMessage);
@@ -949,6 +1056,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
       socketService.offParticipantCursorChanged(applyParticipantCursorPayload);
       socketService.offConversationReadSynced(applyParticipantCursorPayload);
       socketService.offMemberNicknameUpdated(handleMemberNicknameUpdated);
+      socketService.offPinUpdated(handlePinUpdated);
+      socketService.offOwnershipTransferred(handleOwnershipTransferred);
     };
   }, [
     applyParticipantCursorPayload,
@@ -961,6 +1070,8 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     handleStartCallSuccess,
     handleMemberAdded,
     handleMemberNicknameUpdated,
+    handlePinUpdated,
+    handleOwnershipTransferred,
     isAuthenticated,
   ]);
 
@@ -1243,7 +1354,7 @@ export const ConversationsProvider: React.FC<ConversationsProviderProps> = ({
     const handleRemoveConversation = (event: Event) => {
       const custom = event as CustomEvent<{
         conversationId?: string;
-        reason?: "delete-history" | "dissolve-group" | "group-dissolved" | "reject-invitation";
+        reason?: "delete-history" | "leave-group" | "dissolve-group" | "group-dissolved" | "reject-invitation";
         keepOutOfList?: boolean;
       }>;
       const convId = custom.detail?.conversationId;

@@ -22,7 +22,6 @@ export interface ApiUser {
     phoneNumber: string | null;
 }
 
-type ApiEnvelope<T> = { result?: T; message?: string };
 type ChatRelationshipLike = {
     _id?: string;
     requester_id?: string;
@@ -888,7 +887,31 @@ export async function fetchBlockedUsers(userId: string): Promise<any[]> {
     try {
         const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/blocked/${userId}`);
         if (!res.ok) return [];
-        return await res.json();
+        const json = await res.json();
+        return unwrapList<any>(json)
+            .map((rel) => {
+                const requesterId = String(rel.requesterId || rel.requester_id || "").trim();
+                const receiverId = String(rel.receiverId || rel.receiver_id || "").trim();
+                const targetIsRequester = requesterId && requesterId !== String(userId);
+                const targetId = targetIsRequester ? requesterId : receiverId;
+                const targetName = targetIsRequester
+                    ? rel.requesterDisplayName || rel.requesterUsername
+                    : rel.receiverDisplayName || rel.receiverUsername;
+                const targetAvatar = targetIsRequester
+                    ? rel.requesterAvatarUrl
+                    : rel.receiverAvatarUrl;
+                const relationshipId = rel.id || rel._id || rel.relationshipId || rel.relationship_id;
+
+                return {
+                    ...rel,
+                    id: relationshipId,
+                    relationshipId,
+                    receiverId: targetId,
+                    receiverName: targetName || "Người dùng",
+                    receiverAvatar: targetAvatar || "",
+                };
+            })
+            .filter((rel) => rel.id && rel.receiverId);
     } catch {
         return [];
     }

@@ -52,6 +52,13 @@ const GroupActions: React.FC<GroupActionsProps> = ({
 
     try {
       await ParticipantService.leaveGroup(conversation._id, currentUserId);
+      window.dispatchEvent(new CustomEvent("chat:remove-conversation", {
+        detail: {
+          conversationId: conversation._id,
+          reason: "leave-group",
+          keepOutOfList: true,
+        }
+      }));
       onLeaveSuccess();
     } catch (error) {
       console.error("Error leaving group:", error);

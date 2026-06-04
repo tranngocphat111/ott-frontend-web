@@ -22,12 +22,20 @@ interface Props {
   currentUserId: string;
 }
 
+interface BlockedUser {
+  id: string;
+  relationshipId?: string;
+  receiverId: string;
+  receiverName: string;
+  receiverAvatar: string;
+}
+
 const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   const [requests, setRequests] = useState<FriendRequestOption[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [friends, setFriends] = useState<FriendOption[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
-  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [blockedLoading, setBlockedLoading] = useState(false);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
 
@@ -36,26 +44,38 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
 
   const loadRequests = useCallback(async () => {
     if (!currentUserId) return;
+    await Promise.resolve();
     setRequestsLoading(true);
-    const data = await fetchPendingRequests(currentUserId);
-    setRequests(data);
-    setRequestsLoading(false);
+    try {
+      const data = await fetchPendingRequests(currentUserId);
+      setRequests(data);
+    } finally {
+      setRequestsLoading(false);
+    }
   }, [currentUserId]);
 
   const loadFriends = useCallback(async () => {
     if (!currentUserId) return;
+    await Promise.resolve();
     setFriendsLoading(true);
-    const data = await fetchFriends(currentUserId);
-    setFriends(data);
-    setFriendsLoading(false);
+    try {
+      const data = await fetchFriends(currentUserId);
+      setFriends(data);
+    } finally {
+      setFriendsLoading(false);
+    }
   }, [currentUserId]);
 
   const loadBlocked = useCallback(async () => {
     if (!currentUserId) return;
+    await Promise.resolve();
     setBlockedLoading(true);
-    const data = await fetchBlockedUsers(currentUserId);
-    setBlockedUsers(data);
-    setBlockedLoading(false);
+    try {
+      const data = await fetchBlockedUsers(currentUserId);
+      setBlockedUsers(data as BlockedUser[]);
+    } finally {
+      setBlockedLoading(false);
+    }
   }, [currentUserId]);
 
   const getOtherUserId = useCallback(
@@ -111,16 +131,12 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
   );
 
   useEffect(() => {
-    if (!currentUserId) {
-      setRequests([]);
-      setFriends([]);
-      return;
-    }
+    if (!currentUserId) return;
 
     loadRequests();
     loadFriends();
     loadBlocked();
-  }, [currentUserId, updateFromPayload, loadFriends, loadRequests, loadBlocked]);
+  }, [currentUserId, loadFriends, loadRequests, loadBlocked]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -153,11 +169,12 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
     const handleConnect = () => {
       loadRequests();
       loadFriends();
+      loadBlocked();
     };
 
     relationshipSocketService.onConnect(handleConnect);
     return () => relationshipSocketService.offConnect(handleConnect);
-  }, [currentUserId, loadRequests, loadFriends]);
+  }, [currentUserId, loadRequests, loadFriends, loadBlocked]);
 
   const handleAccept = async (relationshipId: string) => {
     setBusyRequestId(relationshipId);
@@ -188,10 +205,14 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
     setBusyRequestId(null);
   };
 
+  const visibleRequests = currentUserId ? requests : [];
+  const visibleFriends = currentUserId ? friends : [];
+  const visibleBlockedUsers = currentUserId ? blockedUsers : [];
+
   return (
     <div className="space-y-5">
       <FriendRequestsPanel
-        requests={requests}
+        requests={visibleRequests}
         loading={requestsLoading}
         busyRequestId={busyRequestId}
         onAccept={handleAccept}
@@ -203,7 +224,7 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
       />
 
       <FriendsPanel
-        friends={friends}
+        friends={visibleFriends}
         loading={friendsLoading}
         onViewAll={() => {
           setModalTab("friends");
@@ -212,7 +233,7 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
       />
 
       <BlockedUsersPanel
-        blockedUsers={blockedUsers}
+        blockedUsers={visibleBlockedUsers}
         loading={blockedLoading}
         busyId={busyRequestId}
         onUnblock={handleUnblock}

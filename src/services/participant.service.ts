@@ -10,7 +10,7 @@ export class ParticipantService {
     conversationId: string,
     userId: string,
     isPinned: boolean,
-  ): Promise<void> {
+  ): Promise<Participant> {
     try {
       const response = await authFetch(`${API_CHAT_SERVER_URL}/participants/pin`, {
         method: "PUT",
@@ -27,6 +27,8 @@ export class ParticipantService {
       if (!response.ok) {
         throw new Error("Failed to update pin status");
       }
+
+      return await response.json();
     } catch (error) {
       console.error("Error updating pin status:", error);
       throw error;

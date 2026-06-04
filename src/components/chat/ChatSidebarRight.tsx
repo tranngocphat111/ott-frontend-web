@@ -16,7 +16,6 @@ import { useToast } from "../../contexts/ToastContext";
 import {
   MessageService,
   ParticipantService,
-  UserService,
   ConversationService,
   fetchRelationshipStatusViaChat,
   fetchFriends,
@@ -645,6 +644,39 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       handleSocketRelationshipUpdate((event as CustomEvent).detail);
     };
 
+    const handleSocketOwnershipTransferred = (payload: any) => {
+      const conversationId = String(
+        payload?.conversationId ||
+          payload?.conversation_id ||
+          payload?.conversation?._id ||
+          "",
+      );
+      if (conversationId !== String(conversation?._id || "")) return;
+
+      const oldOwnerId = String(payload?.oldOwnerId || payload?.old_owner_id || "");
+      const newOwnerId = String(
+        payload?.newOwnerId ||
+          payload?.new_owner_id ||
+          payload?.createdBy ||
+          payload?.conversation?.created_by ||
+          "",
+      );
+      if (!newOwnerId) return;
+
+      setMembers((current) =>
+        current.map((member) => {
+          if (String(member.user_id) === newOwnerId) {
+            return { ...member, role: "admin" };
+          }
+          if (oldOwnerId && String(member.user_id) === oldOwnerId) {
+            return { ...member, role: "user" };
+          }
+          return member;
+        }),
+      );
+      updateConversation(conversationId, { created_by: newOwnerId } as any);
+    };
+
     window.addEventListener(
       "chat:pinned-updated",
       handlePinnedUpdated as EventListener,
@@ -669,6 +701,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     socketService.onMessageRecalled(handleSocketMessageRecalled);
     socketService.onRelationshipUpdate(handleSocketRelationshipUpdate);
     socketService.onMemberNicknameUpdated(handleSocketMemberNicknameUpdated);
+    socketService.onOwnershipTransferred(handleSocketOwnershipTransferred);
     window.addEventListener(
       "chat:message-upserted",
       handleLocalMessageUpserted as EventListener,
@@ -703,6 +736,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
       socketService.offMessageRecalled(handleSocketMessageRecalled);
       socketService.offRelationshipUpdate(handleSocketRelationshipUpdate);
       socketService.offMemberNicknameUpdated(handleSocketMemberNicknameUpdated);
+      socketService.offOwnershipTransferred(handleSocketOwnershipTransferred);
       window.removeEventListener(
         "chat:message-upserted",
         handleLocalMessageUpserted as EventListener,
@@ -720,6 +754,7 @@ const ChatSidebarRight: React.FC<ChatSidebarRightProps> = ({
     loadSidebarData,
     loadPinnedMessagesOnly,
     members,
+    updateConversation,
   ]);
 
   // Load available users for create group modal

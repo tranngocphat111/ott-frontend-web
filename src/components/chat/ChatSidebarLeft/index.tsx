@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ConversationList from "../../conversations/ConversationList";
 import CategoryManagementModal from "../../modal/category/CategoryManagementModal";
 import LoadingSkeleton from "../../common/LoadingSkeleton";
 import CreateGroupModal from "../../modal/group/CreateGroupModal";
 import AddFriendModal from "../../modal/friend/AddFriendModal";
 import { ConversationService } from "../../../services/conversation.service";
-import { CategoryService, socketService, fetchFriends, MessageService } from "../../../services";
+import { socketService, fetchFriends, MessageService } from "../../../services";
 import { parseBackendDate } from "../../../utils/timeUtils";
 import { useConversations } from "../../../contexts/ConversationsContext";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -42,11 +42,6 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     categories,
     loading,
     error,
-    setConversations,
-    setCategories,
-    setLoading,
-    setError,
-    addConversation,
     refreshConversations,
   } = useConversations();
 
@@ -123,6 +118,38 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
     };
     loadUsers();
   }, [normalizedUserId]);
+
+  const availableUsersForGroup = useMemo(() => {
+    const categoryIdsByUserId = new Map<string, Set<string>>();
+
+    conversations.forEach((item) => {
+      const conversation = item.conversation;
+      if (conversation.type !== "private") return;
+
+      const categoryId = item.participant.settings?.category_id;
+      if (!categoryId) return;
+
+      (conversation.participants || []).forEach((participant) => {
+        const participantUserId = String(participant.user_id || participant._id || "");
+        if (!participantUserId || participantUserId === String(normalizedUserId || "")) return;
+
+        if (!categoryIdsByUserId.has(participantUserId)) {
+          categoryIdsByUserId.set(participantUserId, new Set());
+        }
+        categoryIdsByUserId.get(participantUserId)?.add(String(categoryId));
+      });
+    });
+
+    return availableUsers.map((user) => {
+      const userId = String(user.user_id || user._id || "");
+      const categoryIds = Array.from(categoryIdsByUserId.get(userId) || []);
+      return {
+        ...user,
+        category_id: categoryIds[0] || null,
+        categoryIds,
+      };
+    });
+  }, [availableUsers, conversations, normalizedUserId]);
 
   useEffect(() => {
     console.log('🔍 ChatSidebarLeft: Filtering conversations. Raw count:', conversations.length);
@@ -349,7 +376,7 @@ const ChatSidebarLeft: React.FC<SidebarProps> = ({
         isOpen={isCreateGroupModalOpen}
         onClose={() => setIsCreateGroupModalOpen(false)}
         onCreateGroup={handleCreateGroup}
-        availableUsers={availableUsers}
+        availableUsers={availableUsersForGroup}
         categories={categories}
       />
 

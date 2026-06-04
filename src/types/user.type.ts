@@ -16,4 +16,6 @@ export interface User {
   // Computed fields for display
   display_name?: string;
   status?: 'online' | 'offline' | 'away' | 'busy';
+  category_id?: string | null;
+  categoryIds?: string[];
 }

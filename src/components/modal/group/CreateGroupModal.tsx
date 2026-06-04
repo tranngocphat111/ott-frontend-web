@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, Search, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { UserService } from '../../../services/user.service';
 import type { User } from '../../../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -120,10 +120,18 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const filteredUsers = useMemo(() => {
     return availableUsers.filter(user => {
       const name = user.display_name || user.name || '';
+      const userCategoryIds = Array.isArray(user.categoryIds)
+        ? user.categoryIds.map(String)
+        : [];
+      const userCategoryId = user.category_id ? String(user.category_id) : '';
+      const matchesFilter =
+        activeFilter === 'all' ||
+        userCategoryIds.includes(String(activeFilter)) ||
+        userCategoryId === String(activeFilter);
       const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
+      return matchesFilter && matchesSearch;
     });
-  }, [availableUsers, searchTerm]);
+  }, [activeFilter, availableUsers, searchTerm]);
 
   // Group users by first letter
   const groupedUsers = useMemo(() => 
@@ -219,7 +227,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     }
 
     const selected = allPotentialUsers.filter(user => selectedUsers.has(user.user_id));
-    const memberIds = selected.map(u => u.user_id);
     const memberNames = selected.map(u => u.display_name || u.name || "Người dùng");
 
     console.log("Creating group in modal with avatar URL:", finalAvatarUrl);

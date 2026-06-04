@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MessageCircle, Users, Pin, Check, X as XIcon } from "lucide-react";
+import { MessageCircle, Users, Pin } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatTimeAgo } from "../../utils/timeUtils";
 import ConversationContextMenu from "../modal/conversation/ConversationContextMenu";
@@ -17,7 +17,6 @@ import {
 } from "../../utils";
 import { isConversationMuted } from "../../utils/conversationNotification";
 import { EmojiText } from "../chat/EmojiText";
-import { useAuth } from "../../contexts/AuthContext";
 import { usePresence } from "../../contexts/PresenceContext";
 
 // ─── Helper: lấy userId của người kia trong 1-1 chat ─────────────────────────
@@ -39,7 +38,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   currentUserId,
 }) => {
   const { conversation, participant } = item;
-  const { categories, refreshConversations, updateParticipant, removeConversation } =
+  const { categories, refreshConversations, updateParticipant } =
     useConversations();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -50,9 +49,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
-  const [isProcessingInvitation, setIsProcessingInvitation] = useState(false);
   const [relationship, setRelationship] = useState<any>(null);
-  const { user: authUser } = useAuth();
 
   // ── PRESENCE ──────────────────────────────────────────────────────────────
   const { isUserOnline, watchUsers } = usePresence();
@@ -213,40 +210,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
   const isInvited = false;
 
-  const handleAcceptInvitation = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isProcessingInvitation) return;
-    const userId = authUser?.id || currentUserId;
-    if (!userId) return;
-    setIsProcessingInvitation(true);
-    try {
-      await ParticipantService.acceptGroupInvitation(conversation._id, userId);
-      await refreshConversations(userId);
-    } catch (error) {
-      console.error("Error accepting invitation:", error);
-    } finally {
-      setIsProcessingInvitation(false);
-    }
-  };
-
-  const handleRejectInvitation = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isProcessingInvitation) return;
-    const userId = authUser?.id || currentUserId;
-    if (!userId) return;
-    setIsProcessingInvitation(true);
-    try {
-      await ParticipantService.rejectGroupInvitation(conversation._id, userId);
-      // Remove locally so merge logic doesn't bring it back
-      removeConversation(conversation._id);
-      await refreshConversations(userId);
-    } catch (error) {
-      console.error("Error rejecting invitation:", error);
-    } finally {
-      setIsProcessingInvitation(false);
-    }
-  };
-
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY });
@@ -255,15 +218,27 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const handlePin = async () => {
     if (!currentUserId) return;
 
+    const nextPinned = !Boolean(participant.settings.is_pinned);
     try {
-      await ParticipantService.updatePinStatus(
+      const updatedParticipant = await ParticipantService.updatePinStatus(
         conversation._id,
         currentUserId,
-        !participant.settings.is_pinned,
+        nextPinned,
       );
 
-      // Refresh from API to get updated data from database
-      await refreshConversations(currentUserId);
+      updateParticipant(conversation._id, {
+        ...updatedParticipant,
+        settings: {
+          ...participant.settings,
+          ...updatedParticipant.settings,
+          is_pinned: nextPinned,
+          pinned_at: updatedParticipant.settings?.pinned_at || (nextPinned ? new Date().toISOString() : null),
+        },
+      } as any);
+
+      window.dispatchEvent(new CustomEvent("chat:pinned-updated", {
+        detail: { conversationId: conversation._id },
+      }));
     } catch (error) {
       console.error("Error updating pin status:", error);
     }
