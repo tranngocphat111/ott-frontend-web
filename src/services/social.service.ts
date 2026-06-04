@@ -474,31 +474,66 @@ export async function cancelFriendRequestViaChat(
 export async function blockRelationship(
     relationshipId: string,
     blockerId: string,
+    targetId?: string,
 ): Promise<boolean> {
+    let mediaOk = false;
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/${relationshipId}/block?blockerId=${blockerId}`,
             { method: "PATCH", signal: AbortSignal.timeout(5_000) },
         );
-        return res.ok;
+        mediaOk = res.ok;
     } catch {
-        return false;
+        mediaOk = false;
     }
+
+    let chatOk = false;
+    if (targetId) {
+        try {
+            const res = await authFetch(`${API_CHAT_SERVER_URL}/relationships/block`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: blockerId, targetId }),
+                signal: AbortSignal.timeout(5_000),
+            });
+            chatOk = res.ok;
+        } catch {
+            chatOk = false;
+        }
+    }
+
+    return mediaOk || chatOk;
 }
 
 export async function blockUserDirectly(
     requesterId: string,
     receiverId: string,
 ): Promise<boolean> {
+    let mediaOk = false;
     try {
         const res = await authFetch(
             `${API_MEDIA_SERVER_URL}/relationships/block?requesterId=${requesterId}&receiverId=${receiverId}`,
             { method: "POST", signal: AbortSignal.timeout(5_000) },
         );
-        return res.ok;
+        mediaOk = res.ok;
     } catch {
-        return false;
+        mediaOk = false;
     }
+
+    let chatOk = false;
+    try {
+        const res = await authFetch(`${API_CHAT_SERVER_URL}/relationships/block`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: requesterId, targetId: receiverId }),
+            signal: AbortSignal.timeout(5_000),
+        });
+        chatOk = res.ok;
+    } catch {
+        chatOk = false;
+    }
+
+    return mediaOk || chatOk;
 }
 
 export async function unfriendRelationship(
@@ -545,6 +580,7 @@ export async function blockUserViaChat(
     userId: string,
     targetId: string,
 ): Promise<boolean> {
+    let chatOk = false;
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/block`,
@@ -555,10 +591,13 @@ export async function blockUserViaChat(
                 signal: AbortSignal.timeout(5_000)
             },
         );
-        return res.ok;
+        chatOk = res.ok;
     } catch {
-        return false;
+        chatOk = false;
     }
+
+    const mediaOk = await blockUserDirectly(userId, targetId);
+    return chatOk || mediaOk;
 }
 
 /**
@@ -568,6 +607,7 @@ export async function unblockUserViaChat(
     userId: string,
     targetId: string,
 ): Promise<boolean> {
+    let chatOk = false;
     try {
         const res = await authFetch(
             `${API_CHAT_SERVER_URL}/relationships/unblock`,
@@ -578,10 +618,18 @@ export async function unblockUserViaChat(
                 signal: AbortSignal.timeout(5_000)
             },
         );
-        return res.ok;
+        chatOk = res.ok;
     } catch {
-        return false;
+        chatOk = false;
     }
+
+    let mediaOk = false;
+    const mediaRelationship = await fetchRelationshipOf(userId, targetId);
+    if (mediaRelationship?.id && String(mediaRelationship.status).toUpperCase() === "BLOCKED") {
+        mediaOk = await unblockRelationship(mediaRelationship.id);
+    }
+
+    return chatOk || mediaOk;
 }
 
 export async function rejectFriendRequest(
@@ -883,38 +931,87 @@ export async function clearViewHistory(): Promise<boolean> {
     }
 }
 
-export async function fetchBlockedUsers(userId: string): Promise<any[]> {
-    try {
-        const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/blocked/${userId}`);
-        if (!res.ok) return [];
-        const json = await res.json();
-        return unwrapList<any>(json)
-            .map((rel) => {
-                const requesterId = String(rel.requesterId || rel.requester_id || "").trim();
-                const receiverId = String(rel.receiverId || rel.receiver_id || "").trim();
-                const targetIsRequester = requesterId && requesterId !== String(userId);
-                const targetId = targetIsRequester ? requesterId : receiverId;
-                const targetName = targetIsRequester
-                    ? rel.requesterDisplayName || rel.requesterUsername
-                    : rel.receiverDisplayName || rel.receiverUsername;
-                const targetAvatar = targetIsRequester
-                    ? rel.requesterAvatarUrl
-                    : rel.receiverAvatarUrl;
-                const relationshipId = rel.id || rel._id || rel.relationshipId || rel.relationship_id;
+const normalizeBlockedRelationship = (
+    rel: any,
+    userId: string,
+    source: "media" | "chat",
+) => {
+    const requesterId = String(rel.requesterId || rel.requester_id || "").trim();
+    const receiverId = String(rel.receiverId || rel.receiver_id || "").trim();
+    const targetIsRequester = requesterId && requesterId !== String(userId);
+    const targetId = targetIsRequester ? requesterId : receiverId;
+    const targetName = targetIsRequester
+        ? rel.requesterDisplayName || rel.requesterUsername
+        : rel.receiverDisplayName || rel.receiverUsername;
+    const targetAvatar = targetIsRequester
+        ? rel.requesterAvatarUrl
+        : rel.receiverAvatarUrl;
+    const relationshipId = rel.id || rel._id || rel.relationshipId || rel.relationship_id;
 
-                return {
-                    ...rel,
-                    id: relationshipId,
-                    relationshipId,
-                    receiverId: targetId,
-                    receiverName: targetName || "Người dùng",
-                    receiverAvatar: targetAvatar || "",
-                };
-            })
-            .filter((rel) => rel.id && rel.receiverId);
-    } catch {
-        return [];
-    }
+    if (!relationshipId || !targetId) return null;
+
+    return {
+        ...rel,
+        id: String(relationshipId),
+        relationshipId: String(relationshipId),
+        receiverId: targetId,
+        receiverName: targetName || "Người dùng",
+        receiverAvatar: targetAvatar || "",
+        source,
+        mediaRelationshipId: source === "media" ? String(relationshipId) : undefined,
+        chatRelationshipId: source === "chat" ? String(relationshipId) : undefined,
+    };
+};
+
+export async function fetchBlockedUsers(userId: string): Promise<any[]> {
+    const [mediaBlocked, chatBlocked] = await Promise.all([
+        (async () => {
+            try {
+                const res = await authFetch(`${API_MEDIA_SERVER_URL}/relationships/blocked/${userId}`);
+                if (!res.ok) return [];
+                return unwrapList<any>(await res.json())
+                    .map((rel) => normalizeBlockedRelationship(rel, userId, "media"))
+                    .filter(Boolean);
+            } catch {
+                return [];
+            }
+        })(),
+        (async () => {
+            try {
+                const res = await authFetch(`${API_CHAT_SERVER_URL}/relationships/${userId}/blocked`);
+                if (!res.ok) return [];
+                return unwrapList<any>(await res.json())
+                    .map((rel) => normalizeBlockedRelationship(rel, userId, "chat"))
+                    .filter(Boolean);
+            } catch {
+                return [];
+            }
+        })(),
+    ]);
+
+    const merged = new Map<string, any>();
+    [...mediaBlocked, ...chatBlocked].forEach((item: any) => {
+        const key = String(item.receiverId || "");
+        if (!key) return;
+        const current = merged.get(key);
+        if (!current) {
+            merged.set(key, item);
+            return;
+        }
+
+        merged.set(key, {
+            ...current,
+            ...item,
+            id: current.mediaRelationshipId || item.mediaRelationshipId || current.id || item.id,
+            source: current.source === item.source ? current.source : "both",
+            mediaRelationshipId: current.mediaRelationshipId || item.mediaRelationshipId,
+            chatRelationshipId: current.chatRelationshipId || item.chatRelationshipId,
+            receiverName: current.receiverName || item.receiverName,
+            receiverAvatar: current.receiverAvatar || item.receiverAvatar,
+        });
+    });
+
+    return Array.from(merged.values());
 }
 
 export async function unblockRelationship(relationshipId: string): Promise<boolean> {

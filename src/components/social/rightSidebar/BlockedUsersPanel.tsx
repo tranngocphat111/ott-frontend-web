@@ -22,16 +22,19 @@ const stringToColor = (str: string) => {
 
 interface BlockedUser {
   id: string; // id của relationship
+  mediaRelationshipId?: string;
+  chatRelationshipId?: string;
   receiverId: string;
   receiverName: string;
   receiverAvatar: string;
+  source?: "media" | "chat" | "both";
 }
 
 interface Props {
   blockedUsers: BlockedUser[];
   loading: boolean;
   busyId: string | null;
-  onUnblock: (relationshipId: string) => void;
+  onUnblock: (user: BlockedUser) => void;
 }
 
 const BlockedUsersPanel: React.FC<Props> = ({ blockedUsers, loading, busyId, onUnblock }) => {
@@ -77,7 +80,7 @@ const BlockedUsersPanel: React.FC<Props> = ({ blockedUsers, loading, busyId, onU
               </div>
               <button
                 type="button"
-                onClick={() => onUnblock(user.id)}
+                onClick={() => onUnblock(user)}
                 disabled={busyId === user.id}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
               >

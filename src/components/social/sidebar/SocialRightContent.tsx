@@ -6,6 +6,7 @@ import {
   rejectFriendRequest,
   fetchBlockedUsers,
   unblockRelationship,
+  unblockUserViaChat,
   type FriendOption,
   type FriendRequestOption,
 } from "../../../services/social.service";
@@ -25,9 +26,12 @@ interface Props {
 interface BlockedUser {
   id: string;
   relationshipId?: string;
+  mediaRelationshipId?: string;
+  chatRelationshipId?: string;
   receiverId: string;
   receiverName: string;
   receiverAvatar: string;
+  source?: "media" | "chat" | "both";
 }
 
 const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
@@ -196,11 +200,26 @@ const SocialRightContent: React.FC<Props> = ({ currentUserId }) => {
     setBusyRequestId(null);
   };
 
-  const handleUnblock = async (relationshipId: string) => {
-    setBusyRequestId(relationshipId);
-    const ok = await unblockRelationship(relationshipId);
-    if (ok) {
-      setBlockedUsers((prev) => prev.filter((user) => user.id !== relationshipId));
+  const handleUnblock = async (blockedUser: BlockedUser) => {
+    const relationshipId =
+      blockedUser.mediaRelationshipId ||
+      blockedUser.relationshipId ||
+      blockedUser.id;
+    const targetId = blockedUser.receiverId;
+    setBusyRequestId(blockedUser.id);
+
+    const shouldTryMedia = blockedUser.source !== "chat" && Boolean(relationshipId);
+    const shouldTryChat = Boolean(currentUserId && targetId);
+
+    const [mediaOk, chatOk] = await Promise.all([
+      shouldTryMedia ? unblockRelationship(relationshipId) : Promise.resolve(false),
+      shouldTryChat ? unblockUserViaChat(currentUserId, targetId) : Promise.resolve(false),
+    ]);
+
+    if (mediaOk || chatOk) {
+      setBlockedUsers((prev) =>
+        prev.filter((user) => user.id !== blockedUser.id && user.receiverId !== targetId),
+      );
     }
     setBusyRequestId(null);
   };
