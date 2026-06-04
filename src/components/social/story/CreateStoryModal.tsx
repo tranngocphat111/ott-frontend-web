@@ -13,10 +13,17 @@ import {
   Trash2,
   Globe,
   Users,
-  Lock
+  Lock,
 } from "lucide-react";
-import { createStory, updateStory, uploadStoryMedia } from "../../../services/story.service";
-import { fetchFriends, type FriendOption } from "../../../services/social.service";
+import {
+  createStory,
+  updateStory,
+  uploadStoryMedia,
+} from "../../../services/story.service";
+import {
+  fetchFriends,
+  type FriendOption,
+} from "../../../services/social.service";
 import { CustomVisibilityPanel } from "../create-post";
 import type { StoryContentItem, StoryItem } from "../types";
 
@@ -77,14 +84,22 @@ const CreateStoryModal: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
 
   const MOBILE_TOOLS = [
-    { id: 'music', icon: Music2, label: 'Nhạc', onClick: () => { } },
+    { id: "music", icon: Music2, label: "Nhạc", onClick: () => {} },
     {
-      id: 'text', icon: Type, label: 'Văn bản', onClick: () => {
-        const text = prompt("Nhập nội dung text:");
-        if (text) handleAddItem("TEXT", text);
-      }
+      id: "text",
+      icon: Type,
+      label: "Văn bản",
+      onClick: () => {
+        setPromptText("");
+        setShowTextPrompt(true);
+      },
     },
-    { id: 'media', icon: ImageIcon, label: 'Phương tiện', onClick: () => fileInputRef.current?.click() },
+    {
+      id: "media",
+      icon: ImageIcon,
+      label: "Phương tiện",
+      onClick: () => fileInputRef.current?.click(),
+    },
   ];
 
   const [textContent, setTextContent] = useState("");
@@ -92,6 +107,8 @@ const CreateStoryModal: React.FC<Props> = ({
   const [selectedBg, setSelectedBg] = useState(0);
   const [visibility, setVisibility] = useState("FRIENDS");
   const [showVisibility, setShowVisibility] = useState(false);
+  const [showTextPrompt, setShowTextPrompt] = useState(false);
+  const [promptText, setPromptText] = useState("");
 
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
   const [uploadedImageKey, setUploadedImageKey] = useState<string>("");
@@ -117,7 +134,9 @@ const CreateStoryModal: React.FC<Props> = ({
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [friendSearch, setFriendSearch] = useState("");
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
-  const [customRuleType, setCustomRuleType] = useState<"INCLUDE" | "EXCLUDE">("INCLUDE");
+  const [customRuleType, setCustomRuleType] = useState<"INCLUDE" | "EXCLUDE">(
+    "INCLUDE",
+  );
   const [customError, setCustomError] = useState<string | null>(null);
   const [showCustomPanel, setShowCustomPanel] = useState(false);
 
@@ -147,7 +166,8 @@ const CreateStoryModal: React.FC<Props> = ({
   const canShare = useMemo(() => {
     if (submitting || !currentUserId) return false;
     if (step === "text") return textContent.trim().length > 0;
-    if (step === "image") return (items.length > 0 || Boolean(uploadedImageKey)) && !uploadingImage;
+    if (step === "image")
+      return (items.length > 0 || Boolean(uploadedImageKey)) && !uploadingImage;
     return false;
   }, [
     submitting,
@@ -194,7 +214,10 @@ const CreateStoryModal: React.FC<Props> = ({
     }
   };
 
-  const handleAddItem = (type: "TEXT" | "IMAGE" | "VIDEO", content?: string) => {
+  const handleAddItem = (
+    type: "TEXT" | "IMAGE" | "VIDEO",
+    content?: string,
+  ) => {
     const newItem: StoryContentItem = {
       id: Math.random().toString(36).substring(2, 9),
       type,
@@ -211,36 +234,50 @@ const CreateStoryModal: React.FC<Props> = ({
   };
 
   const handleItemMove = (id: string, deltaX: number, deltaY: number) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? {
-        ...item,
-        positionX: item.positionX + deltaX,
-        positionY: item.positionY + deltaY
-      } : item
-    ));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ?
+          {
+            ...item,
+            positionX: item.positionX + deltaX,
+            positionY: item.positionY + deltaY,
+          }
+        : item,
+      ),
+    );
   };
 
-  const handleItemTransform = (id: string, scaleDelta: number, rotateDelta: number) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? {
-        ...item,
-        scale: Math.max(0.2, Math.min(5, item.scale + scaleDelta)),
-        rotation: (item.rotation + rotateDelta) % 360
-      } : item
-    ));
+  const handleItemTransform = (
+    id: string,
+    scaleDelta: number,
+    rotateDelta: number,
+  ) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ?
+          {
+            ...item,
+            scale: Math.max(0.2, Math.min(5, item.scale + scaleDelta)),
+            rotation: (item.rotation + rotateDelta) % 360,
+          }
+        : item,
+      ),
+    );
   };
 
   const handleRemoveItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+    setItems((prev) => prev.filter((item) => item.id !== id));
     if (selectedItemId === id) setSelectedItemId(null);
   };
 
   const handleUpdateItemZIndex = (id: string, delta: number) => {
-    setItems(prev => {
-      const item = prev.find(it => it.id === id);
+    setItems((prev) => {
+      const item = prev.find((it) => it.id === id);
       if (!item) return prev;
       const newZIndex = Math.max(1, item.zIndex + delta);
-      return prev.map(it => it.id === id ? { ...it, zIndex: newZIndex } : it);
+      return prev.map((it) =>
+        it.id === id ? { ...it, zIndex: newZIndex } : it,
+      );
     });
   };
 
@@ -269,7 +306,7 @@ const CreateStoryModal: React.FC<Props> = ({
         zIndex: items.length + 1,
         file: file,
       };
-      setItems(prev => [...prev, newItem]);
+      setItems((prev) => [...prev, newItem]);
       setSelectedItemId(newItem.id || null);
     };
 
@@ -294,7 +331,7 @@ const CreateStoryModal: React.FC<Props> = ({
         setVideoDuration(
           Number.isFinite(video.duration) ?
             Math.round(video.duration * 1000)
-            : 15000,
+          : 15000,
         );
         finalizeItem(w, h);
       };
@@ -314,37 +351,53 @@ const CreateStoryModal: React.FC<Props> = ({
         setStep("image"); // Default to canvas view if multiple items exist
       } else if (editingStory.contentType === "TEXT") {
         setStep("image");
-        setItems([{
-          id: 'legacy-text-' + Math.random().toString(36).substring(2, 5),
-          type: 'TEXT',
-          textContent: editingStory.textContent,
-          textBackgroundColor: editingStory.textBackgroundColor,
-          positionX: 0.5,
-          positionY: 0.5,
-          scale: 1,
-          rotation: 0,
-          zIndex: 1
-        }]);
-      } else if (editingStory.contentType === "IMAGE" || editingStory.contentType === "VIDEO") {
+        setItems([
+          {
+            id: "legacy-text-" + Math.random().toString(36).substring(2, 5),
+            type: "TEXT",
+            textContent: editingStory.textContent,
+            textBackgroundColor: editingStory.textBackgroundColor,
+            positionX: 0.5,
+            positionY: 0.5,
+            scale: 1,
+            rotation: 0,
+            zIndex: 1,
+          },
+        ]);
+      } else if (
+        editingStory.contentType === "IMAGE" ||
+        editingStory.contentType === "VIDEO"
+      ) {
         setStep("image");
-        setItems([{
-          id: 'legacy-media-' + Math.random().toString(36).substring(2, 5),
-          type: editingStory.contentType,
-          url: editingStory.imageUrl || editingStory.videoUrl,
-          positionX: 0.5,
-          positionY: 0.5,
-          scale: 1,
-          rotation: 0,
-          zIndex: 1
-        }]);
-        setImagePreviewUrl(editingStory.imageUrl || editingStory.videoUrl || "");
-        setUploadedImageKey(editingStory.imageUrl || editingStory.videoUrl || "");
+        setItems([
+          {
+            id: "legacy-media-" + Math.random().toString(36).substring(2, 5),
+            type: editingStory.contentType,
+            url: editingStory.imageUrl || editingStory.videoUrl,
+            positionX: 0.5,
+            positionY: 0.5,
+            scale: 1,
+            rotation: 0,
+            zIndex: 1,
+          },
+        ]);
+        setImagePreviewUrl(
+          editingStory.imageUrl || editingStory.videoUrl || "",
+        );
+        setUploadedImageKey(
+          editingStory.imageUrl || editingStory.videoUrl || "",
+        );
         setMediaType(editingStory.contentType === "VIDEO" ? "video" : "image");
       }
       if (editingStory.visibility) {
         setVisibility(editingStory.visibility);
-        if (editingStory.visibility === "CUSTOM" && editingStory.accessControls) {
-          setSelectedFriendIds(editingStory.accessControls.map(ac => ac.accountId));
+        if (
+          editingStory.visibility === "CUSTOM" &&
+          editingStory.accessControls
+        ) {
+          setSelectedFriendIds(
+            editingStory.accessControls.map((ac) => ac.accountId),
+          );
           if (editingStory.accessControls.length > 0) {
             setCustomRuleType(editingStory.accessControls[0].ruleType);
           }
@@ -374,17 +427,26 @@ const CreateStoryModal: React.FC<Props> = ({
       // If we're in quick-text mode and items is empty, create a synthetic item
       // IMPORTANT: Only do this for NEW stories. For editing, we must have items.
       if (!editingStory && step === "text" && itemsToShare.length === 0) {
-        itemsToShare = [{
-          id: 'quick-text-' + Math.random().toString(36).substring(2, 5),
-          type: "TEXT",
-          textContent: textContent.trim() || currentUserName,
-          textBackgroundColor: TEXT_BACKGROUNDS[selectedBg].replace('bg-', '').includes('gradient') ? undefined : TEXT_BACKGROUNDS[selectedBg],
-          positionX: 0.5,
-          positionY: 0.5,
-          scale: 1,
-          rotation: 0,
-          zIndex: 1
-        }];
+        itemsToShare = [
+          {
+            id: "quick-text-" + Math.random().toString(36).substring(2, 5),
+            type: "TEXT",
+            textContent: textContent.trim() || currentUserName,
+            textBackgroundColor:
+              (
+                TEXT_BACKGROUNDS[selectedBg]
+                  .replace("bg-", "")
+                  .includes("gradient")
+              ) ?
+                undefined
+              : TEXT_BACKGROUNDS[selectedBg],
+            positionX: 0.5,
+            positionY: 0.5,
+            scale: 1,
+            rotation: 0,
+            zIndex: 1,
+          },
+        ];
       }
 
       if (itemsToShare.length === 0 && !editingStory) {
@@ -394,43 +456,78 @@ const CreateStoryModal: React.FC<Props> = ({
       }
 
       // 2. Upload all new media items
-      const processedItems = await Promise.all(itemsToShare.map(async (item) => {
-        if (item.file && (item.type === "IMAGE" || item.type === "VIDEO")) {
-          if (item.url?.startsWith("blob:")) {
-            const uploadRes = await uploadStoryMedia(item.file);
-            if (uploadRes) {
-              return { ...item, url: uploadRes.fileKey };
+      const processedItems = await Promise.all(
+        itemsToShare.map(async (item) => {
+          if (item.file && (item.type === "IMAGE" || item.type === "VIDEO")) {
+            if (item.url?.startsWith("blob:")) {
+              const uploadRes = await uploadStoryMedia(item.file);
+              if (uploadRes) {
+                return { ...item, url: uploadRes.fileKey };
+              }
             }
           }
-        }
-        return item;
-      }));
+          return item;
+        }),
+      );
 
       // 3. Map to Backend DTO
-      const finalStoryItems = processedItems.map(item => ({
-        type: item.type === "IMAGE" ? "IMAGE_ITEM" : item.type === "VIDEO" ? "VIDEO_ITEM" : "TEXT_ITEM",
-        imageItem: item.type === "IMAGE" ? { ...BASE_STORY_ITEM, url: item.url, width: item.width, height: item.height } : null,
-        videoItem: item.type === "VIDEO" ? { ...BASE_STORY_ITEM, url: item.url, width: item.width, height: item.height } : null,
-        textItem: item.type === "TEXT" ? {
-          ...BASE_STORY_ITEM,
-          content: item.textContent,
-          backgroundColor: item.textBackgroundColor
-        } : null,
+      const finalStoryItems = processedItems.map((item) => ({
+        type:
+          item.type === "IMAGE" ? "IMAGE_ITEM"
+          : item.type === "VIDEO" ? "VIDEO_ITEM"
+          : "TEXT_ITEM",
+        imageItem:
+          item.type === "IMAGE" ?
+            {
+              ...BASE_STORY_ITEM,
+              url: item.url,
+              width: item.width,
+              height: item.height,
+            }
+          : null,
+        videoItem:
+          item.type === "VIDEO" ?
+            {
+              ...BASE_STORY_ITEM,
+              url: item.url,
+              width: item.width,
+              height: item.height,
+            }
+          : null,
+        textItem:
+          item.type === "TEXT" ?
+            {
+              ...BASE_STORY_ITEM,
+              content: item.textContent,
+              backgroundColor: item.textBackgroundColor,
+            }
+          : null,
         isPrimary: item.zIndex === 1,
         zIndex: item.zIndex,
         positionX: item.positionX,
         positionY: item.positionY,
         scale: item.scale,
         rotation: item.rotation,
-        id: item.id && !item.id.startsWith('legacy-') && !item.id.startsWith('quick-') ? item.id : null,
+        id:
+          (
+            item.id &&
+            !item.id.startsWith("legacy-") &&
+            !item.id.startsWith("quick-")
+          ) ?
+            item.id
+          : null,
       }));
 
       // 4. Send to Backend
 
       let saved: any = null;
-      const accessControls = visibility === "CUSTOM" ?
-        selectedFriendIds.map(id => ({ accountId: id, ruleType: customRuleType })) :
-        undefined;
+      const accessControls =
+        visibility === "CUSTOM" ?
+          selectedFriendIds.map((id) => ({
+            accountId: id,
+            ruleType: customRuleType,
+          }))
+        : undefined;
 
       if (editingStory) {
         saved = await updateStory(
@@ -440,9 +537,11 @@ const CreateStoryModal: React.FC<Props> = ({
             visibility: visibility as any,
             accessControls,
             storyItems: finalStoryItems,
-            expireAt: editingStory.expireAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            expireAt:
+              editingStory.expireAt ||
+              new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           },
-          selectedFile ? [selectedFile] : undefined
+          selectedFile ? [selectedFile] : undefined,
         );
         if (!saved) {
           setError("Không thể cập nhật story. Vui lòng thử lại.");
@@ -473,19 +572,27 @@ const CreateStoryModal: React.FC<Props> = ({
         // Patch media URLs with local blob URLs to avoid "S3 upload lag" (broken images)
         const patchedSaved = { ...saved };
         if (patchedSaved.storyItems) {
-          patchedSaved.storyItems = patchedSaved.storyItems.map((apiItem: any, idx: number) => {
-            const localItem = items[idx];
-            if (localItem?.localUrl?.startsWith("blob:")) {
-              const patchedItem = { ...apiItem };
-              if (patchedItem.imageItem) {
-                patchedItem.imageItem = { ...patchedItem.imageItem, url: localItem.localUrl };
-              } else if (patchedItem.videoItem) {
-                patchedItem.videoItem = { ...patchedItem.videoItem, url: localItem.localUrl };
+          patchedSaved.storyItems = patchedSaved.storyItems.map(
+            (apiItem: any, idx: number) => {
+              const localItem = items[idx];
+              if (localItem?.localUrl?.startsWith("blob:")) {
+                const patchedItem = { ...apiItem };
+                if (patchedItem.imageItem) {
+                  patchedItem.imageItem = {
+                    ...patchedItem.imageItem,
+                    url: localItem.localUrl,
+                  };
+                } else if (patchedItem.videoItem) {
+                  patchedItem.videoItem = {
+                    ...patchedItem.videoItem,
+                    url: localItem.localUrl,
+                  };
+                }
+                return patchedItem;
               }
-              return patchedItem;
-            }
-            return apiItem;
-          });
+              return apiItem;
+            },
+          );
         }
         await onCreated(patchedSaved);
       }
@@ -502,9 +609,9 @@ const CreateStoryModal: React.FC<Props> = ({
     }
   };
 
-  const dragStartPos = useRef<{ x: number, y: number } | null>(null);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const phoneCanvas = (
     <div
@@ -517,10 +624,10 @@ const CreateStoryModal: React.FC<Props> = ({
         event.preventDefault();
         setIsDragActive(false);
         handlePickImage(event.dataTransfer.files?.[0]);
-      }}
-    >
+      }}>
       {items.length === 0 && step === "text" && (
-        <div className={`absolute inset-0 ${TEXT_BACKGROUNDS[selectedBg]} flex items-center justify-center p-8 transition-colors duration-500`}>
+        <div
+          className={`absolute inset-0 ${TEXT_BACKGROUNDS[selectedBg]} flex items-center justify-center p-8 transition-colors duration-500`}>
           <p className="text-white text-3xl font-black text-center break-words whitespace-pre-wrap drop-shadow-2xl">
             {textContent || "Chạm để nhập..."}
           </p>
@@ -547,13 +654,17 @@ const CreateStoryModal: React.FC<Props> = ({
       {items.map((item) => (
         <div
           key={item.id}
-          className={`absolute cursor-move select-none transition-shadow ${selectedItemId === item.id ? "ring-2 ring-blue-500 rounded-lg p-1" : ""
-            } ${isDragging && selectedItemId === item.id ? "shadow-2xl scale-[1.02] z-[100]" : ""}`}
+          className={`absolute cursor-move select-none transition-shadow ${
+            selectedItemId === item.id ?
+              "ring-2 ring-blue-500 rounded-lg p-1"
+            : ""
+          } ${isDragging && selectedItemId === item.id ? "shadow-2xl scale-[1.02] z-[100]" : ""}`}
           style={{
             left: `${item.positionX * 100}%`,
             top: `${item.positionY * 100}%`,
             transform: `translate(-50%, -50%) scale(${item.scale}) rotate(${item.rotation}deg)`,
-            zIndex: isDragging && selectedItemId === item.id ? 100 : item.zIndex,
+            zIndex:
+              isDragging && selectedItemId === item.id ? 100 : item.zIndex,
             width: item.type === "TEXT" ? "auto" : "100%",
             height: item.type === "TEXT" ? "auto" : "100%",
           }}
@@ -572,26 +683,39 @@ const CreateStoryModal: React.FC<Props> = ({
               }, 200);
             }
 
-            const canvas = (e.currentTarget as HTMLElement).closest('.story-canvas');
+            const canvas = (e.currentTarget as HTMLElement).closest(
+              ".story-canvas",
+            );
             const rect = canvas?.getBoundingClientRect();
 
             const onMouseMove = (moveEvent: MouseEvent) => {
-              if (!dragStartPos.current || !rect || rect.height === 0 || rect.width === 0) return;
+              if (
+                !dragStartPos.current ||
+                !rect ||
+                rect.height === 0 ||
+                rect.width === 0
+              )
+                return;
               hasDragged = true;
               if (clickTimer.current) {
                 clearTimeout(clickTimer.current);
                 clickTimer.current = null;
               }
               // Calculate movement relative to ACTUAL canvas size
-              const dx = (moveEvent.clientX - dragStartPos.current.x) / rect.width;
-              const dy = (moveEvent.clientY - dragStartPos.current.y) / rect.height;
+              const dx =
+                (moveEvent.clientX - dragStartPos.current.x) / rect.width;
+              const dy =
+                (moveEvent.clientY - dragStartPos.current.y) / rect.height;
               handleItemMove(id, dx, dy);
-              dragStartPos.current = { x: moveEvent.clientX, y: moveEvent.clientY };
+              dragStartPos.current = {
+                x: moveEvent.clientX,
+                y: moveEvent.clientY,
+              };
             };
 
             const onMouseUp = () => {
-              window.removeEventListener('mousemove', onMouseMove);
-              window.removeEventListener('mouseup', onMouseUp);
+              window.removeEventListener("mousemove", onMouseMove);
+              window.removeEventListener("mouseup", onMouseUp);
               dragStartPos.current = null;
               setIsDragging(false);
 
@@ -604,25 +728,36 @@ const CreateStoryModal: React.FC<Props> = ({
               }
             };
 
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('mouseup', onMouseUp);
-          }}
-        >
+            window.addEventListener("mousemove", onMouseMove);
+            window.addEventListener("mouseup", onMouseUp);
+          }}>
           {item.type === "IMAGE" && item.url && (
             <div className="w-full h-full flex items-center justify-center">
-              <img src={item.url} alt="" className="max-w-full max-h-full object-contain pointer-events-none shadow-sm" />
+              <img
+                src={item.url}
+                alt=""
+                className="max-w-full max-h-full object-contain pointer-events-none shadow-sm"
+              />
             </div>
           )}
           {item.type === "VIDEO" && item.url && (
             <div className="w-full h-full flex items-center justify-center">
-              <video src={item.url} className="max-w-full max-h-full object-contain pointer-events-none shadow-sm" autoPlay muted loop />
+              <video
+                src={item.url}
+                className="max-w-full max-h-full object-contain pointer-events-none shadow-sm"
+                autoPlay
+                muted
+                loop
+              />
             </div>
           )}
           {item.type === "TEXT" && item.textContent && (
             <div
               className="px-4 py-2 rounded-xl shadow-md"
-              style={{ backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
-            >
+              style={{
+                backgroundColor: item.textBackgroundColor || "rgba(0,0,0,0.7)",
+                backdropFilter: "blur(4px)",
+              }}>
               <p className="text-white text-lg font-bold leading-tight whitespace-pre-wrap break-words text-center">
                 {item.textContent}
               </p>
@@ -630,8 +765,12 @@ const CreateStoryModal: React.FC<Props> = ({
           )}
           {selectedItemId === item.id && (
             <div className="absolute -inset-2 border-2 border-blue-500 rounded-lg pointer-events-none">
-              <div className="absolute -top-3 -right-3 size-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg cursor-pointer pointer-events-auto"
-                onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id!); }}>
+              <div
+                className="absolute -top-3 -right-3 size-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg cursor-pointer pointer-events-auto"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveItem(item.id!);
+                }}>
                 <X className="size-3" />
               </div>
             </div>
@@ -664,8 +803,7 @@ const CreateStoryModal: React.FC<Props> = ({
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-none">
           <button
             onClick={handleClose}
-            className="size-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white pointer-events-auto border border-white/10"
-          >
+            className="size-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white pointer-events-auto border border-white/10">
             <X className="size-6" />
           </button>
           <div className="flex gap-2 pointer-events-auto">
@@ -679,15 +817,18 @@ const CreateStoryModal: React.FC<Props> = ({
         <div className="absolute bottom-0 left-0 right-0 p-6 pb-10 flex flex-col gap-6 z-30 pointer-events-none bg-gradient-to-t from-black/90 via-black/40 to-transparent">
           {/* Tool Icons Row */}
           <div className="flex items-center justify-center gap-5 pointer-events-auto">
-            {MOBILE_TOOLS.map(tool => (
-              <div key={tool.id} className="flex flex-col items-center gap-1.5 group">
+            {MOBILE_TOOLS.map((tool) => (
+              <div
+                key={tool.id}
+                className="flex flex-col items-center gap-1.5 group">
                 <button
                   onClick={tool.onClick}
-                  className="size-14 rounded-full bg-white/10 backdrop-blur-2xl border border-white/20 flex items-center justify-center text-white hover:bg-white/30 hover:scale-110 transition-all duration-300 shadow-lg"
-                >
+                  className="size-14 rounded-full bg-white/10 backdrop-blur-2xl border border-white/20 flex items-center justify-center text-white hover:bg-white/30 hover:scale-110 transition-all duration-300 shadow-lg">
                   <tool.icon className="size-6" />
                 </button>
-                <span className="text-[10px] text-white/70 font-bold uppercase tracking-wider">{tool.label}</span>
+                <span className="text-[10px] text-white/70 font-bold uppercase tracking-wider">
+                  {tool.label}
+                </span>
               </div>
             ))}
           </div>
@@ -697,78 +838,132 @@ const CreateStoryModal: React.FC<Props> = ({
             <button
               onClick={handleShare}
               disabled={!canShare || submitting}
-              className="flex-1 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-[0_8px_24px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:grayscale active:scale-95 transition-all"
-            >
+              className="flex-1 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-[0_8px_24px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:grayscale active:scale-95 transition-all">
               {submitting ? "Đang xử lý..." : "CHIA SẺ"}
             </button>
           </div>
         </div>
-
-
 
         {/* Item Edit Bottom Sheet (Mobile) */}
         {selectedItemId && showMobileEditModal && (
           <div className="absolute inset-0 z-40 pointer-events-none md:hidden">
             <div
               className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto"
-              onClick={() => { setSelectedItemId(null); setShowMobileEditModal(false); }}
+              onClick={() => {
+                setSelectedItemId(null);
+                setShowMobileEditModal(false);
+              }}
             />
             <div className="absolute bottom-0 left-0 right-0 z-50 bg-white rounded-t-[3rem] p-8 pb-12 pointer-events-auto shadow-[0_-20px_80px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom-full duration-500 ease-out">
               <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
 
               <div className="flex items-center justify-between mb-8">
-                <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Chỉnh sửa đối tượng</h3>
-                <button onClick={() => { setSelectedItemId(null); setShowMobileEditModal(false); }} className="size-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition">
+                <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">
+                  Chỉnh sửa đối tượng
+                </h3>
+                <button
+                  onClick={() => {
+                    setSelectedItemId(null);
+                    setShowMobileEditModal(false);
+                  }}
+                  className="size-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition">
                   <X className="size-4" />
                 </button>
               </div>
 
-              {items.find(it => it.id === selectedItemId) && (() => {
-                const item = items.find(it => it.id === selectedItemId)!;
-                return (
-                  <div className="space-y-8">
-                    {item.type === 'TEXT' && (
-                      <textarea
-                        value={item.textContent || ""}
-                        onChange={(e) => setItems(items.map(it => it.id === selectedItemId ? { ...it, textContent: e.target.value } : it))}
-                        className="w-full h-24 rounded-3xl bg-slate-50 border border-slate-100 p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
-                        placeholder="Nhập nội dung văn bản..."
-                      />
-                    )}
-                    <div className="space-y-6">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center text-[10px] font-black text-slate-400 tracking-widest">
-                          <span>KÍCH THƯỚC</span>
-                          <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{item.scale.toFixed(1)}x</span>
-                        </div>
-                        <input
-                          type="range" min={0.1} max={3} step={0.1} value={item.scale}
-                          onChange={(e) => handleItemTransform(selectedItemId!, Number(e.target.value) - item.scale, 0)}
-                          className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              {items.find((it) => it.id === selectedItemId) &&
+                (() => {
+                  const item = items.find((it) => it.id === selectedItemId)!;
+                  return (
+                    <div className="space-y-8">
+                      {item.type === "TEXT" && (
+                        <textarea
+                          value={item.textContent || ""}
+                          onChange={(e) =>
+                            setItems(
+                              items.map((it) =>
+                                it.id === selectedItemId ?
+                                  { ...it, textContent: e.target.value }
+                                : it,
+                              ),
+                            )
+                          }
+                          className="w-full h-24 rounded-3xl bg-slate-50 border border-slate-100 p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-inner"
+                          placeholder="Nhập nội dung văn bản..."
                         />
+                      )}
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-[10px] font-black text-slate-400 tracking-widest">
+                            <span>KÍCH THƯỚC</span>
+                            <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                              {item.scale.toFixed(1)}x
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0.1}
+                            max={3}
+                            step={0.1}
+                            value={item.scale}
+                            onChange={(e) =>
+                              handleItemTransform(
+                                selectedItemId!,
+                                Number(e.target.value) - item.scale,
+                                0,
+                              )
+                            }
+                            className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-[10px] font-black text-slate-400 tracking-widest">
+                            <span>XOAY</span>
+                            <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                              {item.rotation}°
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={360}
+                            step={5}
+                            value={item.rotation}
+                            onChange={(e) =>
+                              handleItemTransform(
+                                selectedItemId!,
+                                0,
+                                Number(e.target.value) - item.rotation,
+                              )
+                            }
+                            className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center text-[10px] font-black text-slate-400 tracking-widest">
-                          <span>XOAY</span>
-                          <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">{item.rotation}°</span>
-                        </div>
-                        <input
-                          type="range" min={0} max={360} step={5} value={item.rotation}
-                          onChange={(e) => handleItemTransform(selectedItemId!, 0, Number(e.target.value) - item.rotation)}
-                          className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                        />
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={() =>
+                            handleUpdateItemZIndex(selectedItemId!, 1)
+                          }
+                          className="flex-1 h-14 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-xs hover:bg-white hover:shadow-md transition">
+                          LÊN TRÊN
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleUpdateItemZIndex(selectedItemId!, -1)
+                          }
+                          className="flex-1 h-14 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-xs hover:bg-white hover:shadow-md transition">
+                          XUỐNG DƯỚI
+                        </button>
+                        <button
+                          onClick={() => handleRemoveItem(selectedItemId!)}
+                          className="size-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition shadow-sm">
+                          <Trash2 className="size-6" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-3 pt-2">
-                      <button onClick={() => handleUpdateItemZIndex(selectedItemId!, 1)} className="flex-1 h-14 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-xs hover:bg-white hover:shadow-md transition">LÊN TRÊN</button>
-                      <button onClick={() => handleUpdateItemZIndex(selectedItemId!, -1)} className="flex-1 h-14 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-xs hover:bg-white hover:shadow-md transition">XUỐNG DƯỚI</button>
-                      <button onClick={() => handleRemoveItem(selectedItemId!)} className="size-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition shadow-sm">
-                        <Trash2 className="size-6" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </div>
           </div>
         )}
@@ -816,7 +1011,7 @@ const CreateStoryModal: React.FC<Props> = ({
                 <div className="w-full h-px bg-white/20" />
               </button>
             </div>
-            : <div className="h-full flex flex-col items-center justify-center py-4">
+          : <div className="h-full flex flex-col items-center justify-center py-4">
               <div className="relative group/canvas scale-[0.8] sm:scale-[0.9] lg:scale-100 transition-transform origin-center">
                 {/* Visual anchor for the canvas */}
                 <div className="absolute -inset-10 bg-blue-500/5 blur-3xl rounded-full opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-1000" />
@@ -826,8 +1021,13 @@ const CreateStoryModal: React.FC<Props> = ({
                 </div>
 
                 <div className="mt-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 hidden md:block">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">Xem trước thiết kế</p>
-                  <p className="text-[10px] text-slate-300 mt-1">Kéo để di chuyển • Sử dụng bảng điều khiển bên {window.innerWidth < 768 ? 'dưới' : 'trái'}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">
+                    Xem trước thiết kế
+                  </p>
+                  <p className="text-[10px] text-slate-300 mt-1">
+                    Kéo để di chuyển • Sử dụng bảng điều khiển bên{" "}
+                    {window.innerWidth < 768 ? "dưới" : "trái"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -855,9 +1055,6 @@ const CreateStoryModal: React.FC<Props> = ({
               <h2 className="text-2xl leading-tight font-['Fraunces'] font-semibold text-slate-900">
                 {editingStory ? "Cập nhật story" : "Tạo story mới"}
               </h2>
-              <button className="size-10 rounded-full bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center transition">
-                <Settings className="size-5 text-slate-600" />
-              </button>
             </div>
 
             <div className="flex items-center gap-3 mb-6 relative z-50">
@@ -867,39 +1064,51 @@ const CreateStoryModal: React.FC<Props> = ({
                 className="size-12 rounded-2xl object-cover"
               />
               <div>
-                <div className="text-xs text-slate-500 font-medium">Đăng với tư cách</div>
+                <div className="text-xs text-slate-500 font-medium">
+                  Đăng với tư cách
+                </div>
                 <div className="text-base font-bold text-slate-900 leading-tight">
                   {currentUserName}
                 </div>
                 <div className="relative mt-1">
                   <button
                     onClick={() => setShowVisibility(!showVisibility)}
-                    className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded-md text-xs font-medium text-slate-700 transition"
-                  >
-                    {visibility === 'PUBLIC' ? <Globe className="size-3" /> : visibility === 'PRIVATE' ? <Lock className="size-3" /> : <Users className="size-3" />}
-                    <span>{visibility === 'PUBLIC' ? 'Công khai' : visibility === 'PRIVATE' ? 'Chỉ mình tôi' : visibility === 'CUSTOM' ? 'Tùy chỉnh' : 'Bạn bè'}</span>
+                    className="flex items-center gap-1 mt-0.5 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded-md text-xs font-medium text-gray-700 transition">
+                    {visibility === "PUBLIC" ?
+                      <Globe className="size-3" />
+                    : visibility === "PRIVATE" ?
+                      <Lock className="size-3" />
+                    : <Users className="size-3" />}
+                    <span>
+                      {visibility === "PUBLIC" ?
+                        "Công khai"
+                      : visibility === "PRIVATE" ?
+                        "Chỉ mình tôi"
+                      : visibility === "CUSTOM" ?
+                        "Tùy chỉnh"
+                      : "Bạn bè"}
+                    </span>
                     <ChevronDown className="size-3" />
                   </button>
                   {showVisibility && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 min-w-36 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-36 overflow-hidden">
                       {[
-                        { value: 'PUBLIC', label: 'Công khai', icon: Globe },
-                        { value: 'FRIENDS', label: 'Bạn bè', icon: Users },
-                        { value: 'PRIVATE', label: 'Chỉ mình tôi', icon: Lock },
-                        { value: 'CUSTOM', label: 'Tùy chỉnh', icon: Users }
+                        { value: "PUBLIC", label: "Công khai", icon: Globe },
+                        { value: "FRIENDS", label: "Bạn bè", icon: Users },
+                        { value: "PRIVATE", label: "Chỉ mình tôi", icon: Lock },
+                        { value: "CUSTOM", label: "Tùy chỉnh", icon: Users },
                       ].map((opt) => (
                         <button
                           key={opt.value}
                           onClick={() => {
                             setVisibility(opt.value);
                             setShowVisibility(false);
-                            if (opt.value !== 'CUSTOM') {
+                            if (opt.value !== "CUSTOM") {
                               setSelectedFriendIds([]);
                               setCustomError(null);
                             }
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 transition ${visibility === opt.value ? "text-blue-600 font-semibold" : "text-slate-700"}`}
-                        >
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition ${visibility === opt.value ? "text-primary-600 font-semibold" : "text-gray-700"}`}>
                           <opt.icon className="size-4" />
                           {opt.label}
                         </button>
@@ -923,7 +1132,9 @@ const CreateStoryModal: React.FC<Props> = ({
                   onToggleFriend={(friendId) => {
                     setCustomError(null);
                     setSelectedFriendIds((prev) =>
-                      prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
+                      prev.includes(friendId) ?
+                        prev.filter((id) => id !== friendId)
+                      : [...prev, friendId],
                     );
                   }}
                   customError={customError}
@@ -931,14 +1142,14 @@ const CreateStoryModal: React.FC<Props> = ({
               </div>
             )}
 
-
-
             {/* Content Control Section */}
             <div className="space-y-6">
               {step === "text" && items.length === 0 && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Nội dung văn bản</label>
+                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                      Nội dung văn bản
+                    </label>
                     <textarea
                       value={textContent}
                       onChange={(e) => setTextContent(e.target.value)}
@@ -949,7 +1160,9 @@ const CreateStoryModal: React.FC<Props> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Màu nền</label>
+                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                      Màu nền
+                    </label>
                     <div className="flex flex-wrap gap-2">
                       {TEXT_BACKGROUNDS.map((bg, idx) => (
                         <button
@@ -965,135 +1178,186 @@ const CreateStoryModal: React.FC<Props> = ({
 
               {step === "image" && (
                 <div className="space-y-6">
-                  {selectedItemId && items.find(it => it.id === selectedItemId) && (() => {
-                    const item = items.find(it => it.id === selectedItemId)!;
-                    return (
-                      <div className="p-4 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl space-y-4 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-top-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Chỉnh sửa {item.type === 'TEXT' ? 'Văn bản' : 'Phương tiện'}</h3>
-                          <button onClick={() => setSelectedItemId(null)} className="size-6 rounded-full bg-slate-200/50 flex items-center justify-center hover:bg-slate-200 transition">
-                            <X className="size-3 text-slate-600" />
-                          </button>
-                        </div>
-
-                        {item.type === 'TEXT' && (
-                          <div className="space-y-1.5">
-                            <textarea
-                              value={item.textContent || ""}
-                              onChange={(e) => {
-                                setItems(items.map(it => it.id === selectedItemId ? { ...it, textContent: e.target.value } : it));
-                              }}
-                              className="w-full rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none transition-all placeholder:text-slate-300"
-                              placeholder="Nhập nội dung văn bản..."
-                              rows={2}
-                            />
-                          </div>
-                        )}
-
-                        <div className="space-y-3">
+                  {selectedItemId &&
+                    items.find((it) => it.id === selectedItemId) &&
+                    (() => {
+                      const item = items.find(
+                        (it) => it.id === selectedItemId,
+                      )!;
+                      return (
+                        <div className="p-4 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl space-y-4 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-top-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">Scale & Xoay</span>
-                            <div className="flex gap-2">
-                              <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-mono">{item.scale.toFixed(1)}x</span>
-                              <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-mono">{item.rotation}°</span>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                              Chỉnh sửa{" "}
+                              {item.type === "TEXT" ? "Văn bản" : "Phương tiện"}
+                            </h3>
+                            <button
+                              onClick={() => setSelectedItemId(null)}
+                              className="size-6 rounded-full bg-slate-200/50 flex items-center justify-center hover:bg-slate-200 transition">
+                              <X className="size-3 text-slate-600" />
+                            </button>
+                          </div>
+
+                          {item.type === "TEXT" && (
+                            <div className="space-y-1.5">
+                              <textarea
+                                value={item.textContent || ""}
+                                onChange={(e) => {
+                                  setItems(
+                                    items.map((it) =>
+                                      it.id === selectedItemId ?
+                                        { ...it, textContent: e.target.value }
+                                      : it,
+                                    ),
+                                  );
+                                }}
+                                className="w-full rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none transition-all placeholder:text-slate-300"
+                                placeholder="Nhập nội dung văn bản..."
+                                rows={2}
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                Scale & Xoay
+                              </span>
+                              <div className="flex gap-2">
+                                <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-mono">
+                                  {item.scale.toFixed(1)}x
+                                </span>
+                                <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-mono">
+                                  {item.rotation}°
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <input
+                                type="range"
+                                min={0.1}
+                                max={3}
+                                step={0.1}
+                                value={item.scale}
+                                onChange={(e) =>
+                                  handleItemTransform(
+                                    selectedItemId!,
+                                    Number(e.target.value) - item.scale,
+                                    0,
+                                  )
+                                }
+                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                              />
+                              <input
+                                type="range"
+                                min={0}
+                                max={360}
+                                step={5}
+                                value={item.rotation}
+                                onChange={(e) =>
+                                  handleItemTransform(
+                                    selectedItemId!,
+                                    0,
+                                    Number(e.target.value) - item.rotation,
+                                  )
+                                }
+                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                              />
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <input
-                              type="range"
-                              min={0.1}
-                              max={3}
-                              step={0.1}
-                              value={item.scale}
-                              onChange={(e) => handleItemTransform(selectedItemId!, Number(e.target.value) - item.scale, 0)}
-                              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                            />
-                            <input
-                              type="range"
-                              min={0}
-                              max={360}
-                              step={5}
-                              value={item.rotation}
-                              onChange={(e) => handleItemTransform(selectedItemId!, 0, Number(e.target.value) - item.rotation)}
-                              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                            />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() =>
+                                handleUpdateItemZIndex(selectedItemId!, 1)
+                              }
+                              className="flex-1 h-9 rounded-xl bg-white/80 border border-slate-200 text-[10px] font-bold text-slate-700 hover:bg-white transition shadow-sm">
+                              Lên trên
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleUpdateItemZIndex(selectedItemId!, -1)
+                              }
+                              className="flex-1 h-9 rounded-xl bg-white/80 border border-slate-200 text-[10px] font-bold text-slate-700 hover:bg-white transition shadow-sm">
+                              Xuống dưới
+                            </button>
+                            <button
+                              onClick={() => handleRemoveItem(selectedItemId!)}
+                              className="size-9 rounded-xl bg-red-50/80 border border-red-100 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition shadow-sm">
+                              <Trash2 className="size-4" />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleUpdateItemZIndex(selectedItemId!, 1)}
-                            className="flex-1 h-9 rounded-xl bg-white/80 border border-slate-200 text-[10px] font-bold text-slate-700 hover:bg-white transition shadow-sm"
-                          >
-                            Lên trên
-                          </button>
-                          <button
-                            onClick={() => handleUpdateItemZIndex(selectedItemId!, -1)}
-                            className="flex-1 h-9 rounded-xl bg-white/80 border border-slate-200 text-[10px] font-bold text-slate-700 hover:bg-white transition shadow-sm"
-                          >
-                            Xuống dưới
-                          </button>
-                          <button
-                            onClick={() => handleRemoveItem(selectedItemId!)}
-                            className="size-9 rounded-xl bg-red-50/80 border border-red-100 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition shadow-sm"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
 
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       className="rounded-2xl bg-white/60 border border-slate-200/60 p-4 flex flex-col items-center gap-2 hover:border-blue-400 hover:bg-white hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group"
                       onClick={() => {
-                        const text = prompt("Nhập nội dung text:");
-                        if (text) handleAddItem("TEXT", text);
-                      }}
-                    >
+                        setPromptText("");
+                        setShowTextPrompt(true);
+                      }}>
                       <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Type className="size-5" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-600">Văn bản</span>
+                      <span className="text-[11px] font-bold text-slate-600">
+                        Văn bản
+                      </span>
                     </button>
                     <button
                       type="button"
                       className="rounded-2xl bg-white/60 border border-slate-200/60 p-4 flex flex-col items-center gap-2 hover:border-emerald-400 hover:bg-white hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 group"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                      onClick={() => fileInputRef.current?.click()}>
                       <div className="size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <ImageIcon className="size-5" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-600">Phương tiện</span>
+                      <span className="text-[11px] font-bold text-slate-600">
+                        Phương tiện
+                      </span>
                     </button>
                   </div>
 
                   {items.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Danh sách items</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        Danh sách items
+                      </p>
                       <div className="max-h-[200px] overflow-auto space-y-1 pr-1 custom-scrollbar">
                         {[...items].reverse().map((item) => (
                           <div
                             key={item.id}
                             onClick={() => setSelectedItemId(item.id!)}
-                            className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition ${selectedItemId === item.id ? "bg-blue-600 text-white shadow-md" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
-                          >
-                            <div className={`size-8 rounded-lg flex items-center justify-center ${selectedItemId === item.id ? "bg-white/20" : "bg-white border border-slate-200"}`}>
-                              {item.type === 'TEXT' ? <Type className="size-4" /> : item.type === 'VIDEO' ? <Film className="size-4" /> : <ImageIcon className="size-4" />}
+                            className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition ${selectedItemId === item.id ? "bg-blue-600 text-white shadow-md" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}>
+                            <div
+                              className={`size-8 rounded-lg flex items-center justify-center ${selectedItemId === item.id ? "bg-white/20" : "bg-white border border-slate-200"}`}>
+                              {item.type === "TEXT" ?
+                                <Type className="size-4" />
+                              : item.type === "VIDEO" ?
+                                <Film className="size-4" />
+                              : <ImageIcon className="size-4" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[11px] font-bold truncate">
-                                {item.type === 'TEXT' ? (item.textContent || "Văn bản") : item.type === 'VIDEO' ? "Video" : "Ảnh"}
+                                {item.type === "TEXT" ?
+                                  item.textContent || "Văn bản"
+                                : item.type === "VIDEO" ?
+                                  "Video"
+                                : "Ảnh"}
                               </p>
-                              <p className={`text-[9px] ${selectedItemId === item.id ? "text-white/70" : "text-slate-400"}`}>Lớp {item.zIndex}</p>
+                              <p
+                                className={`text-[9px] ${selectedItemId === item.id ? "text-white/70" : "text-slate-400"}`}>
+                                Lớp {item.zIndex}
+                              </p>
                             </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id!); }}
-                              className={`p-1 rounded-md transition ${selectedItemId === item.id ? "hover:bg-white/20 text-white" : "hover:bg-red-50 text-slate-400 hover:text-red-500"}`}
-                            >
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveItem(item.id!);
+                              }}
+                              className={`p-1 rounded-md transition ${selectedItemId === item.id ? "hover:bg-white/20 text-white" : "hover:bg-red-50 text-slate-400 hover:text-red-500"}`}>
                               <X className="size-3" />
                             </button>
                           </div>
@@ -1121,13 +1385,54 @@ const CreateStoryModal: React.FC<Props> = ({
                 onClick={handleShare}
                 disabled={!canShare}
                 className="flex-1 h-11 rounded-full bg-slate-900 disabled:bg-slate-300 text-sm font-semibold text-white disabled:text-slate-500 hover:bg-slate-800 transition">
-                {submitting ? (editingStory ? "Đang lưu..." : "Đang đăng...") : (editingStory ? "Cập nhật" : "Đăng story")}
+                {submitting ?
+                  editingStory ?
+                    "Đang lưu..."
+                  : "Đang đăng..."
+                : editingStory ?
+                  "Cập nhật"
+                : "Đăng story"}
               </button>
             </div>
           )}
         </aside>
-
       </div>
+
+      {/* Custom Text Input Overlay */}
+      {showTextPrompt && (
+        <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200 border border-white/20">
+            <h3 className="text-xl font-bold text-slate-900 mb-5 text-center">
+              Thêm văn bản
+            </h3>
+            <textarea
+              autoFocus
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              className="w-full rounded-2xl border-2 border-blue-100 bg-blue-50/50 px-4 py-4 text-[15px] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 resize-none shadow-inner"
+              placeholder="Nhập nội dung văn bản của bạn..."
+              rows={4}
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowTextPrompt(false)}
+                className="flex-1 h-12 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 hover:text-slate-900 transition">
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  if (promptText.trim()) {
+                    handleAddItem("TEXT", promptText.trim());
+                  }
+                  setShowTextPrompt(false);
+                }}
+                className="flex-1 h-12 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-700 hover:shadow-blue-500/50 transition active:scale-95">
+                Thêm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
