@@ -6,19 +6,19 @@
   "rewrites": [
     {
       "source": "/riff/api/:path*",
-      "destination": "http://13.215.227.27/riff/api/:path*"
+      "destination": "http://139.59.112.104:8080/riff/api/:path*"
     },
     {
       "source": "/socket.io",
-      "destination": "http://13.215.227.27/socket.io"
+      "destination": "http://139.59.112.104:8080/socket.io"
     },
     {
       "source": "/socket.io/",
-      "destination": "http://13.215.227.27/socket.io/"
+      "destination": "http://139.59.112.104:8080/socket.io/"
     },
     {
       "source": "/socket.io/:path*",
-      "destination": "http://13.215.227.27/socket.io/:path*"
+      "destination": "http://139.59.112.104:8080/socket.io/:path*"
     },
     {
       "source": "/(.*)",
