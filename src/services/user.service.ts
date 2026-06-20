@@ -113,7 +113,7 @@ export class UserService {
       }
 
       const data = await response.json();
-      
+
       // media-service returns an array directly, but just in case it's wrapped
       const usersList = Array.isArray(data) ? data : data.content || data.result || [];
       return usersList.map((user: any) => ({
@@ -135,4 +135,4 @@ export class UserService {
       return [];
     }
   }
-}
+}

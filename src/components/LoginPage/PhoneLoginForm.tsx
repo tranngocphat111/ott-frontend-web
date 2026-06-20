@@ -147,6 +147,31 @@ export const PhoneLoginForm: React.FC<Props> = ({ onSuccess }) => {
       </div>
 
       <SubmitBtn loading={loading} label="Đăng nhập" loadingLabel="Đang đăng nhập..." />
+
+      {/* Demo Accounts Helper */}
+      <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255, 255, 255, 0.5)', border: '1px dashed var(--color-primary-300)', textAlign: 'center' }}>
+        <p style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--color-primary-700)', marginBottom: 4 }}>
+          Tài khoản Demo (Click để tự điền):
+        </p>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {['0898000020', '0898000021', '0898000022'].map(acc => (
+            <button
+              key={acc}
+              type="button"
+              onClick={() => { setIdentifier(acc); setPassword('Test1234'); }}
+              className="transition-fast"
+              style={{
+                fontSize: '0.68rem', padding: '3px 8px', borderRadius: 5,
+                background: 'var(--color-primary-100)', color: 'var(--color-primary-800)',
+                border: '1px solid var(--color-primary-200)', cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              {acc}
+            </button>
+          ))}
+        </div>
+      </div>
     </form>
   );
 };
